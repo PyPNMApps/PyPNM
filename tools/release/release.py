@@ -584,6 +584,7 @@ def _run_repo_hygiene_checks() -> None:
     """Run pre-release hygiene checks (secrets, MAC address scans, etc.)."""
     checks: list[tuple[str, list[str]]] = [
         ("Secret scan", ["./tools/security/scan-secrets.sh"]),
+        ("Encrypted secret scan", [sys.executable, "./tools/security/scan-enc-secrets.py"]),
         ("MAC scan", ["./tools/security/scan-mac-addresses.py", "--fail-on-found"]),
     ]
     print("Running repository hygiene checks...")

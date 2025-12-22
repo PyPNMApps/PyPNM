@@ -16,6 +16,15 @@ ENC_PATTERN: Final[re.Pattern[str]] = re.compile(
     r'password_enc\s*[:=]\s*["\']ENC\[v1\]:[^"\']+["\']',
     re.IGNORECASE,
 )
+ENC_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r'["\']?password_enc["\']?\s*[:=]',
+    re.IGNORECASE,
+)
+ENC_VALUE_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r'ENC\[v1\]:',
+    re.IGNORECASE,
+)
+ENC_CONTEXT_LINES: Final[int] = 3
 
 SCAN_EXTENSIONS: Final[set[str]] = {
     ".json",
@@ -103,6 +112,28 @@ def _scan_file(path: Path) -> list[dict[str, str]]:
                 "match": snippet,
             }
         )
+    if matches:
+        return matches
+
+    lines = content.splitlines()
+    key_lines = [idx for idx, line in enumerate(lines) if ENC_KEY_PATTERN.search(line)]
+    value_lines = [idx for idx, line in enumerate(lines) if ENC_VALUE_PATTERN.search(line)]
+    if not key_lines or not value_lines:
+        return matches
+
+    for key_idx in key_lines:
+        for value_idx in value_lines:
+            if abs(key_idx - value_idx) <= ENC_CONTEXT_LINES:
+                snippet_lines = lines[min(key_idx, value_idx) : max(key_idx, value_idx) + 1]
+                snippet = " | ".join(line.strip() for line in snippet_lines if line.strip())
+                matches.append(
+                    {
+                        "path": str(path),
+                        "line": str(key_idx + 1),
+                        "match": snippet,
+                    }
+                )
+                break
     return matches
 
 
