@@ -3,14 +3,14 @@
 Copy-paste flow using the current release tag:
 
 ```bash
-TAG="v1.0.5.0"
+TAG="v1.0.0.0"
 tools/k8s/pypnm_k8s_toolkit.sh --create --image-source ghcr --tag ${TAG} --replicas 1
 ```
 
 To target a specific namespace (useful for one PyPNM per CMTS):
 
 ```bash
-TAG="v1.0.5.0"
+TAG="v1.0.0.0"
 NAMESPACE="pypnm-cmts-a"
 tools/k8s/pypnm_k8s_toolkit.sh --create --image-source ghcr --tag ${TAG} --replicas 1 --namespace ${NAMESPACE}
 ```
