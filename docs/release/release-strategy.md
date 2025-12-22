@@ -129,6 +129,10 @@ Examples:
 
 All four segments must be numeric. Both `src/pypnm/version.py` and `pyproject.toml` must carry the same four-part string after a release.
 
+### Release candidate tags
+
+For major, minor, and maintenance bumps, the release script will ask whether you want a release candidate tag. If you opt in, it adds a `-rcX` suffix to the git tag (for example `v0.3.0.0-rc1`). The version files remain numeric (`0.3.0.0`); only the git tag (and README/docs TAG placeholders) carry the RC suffix. Build bumps do not prompt for RC tags.
+
 ## 4. Release Script Overview (`tools/release/release.py`)
 
 The `tools/release/release.py` script is the primary entry point for performing a release. It is responsible for:
@@ -161,7 +165,7 @@ When you run `tools/release/release.py` (and confirm the prompt when applicable)
 9. Optionally run local Docker build + health preflight (`tools/local/local_container_build.sh --smoke`; skip with `--skip-docker-test`).  
 10. Build docs with `mkdocs --strict`.  
 11. Commit the version bump.  
-12. Create an annotated git tag.  
+12. Create an annotated git tag (optionally with `-rcX` for major/minor/maintenance).  
 13. Push the branch and tag to `origin` (skipped when running `--test-release`).
 
 If any step fails (for example, tests fail or versions do not match), the script prints an error and exits without completing the release.
@@ -215,6 +219,7 @@ Behavior:
 * Runs the release flow after you confirm.
 
 Use this when you want to clearly indicate the type of release (major, minor, maintenance, build) without manually typing the version string.
+For major, minor, and maintenance bumps, you will also be prompted to add an optional `-rcX` suffix to the tag. Build bumps do not prompt for RC tags.
 
 ### 5.3 Explicit Version (`--version`)
 
@@ -289,6 +294,11 @@ The tag name is always built as `<tag-prefix><version>`, for example:
 
 * `v0.2.2.0`  
 * `pypnm-0.3.0.0`
+
+If you select a release candidate for a major, minor, or maintenance bump, the tag name becomes `<tag-prefix><version>-rcX`, for example:
+
+* `v0.3.0.0-rc1`  
+* `pypnm-1.0.0.0-rc2`
 
 ### 5.7 Test-Only Release (`--test-release`)
 

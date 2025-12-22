@@ -22,7 +22,7 @@ BUMP_SCRIPT_PATH: Final[Path]            = Path("tools/support") / "bump_version
 PYPROJECT_FILE_PATH: Final[Path]         = Path("pyproject.toml")
 README_FILE_PATH: Final[Path]            = Path("README.md")
 DOCS_ROOT: Final[Path]                   = Path("docs")
-README_TAG_PATTERN: Final[re.Pattern[str]] = re.compile(r'TAG="v\d+\.\d+\.\d+\.\d+"')
+README_TAG_PATTERN: Final[re.Pattern[str]] = re.compile(r'TAG="v\d+\.\d+\.\d+\.\d+(?:-rc\d+)?"')
 
 VERSION_PART_SEPARATOR: Final[str]       = "."
 EXPECTED_VERSION_PARTS: Final[int]       = 4
@@ -31,6 +31,8 @@ MAJOR_INDEX: Final[int]                  = 0
 MINOR_INDEX: Final[int]                  = 1
 MAINTENANCE_INDEX: Final[int]            = 2
 BUILD_INDEX: Final[int]                  = 3
+RC_SUFFIX_PREFIX: Final[str]             = "-rc"
+RC_DEFAULT_NUMBER: Final[int]            = 1
 
 REPORT_DIR_NAME: Final[str]              = "release-reports"
 REPORT_FILE_PREFIX: Final[str]           = "release-report"
@@ -54,6 +56,47 @@ K8S_PREFIX: Final[str]                   = "docs/kubernetes/"
 
 SUMMARY: dict[str, str] = {}
 RELEASE_LOG_DIR: Path | None = None
+
+
+def _parse_version_parts(version: str) -> list[int]:
+    _validate_version_string(version)
+    return [int(part) for part in version.split(VERSION_PART_SEPARATOR)]
+
+
+def _determine_bump_kind(current_version: str, new_version: str) -> str:
+    current_parts = _parse_version_parts(current_version)
+    new_parts = _parse_version_parts(new_version)
+    if new_parts[MAJOR_INDEX] != current_parts[MAJOR_INDEX]:
+        return "major"
+    if new_parts[MINOR_INDEX] != current_parts[MINOR_INDEX]:
+        return "minor"
+    if new_parts[MAINTENANCE_INDEX] != current_parts[MAINTENANCE_INDEX]:
+        return "maintenance"
+    if new_parts[BUILD_INDEX] != current_parts[BUILD_INDEX]:
+        return "build"
+    return "none"
+
+
+def _prompt_release_candidate(bump_kind: str) -> str:
+    prompt = f"Release candidate for {bump_kind} bump? [y/N]: "
+    answer = input(prompt).strip().lower()
+    if answer not in ("y", "yes"):
+        return ""
+
+    rc_input = input(f"RC number (default {RC_DEFAULT_NUMBER}): ").strip()
+    if not rc_input:
+        rc_number = RC_DEFAULT_NUMBER
+    elif rc_input.isdigit():
+        rc_number = int(rc_input)
+    else:
+        print("ERROR: RC number must be a positive integer.", file=sys.stderr)
+        sys.exit(1)
+
+    if rc_number < RC_DEFAULT_NUMBER:
+        print("ERROR: RC number must be at least 1.", file=sys.stderr)
+        sys.exit(1)
+
+    return f"{RC_SUFFIX_PREFIX}{rc_number}"
 
 
 def _print_banner() -> None:
@@ -647,9 +690,9 @@ def _commit_version_bump(new_version: str) -> None:
     _run(["git", "commit", "-m", f"Release {new_version}"], label="git-commit")
 
 
-def _create_tag(new_version: str, tag_prefix: str) -> str:
+def _create_tag(new_version: str, tag_prefix: str, tag_suffix: str = "") -> str:
     """Create an annotated git tag for the release."""
-    tag_name = f"{tag_prefix}{new_version}"
+    tag_name = f"{tag_prefix}{new_version}{tag_suffix}"
     _run(["git", "tag", "-a", tag_name, "-m", f"Release {new_version}"], label="git-tag")
     return tag_name
 
@@ -854,12 +897,16 @@ def main() -> None:
         print(f"No change: version is already {current_version}.")
         sys.exit(0)
 
+    bump_kind = _determine_bump_kind(current_version, new_version)
+    rc_suffix = ""
+    release_tag = f"{tag_prefix}{new_version}"
+
     if dry_run:
         print("Dry run: the following actions would be performed:")
         print("  1) Ensure git working tree is clean")
         print(f"  2) Checkout branch '{branch}' and pull with --ff-only")
         print(f"  3) Update version {current_version} -> {new_version} via tools/bump_version.py")
-        print(f"  4) Update README/docs TAG placeholders to {tag_prefix}{new_version}")
+        print(f"  4) Update README/docs TAG placeholders to {release_tag}")
         print("  5) Run repository hygiene checks (secrets/macs)")
         if not skip_tests:
             print("  6) Run pytest")
@@ -873,8 +920,10 @@ def main() -> None:
             print(f" 11) Restore version files back to {current_version}")
         else:
             print(f" 10) Commit version bump: 'Release {new_version}'")
-            print(f" 11) Create annotated tag '{tag_prefix}{new_version}'")
+            print(f" 11) Create annotated tag '{release_tag}'")
             print(f" 12) Push branch '{branch}' and tag to origin")
+        if bump_kind in ("major", "minor", "maintenance"):
+            print("Note: you will be prompted to add a -rcX suffix for a release candidate.")
         sys.exit(0)
 
     _ensure_virtualenv()
@@ -886,6 +935,10 @@ def main() -> None:
         if answer not in ("y", "yes"):
             print("Aborted: release was not confirmed.")
             sys.exit(1)
+
+    if bump_kind in ("major", "minor", "maintenance"):
+        rc_suffix = _prompt_release_candidate(bump_kind)
+        release_tag = f"{tag_prefix}{new_version}{rc_suffix}"
 
     _init_release_logging()
     if not skip_docker or not skip_k8s:
@@ -899,7 +952,7 @@ def main() -> None:
 
     print(f"Bumping version: {current_version} -> {new_version}")
     _bump_version(new_version)
-    _update_readme_tag(f"{tag_prefix}{new_version}")
+    _update_readme_tag(release_tag)
 
     _run_repo_hygiene_checks()
 
@@ -961,7 +1014,7 @@ def main() -> None:
         return
 
     _commit_version_bump(new_version)
-    tag_name = _create_tag(new_version, tag_prefix)
+    tag_name = _create_tag(new_version, tag_prefix, rc_suffix)
     _push_branch_and_tag(branch, tag_name)
 
     _print_status("Release report", "pass")
