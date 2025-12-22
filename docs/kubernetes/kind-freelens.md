@@ -23,7 +23,7 @@ bash /tmp/pypnm_kind_vm_bootstrap.sh
 Pick a release tag, then deploy into a namespace (one namespace per CMTS). This script pulls manifests from GitHub, so no repo clone is required:
 
 ```bash
-TAG="v1.0.5.0-rc1"
+TAG="v1.0.6.0"
 NAMESPACE="pypnm-cmts-a"
 
 curl -fsSL https://raw.githubusercontent.com/PyPNMApps/PyPNM/main/tools/k8s/pypnm_k8s_remote_deploy.sh \
@@ -111,7 +111,7 @@ Tip: keep one FreeLens workspace per CMTS namespace so it is easy to keep sessio
 Deploy a PyPNM instance per CMTS by assigning a unique namespace and configuration per CMTS:
 
 ```bash
-TAG="v1.0.5.0-rc1"
+TAG="v1.0.6.0"
 
 for CMTS in cmts-a cmts-b cmts-c; do
   NAMESPACE="pypnm-${CMTS}"
