@@ -40,6 +40,8 @@ REPORT_SECTIONS: Final[list[str]]        = [
     "K8s",
     "FastAPI",
     "REST",
+    "DOCSIS",
+    "PNM",
     "PNM-Python",
     "Tools",
     "Install",
@@ -177,9 +179,51 @@ def _get_head_commit() -> str:
     return result.stdout.strip()
 
 
+def _get_previous_commit() -> str | None:
+    result = _run(["git", "rev-parse", "HEAD~1"], check=False, label="git-rev-parse-prev")
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def _get_current_branch() -> str:
+    result = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], label="git-branch")
+    return result.stdout.strip()
+
+
+def _get_upstream_ref() -> str | None:
+    result = _run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        check=False,
+        label="git-upstream",
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def _list_pending_commits(upstream: str) -> list[str]:
+    result = _run(["git", "rev-list", "--reverse", f"{upstream}..HEAD"], label="git-rev-list")
+    commits = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    return commits
+
+
 def _collect_commit_files(commit: str) -> list[str]:
     result = _run(["git", "show", "--pretty=format:", "--name-only", commit], label="git-show")
     paths = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    return paths
+
+
+def _collect_range_files(range_spec: str) -> list[str]:
+    result = _run(["git", "log", "--pretty=format:", "--name-only", range_spec], label="git-log-range")
+    seen: set[str] = set()
+    paths: list[str] = []
+    for line in (result.stdout or "").splitlines():
+        path = line.strip()
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        paths.append(path)
     return paths
 
 
@@ -193,9 +237,15 @@ def _classify_path(path: str) -> str:
         return "Docs"
     if "fastapi" in normalized:
         return "FastAPI"
+    if normalized.startswith("src/pypnm/api/routes/"):
+        return "REST"
     if "/rest" in normalized or "rest_" in normalized or "rest-" in normalized:
         return "REST"
     if normalized.startswith("src/pypnm/") or normalized == "pyproject.toml":
+        if normalized.startswith("src/pypnm/docsis/"):
+            return "DOCSIS"
+        if normalized.startswith("src/pypnm/pnm/"):
+            return "PNM"
         return "PNM-Python"
     if normalized.startswith("tools/"):
         return "Tools"
@@ -258,7 +308,8 @@ def _write_release_report(
     version: str,
     tag_name: str,
     branch: str,
-    test_release: bool,
+    report_mode: str,
+    extra_sections: list[str] | None = None,
 ) -> Path:
     report_dir = Path(REPORT_DIR_NAME)
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -266,27 +317,28 @@ def _write_release_report(
     report_path = report_dir / f"{REPORT_FILE_PREFIX}-{version}-{timestamp}.md"
     files = _collect_commit_files(commit)
     counts = _summarize_sections(files)
-    mode = "test-release" if test_release else "release"
+    mode = report_mode
 
-    report_path.write_text(
-        "\n".join(
-            [
-                f"# PyPNM {mode} report",
-                "",
-                f"- Generated: {datetime.now().isoformat(timespec='seconds')}",
-                f"- Branch: {branch}",
-                f"- Source commit: `{commit}`",
-                f"- Release version: `{version}`",
-                f"- Release tag: `{tag_name}`",
-                "",
-                "## Change summary (last commit)",
-                "",
-                _render_markdown_table(counts),
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    lines = [
+        f"# PyPNM {mode} report",
+        "",
+        f"- Generated: {datetime.now().isoformat(timespec='seconds')}",
+        f"- Branch: {branch}",
+        f"- Source commit: `{commit}`",
+        f"- Release version: `{version}`",
+        f"- Release tag: `{tag_name}`",
+        "",
+        "## Change summary (commit)",
+        "",
+        _render_markdown_table(counts),
+        "",
+    ]
+    if extra_sections:
+        lines.extend(extra_sections)
+        if lines[-1] != "":
+            lines.append("")
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
 
 
@@ -640,6 +692,16 @@ def main() -> None:
         action="store_true",
         help="Show planned actions without modifying anything.",
     )
+    parser.add_argument(
+        "--last-commit-report",
+        action="store_true",
+        help="Generate a report for the previous commit only (no release actions).",
+    )
+    parser.add_argument(
+        "--latest-commit-report",
+        action="store_true",
+        help="Generate a report for the current commit only (no release actions).",
+    )
 
     args = parser.parse_args()
     explicit_version: str | None = args.version
@@ -651,6 +713,79 @@ def main() -> None:
     skip_k8s: bool               = args.skip_k8s_test
     dry_run: bool                = args.dry_run
     test_release: bool           = args.test_release
+    last_commit_report: bool     = args.last_commit_report
+    latest_commit_report: bool   = args.latest_commit_report
+
+    if last_commit_report and latest_commit_report:
+        print("ERROR: --last-commit-report and --latest-commit-report cannot be used together.", file=sys.stderr)
+        sys.exit(1)
+
+    if last_commit_report or latest_commit_report:
+        if explicit_version or next_mode or skip_tests or skip_docker or skip_k8s or dry_run or test_release:
+            print("ERROR: Commit report modes cannot be combined with release options.", file=sys.stderr)
+            sys.exit(1)
+
+        current_branch = _get_current_branch()
+        if branch != current_branch:
+            print(
+                f"ERROR: Commit report runs on the current branch ({current_branch}). "
+                f"Checkout '{branch}' first or omit --branch.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        target_commit = _get_previous_commit() if last_commit_report else _get_head_commit()
+        if not target_commit:
+            print("ERROR: Unable to resolve the requested commit for reporting.", file=sys.stderr)
+            sys.exit(1)
+
+        report_version = _read_current_version()
+        report_mode = "last-commit" if last_commit_report else "latest-commit"
+        report_tag = "n/a"
+
+        pending_counts = None
+        pending_count = 0
+        pending_upstream = _get_upstream_ref()
+        if pending_upstream:
+            pending_commits = _list_pending_commits(pending_upstream)
+            pending_count = len(pending_commits)
+            if pending_count > 1:
+                pending_files = _collect_range_files(f"{pending_upstream}..HEAD")
+                pending_counts = _summarize_sections(pending_files)
+
+        extra_sections: list[str] = []
+        if pending_counts:
+            extra_sections.extend(
+                [
+                    "## Change summary (pending commits ahead of upstream)",
+                    "",
+                    _render_markdown_table(pending_counts),
+                    "",
+                    f"- Pending commits: {pending_count}",
+                    f"- Upstream: `{pending_upstream}`",
+                    "",
+                ]
+            )
+
+        report_path = _write_release_report(
+            target_commit,
+            report_version,
+            report_tag,
+            current_branch,
+            report_mode,
+            extra_sections=extra_sections or None,
+        )
+
+        counts = _summarize_sections(_collect_commit_files(target_commit))
+        print("\nCommit change summary:")
+        print(_render_table(counts))
+        if pending_counts:
+            print("\nPending commits summary (ahead of upstream):")
+            print(_render_table(pending_counts))
+            print(f"Pending commits: {pending_count}")
+            print(f"Upstream: {pending_upstream}")
+        print(f"Commit report saved to {report_path}")
+        return
 
     current_version   = _read_current_version()
     pyproject_version = _read_pyproject_version()
@@ -789,7 +924,8 @@ def main() -> None:
     tag_name = _create_tag(new_version, tag_prefix)
     _push_branch_and_tag(branch, tag_name)
 
-    report_path = _write_release_report(report_commit, new_version, tag_name, branch, test_release)
+    report_mode = "test-release" if test_release else "release"
+    report_path = _write_release_report(report_commit, new_version, tag_name, branch, report_mode)
     counts = _summarize_sections(_collect_commit_files(report_commit))
     print("\nRelease change summary (last commit):")
     print(_render_table(counts))

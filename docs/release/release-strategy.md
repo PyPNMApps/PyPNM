@@ -305,6 +305,24 @@ Behavior:
 * Skips commit, tag, and push steps.
 * Restores version files and TAG placeholders back to the original version.
 
+### 5.8 Commit Report Only
+
+Use these when you only want a change summary report without running the release flow:
+
+```bash
+# Report the previous commit
+tools/release/release.py --last-commit-report
+
+# Report the current commit
+tools/release/release.py --latest-commit-report
+```
+
+Behavior:
+
+* Writes a markdown report under `release-reports/`.
+* Prints the section summary table in the CLI.
+* If multiple commits are ahead of the upstream branch, includes an additional summary for the pending range.
+
 ## 6. Standard Release Flow On `main`
 
 Below is an example of a typical release workflow using automatic maintenance bumping on `main`:
