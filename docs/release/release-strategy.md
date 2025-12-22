@@ -118,6 +118,8 @@ Guidelines:
 * `BUILD`  
   Increment for very small hotfixes or internal rebuilds that do not change public behavior but still need a distinct version.
 
+Note: any version with a non-zero `BUILD` segment is considered a hot-fix release (typically cut from the `hot-fix` branch). These releases are not treated as clean GA releases and are not guaranteed to pass the full test matrix.
+
 Examples:
 
 * `0.2.1.0` - Minor feature set with maintenance updates.  
@@ -137,6 +139,7 @@ The `tools/release/release.py` script is the primary entry point for performing 
 * Creating a release commit.  
 * Tagging the release.  
 * Pushing branch and tags to `origin`.
+* Writing a markdown release report under `release-reports/` with a summary table of the last commit.
 
 You typically run this script directly; it internally handles all version file changes.
 
@@ -276,6 +279,11 @@ tools/release/release.py --branch stable --next minor
 # Use a custom tag prefix, for example pypnm-0.3.0.0
 tools/release/release.py --version 0.3.0.0 --tag-prefix pypnm-
 ```
+
+If you use the optional aliases from `scripts/install_aliases.sh`, the defaults are:
+
+* `pypnm-release` runs on `main` with the default maintenance bump.  
+* `pypnm-release-hot-fix` runs on `hot-fix` and bumps the build segment.  
 
 The tag name is always built as `<tag-prefix><version>`, for example:
 

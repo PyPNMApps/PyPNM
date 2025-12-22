@@ -63,7 +63,7 @@ append_alias() {
 
 append_alias "alias config-menu='cd \"${PROJECT_ROOT}\" && python tools/system_config/menu.py'"
 append_alias "alias pypnm-release='cd \"${PROJECT_ROOT}\" && python tools/release/release.py'"
-append_alias "alias pypnm-release-hot-fix='cd \"${PROJECT_ROOT}\" && python tools/release/release.py --branch hot-fix'"
+append_alias "alias pypnm-release-hot-fix='cd \"${PROJECT_ROOT}\" && python tools/release/release.py --branch hot-fix --next build'"
 append_alias "alias pypnm-clean='cd \"${PROJECT_ROOT}\" && ./tools/maintenance/clean.sh'"
 append_alias "alias pypnm-support-bundle='cd \"${PROJECT_ROOT}\" && python tools/build/support_bundle_builder.py'"
 append_alias "alias pypnm-mac-update='cd \"${PROJECT_ROOT}\" && python tools/pnm/pnm-mac-updater.py'"

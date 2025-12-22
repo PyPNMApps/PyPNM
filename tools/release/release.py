@@ -32,6 +32,23 @@ MINOR_INDEX: Final[int]                  = 1
 MAINTENANCE_INDEX: Final[int]            = 2
 BUILD_INDEX: Final[int]                  = 3
 
+REPORT_DIR_NAME: Final[str]              = "release-reports"
+REPORT_FILE_PREFIX: Final[str]           = "release-report"
+REPORT_SECTIONS: Final[list[str]]        = [
+    "Docs",
+    "Docker",
+    "K8s",
+    "FastAPI",
+    "REST",
+    "PNM-Python",
+    "Tools",
+    "Install",
+]
+REPORT_HEADERS: Final[list[str]]         = ["Section", "Files Changed"]
+INSTALL_PREFIXES: Final[list[str]]       = ["install.sh", "scripts/install", "deploy/"]
+DOCKER_PREFIXES: Final[list[str]]        = ["docker/", "docker-compose", "docs/docker/"]
+K8S_PREFIX: Final[str]                   = "docs/kubernetes/"
+
 
 SUMMARY: dict[str, str] = {}
 RELEASE_LOG_DIR: Path | None = None
@@ -153,6 +170,124 @@ def _ensure_clean_worktree() -> None:
     if output:
         print("ERROR: Working tree is not clean. Commit or stash changes first.", file=sys.stderr)
         sys.exit(1)
+
+
+def _get_head_commit() -> str:
+    result = _run(["git", "rev-parse", "HEAD"], label="git-rev-parse")
+    return result.stdout.strip()
+
+
+def _collect_commit_files(commit: str) -> list[str]:
+    result = _run(["git", "show", "--pretty=format:", "--name-only", commit], label="git-show")
+    paths = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    return paths
+
+
+def _classify_path(path: str) -> str:
+    normalized = path.replace("\\", "/").lower()
+    if normalized.startswith(K8S_PREFIX):
+        return "K8s"
+    if any(normalized.startswith(prefix) for prefix in DOCKER_PREFIXES):
+        return "Docker"
+    if normalized.startswith("docs/") or normalized == "readme.md":
+        return "Docs"
+    if "fastapi" in normalized:
+        return "FastAPI"
+    if "/rest" in normalized or "rest_" in normalized or "rest-" in normalized:
+        return "REST"
+    if normalized.startswith("src/pypnm/") or normalized == "pyproject.toml":
+        return "PNM-Python"
+    if normalized.startswith("tools/"):
+        return "Tools"
+    if any(normalized.startswith(prefix) for prefix in INSTALL_PREFIXES):
+        return "Install"
+    return "Other"
+
+
+def _summarize_sections(paths: list[str]) -> dict[str, int]:
+    counts = {section: 0 for section in REPORT_SECTIONS}
+    counts["Other"] = 0
+    for path in paths:
+        section = _classify_path(path)
+        if section in counts:
+            counts[section] += 1
+        else:
+            counts["Other"] += 1
+    return counts
+
+
+def _render_table(counts: dict[str, int]) -> str:
+    rows = [(section, str(counts.get(section, 0))) for section in REPORT_SECTIONS]
+    if counts.get("Other", 0) > 0:
+        rows.append(("Other", str(counts["Other"])))
+
+    header_section, header_count = REPORT_HEADERS
+    section_width = max(len(header_section), max(len(row[0]) for row in rows))
+    count_width = max(len(header_count), max(len(row[1]) for row in rows))
+
+    def line() -> str:
+        return f"+{'-' * (section_width + 2)}+{'-' * (count_width + 2)}+"
+
+    lines = [
+        line(),
+        f"| {header_section.ljust(section_width)} | {header_count.ljust(count_width)} |",
+        line(),
+    ]
+    for section, count in rows:
+        lines.append(f"| {section.ljust(section_width)} | {count.ljust(count_width)} |")
+    lines.append(line())
+    return "\n".join(lines)
+
+
+def _render_markdown_table(counts: dict[str, int]) -> str:
+    rows = [(section, str(counts.get(section, 0))) for section in REPORT_SECTIONS]
+    if counts.get("Other", 0) > 0:
+        rows.append(("Other", str(counts["Other"])))
+
+    lines = [
+        f"| {REPORT_HEADERS[0]} | {REPORT_HEADERS[1]} |",
+        "| --- | --- |",
+    ]
+    for section, count in rows:
+        lines.append(f"| {section} | {count} |")
+    return "\n".join(lines)
+
+
+def _write_release_report(
+    commit: str,
+    version: str,
+    tag_name: str,
+    branch: str,
+    test_release: bool,
+) -> Path:
+    report_dir = Path(REPORT_DIR_NAME)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    report_path = report_dir / f"{REPORT_FILE_PREFIX}-{version}-{timestamp}.md"
+    files = _collect_commit_files(commit)
+    counts = _summarize_sections(files)
+    mode = "test-release" if test_release else "release"
+
+    report_path.write_text(
+        "\n".join(
+            [
+                f"# PyPNM {mode} report",
+                "",
+                f"- Generated: {datetime.now().isoformat(timespec='seconds')}",
+                f"- Branch: {branch}",
+                f"- Source commit: `{commit}`",
+                f"- Release version: `{version}`",
+                f"- Release tag: `{tag_name}`",
+                "",
+                "## Change summary (last commit)",
+                "",
+                _render_markdown_table(counts),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return report_path
 
 
 def _ensure_virtualenv() -> None:
@@ -438,7 +573,7 @@ def main() -> None:
 
     Typical flows
     -------------
-    1) Let the script compute the next build version:
+    1) Let the script compute the next maintenance version:
        tools/release/release.py
 
     2) Let the script compute the next version by mode:
@@ -451,7 +586,7 @@ def main() -> None:
        tools/release/release.py --version 0.2.1.0
 
     4) Show what would happen without changing anything:
-       tools/release/release.py --next build --dry-run
+       tools/release/release.py --next maintenance --dry-run
        tools/release/release.py --dry-run
     """
     _print_banner()
@@ -468,7 +603,7 @@ def main() -> None:
     parser.add_argument(
         "--next",
         choices=["major", "minor", "maintenance", "build"],
-        help="Compute the next version from the current one (default: build if omitted).",
+        help="Compute the next version from the current one (default: maintenance if omitted).",
     )
     parser.add_argument(
         "--branch",
@@ -537,7 +672,7 @@ def main() -> None:
         new_version = explicit_version
         _validate_version_string(new_version)
     else:
-        mode       = next_mode or "build"
+        mode       = next_mode or "maintenance"
         new_version = _compute_next_version(current_version, mode)
 
     if new_version == current_version:
@@ -584,6 +719,8 @@ def main() -> None:
     _ensure_clean_worktree()
     if not test_release:
         _checkout_and_pull(branch)
+
+    report_commit = _get_head_commit()
 
     print(f"Bumping version: {current_version} -> {new_version}")
     _bump_version(new_version)
@@ -651,6 +788,13 @@ def main() -> None:
     _commit_version_bump(new_version)
     tag_name = _create_tag(new_version, tag_prefix)
     _push_branch_and_tag(branch, tag_name)
+
+    report_path = _write_release_report(report_commit, new_version, tag_name, branch, test_release)
+    counts = _summarize_sections(_collect_commit_files(report_commit))
+    print("\nRelease change summary (last commit):")
+    print(_render_table(counts))
+    print(f"Release report saved to {report_path}")
+    _print_status("Release report", "pass")
 
     print(f"Release {new_version} completed on branch '{branch}' with tag '{tag_name}'.")
 
