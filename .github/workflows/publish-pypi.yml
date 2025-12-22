@@ -13,7 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is_ga: ${{ steps.check.outputs.is_ga }}
+      is_on_main: ${{ steps.maincheck.outputs.is_on_main }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Validate GA tag
         id: check
         shell: bash
@@ -23,10 +28,20 @@ jobs:
           else
             echo "is_ga=false" >> "${GITHUB_OUTPUT}"
           fi
+      - name: Validate tag is on main
+        id: maincheck
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          if git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
+            echo "is_on_main=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is_on_main=false" >> "${GITHUB_OUTPUT}"
+          fi
 
   publish:
     needs: tag-check
-    if: ${{ needs.tag-check.outputs.is_ga == 'true' }}
+    if: ${{ needs.tag-check.outputs.is_ga == 'true' && needs.tag-check.outputs.is_on_main == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

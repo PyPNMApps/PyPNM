@@ -438,7 +438,7 @@ def main() -> None:
 
     Typical flows
     -------------
-    1) Let the script compute the next maintenance version:
+    1) Let the script compute the next build version:
        tools/release/release.py
 
     2) Let the script compute the next version by mode:
@@ -451,7 +451,7 @@ def main() -> None:
        tools/release/release.py --version 0.2.1.0
 
     4) Show what would happen without changing anything:
-       tools/release/release.py --next maintenance --dry-run
+       tools/release/release.py --next build --dry-run
        tools/release/release.py --dry-run
     """
     _print_banner()
@@ -468,7 +468,7 @@ def main() -> None:
     parser.add_argument(
         "--next",
         choices=["major", "minor", "maintenance", "build"],
-        help="Compute the next version from the current one (default: maintenance if omitted).",
+        help="Compute the next version from the current one (default: build if omitted).",
     )
     parser.add_argument(
         "--branch",
@@ -537,7 +537,7 @@ def main() -> None:
         new_version = explicit_version
         _validate_version_string(new_version)
     else:
-        mode       = next_mode or "maintenance"
+        mode       = next_mode or "build"
         new_version = _compute_next_version(current_version, mode)
 
     if new_version == current_version:
