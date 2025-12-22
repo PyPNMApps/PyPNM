@@ -10,7 +10,7 @@ and exposes each instance on a unique local port.
 ## Deploy 10 namespaces (parallel)
 
 ```bash
-TAG="v1.0.2.10"
+TAG="v1.0.3.0"
 BASE_NS="pypnm-cmts"
 REPLICAS="1"
 COUNT="10"
