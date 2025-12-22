@@ -3,7 +3,7 @@ name: Publish PyPNM To PyPI
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*.*.*.*"
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         id: check
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "is_ga=true" >> "${GITHUB_OUTPUT}"
           else
             echo "is_ga=false" >> "${GITHUB_OUTPUT}"
