@@ -55,7 +55,7 @@
         "json_transaction_db": ".data/db/json_transactions.json",
         "retries": 5,
         "retrival_method": {
-            "method": "sftp",
+            "method": "local",
             "methods": {
                 "local": {
                     "src_dir": "/srv/tftp"

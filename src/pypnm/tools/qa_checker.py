@@ -59,6 +59,7 @@ def _build_commands(include_pyright: bool, pytest_args: Sequence[str]) -> List[C
     """
     commands: List[Command] = [
         ("secrets", ["./tools/security/scan-secrets.sh"]),
+        ("enc-secrets", ["python", "./tools/security/scan-enc-secrets.py"]),
         ("macs", ["./tools/security/scan-mac-addresses.py", "--fail-on-found"]),
         ("headers", ["./tools/build/add-required-python-headers.py"]),
         ("ruff", ["ruff", "check", "src"]),
@@ -83,10 +84,11 @@ def main() -> None:
 
     1) secrets             - secret scanning via ./tools/security/scan-secrets.sh
                              (gitleaks + .gitleaks.toml if available).
-    2) macs                - repository scan for non-approved MAC addresses.
-    3) headers             - ensure SPDX/license headers (./tools/build/add-required-python-headers.py).
-    4) ruff check src      - syntax, style, and common bug patterns.
-    5) pytest              - unit tests (pytest options from pyproject.toml).
+    2) enc-secrets         - encrypted password pattern scan (ENC[v1] + password_enc).
+    3) macs                - repository scan for non-approved MAC addresses.
+    4) headers             - ensure SPDX/license headers (./tools/build/add-required-python-headers.py).
+    5) ruff check src      - syntax, style, and common bug patterns.
+    6) pytest              - unit tests (pytest options from pyproject.toml).
 
     Optional Pyright
     ----------------

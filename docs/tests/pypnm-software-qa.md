@@ -30,9 +30,13 @@ pypnm-software-qa-checker [OPTIONS]
 
 By default (with no options), it runs a **standard QA sweep** over your project:
 
-1. `ruff check src`
-2. `pytest`
-3. `pycycle --here` (from the project root)
+1. `./tools/security/scan-secrets.sh`
+2. `python ./tools/security/scan-enc-secrets.py`
+3. `./tools/security/scan-mac-addresses.py --fail-on-found`
+4. `./tools/build/add-required-python-headers.py`
+5. `ruff check src`
+6. `pytest`
+7. `pycycle --here` (from the project root)
 
 Each step is run in sequence; if any step fails (non-zero exit code), the script exits with that code and
 prints the failing command.
@@ -60,10 +64,14 @@ pypnm-software-qa-checker --with-pyright
 
 This is effectively equivalent to:
 
-1. `ruff check src`
-2. `pyright`
-3. `pytest`
-4. `pycycle --here`
+1. `./tools/security/scan-secrets.sh`
+2. `python ./tools/security/scan-enc-secrets.py`
+3. `./tools/security/scan-mac-addresses.py --fail-on-found`
+4. `./tools/build/add-required-python-headers.py`
+5. `ruff check src`
+6. `pyright`
+7. `pytest`
+8. `pycycle --here`
 
 If Pyright is not installed or not on `PATH`, the QA checker will report it as “NOT FOUND” and continue
 based on Pyright’s exit status.
@@ -96,6 +104,10 @@ pypnm-software-qa-checker --with-pyright
 
 Effectively runs:
 
+- Secret scanning (`./tools/security/scan-secrets.sh`)
+- Encrypted password scan (`python ./tools/security/scan-enc-secrets.py`)
+- MAC address scan (`./tools/security/scan-mac-addresses.py --fail-on-found`)
+- SPDX/license header scan (`./tools/build/add-required-python-headers.py`)
 - Lint (`ruff check src`)
 - Static type checking (`pyright`)
 - Tests (`pytest`)
@@ -106,6 +118,10 @@ Effectively runs:
 You can still run each tool directly when you need fine-grained control:
 
 ```bash
+./tools/security/scan-secrets.sh
+python ./tools/security/scan-enc-secrets.py
+./tools/security/scan-mac-addresses.py --fail-on-found
+./tools/build/add-required-python-headers.py
 ruff check src
 pytest -m 'not slow'
 pycycle --here

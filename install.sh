@@ -14,6 +14,7 @@ DEVELOPMENT_MODE="0"
 CLEAN_MODE="0"
 PURGE_CACHE="0"
 UNINSTALL_MODE="0"
+GITLEAKS_VERSION="8.18.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}"
@@ -36,7 +37,7 @@ Usage:
   ./install.sh --help
 
 Options:
-  --development  Install Docker Engine + kind/kubectl for local dev and release workflows.
+  --development  Install Docker Engine + kind/kubectl + gitleaks for local dev and release workflows.
   --clean        Remove prior install artifacts (venv/build/dist/cache) before installing.
   --purge-cache  Clear pip cache after activating the venv (use with --clean when needed).
   --uninstall    Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
@@ -81,7 +82,7 @@ Examples:
       (backing up the current system.json first).
 
   ./install.sh --development
-      Install Docker Engine + kind/kubectl so release smoke tests can run.
+      Install Docker Engine + kind/kubectl + gitleaks so release smoke tests can run.
       Tested on Ubuntu 22.04/24.04.
 
   ./install.sh --clean
@@ -188,6 +189,113 @@ clean_previous_install() {
   done
 
   echo "ℹ️  Preserving ${PROJECT_ROOT}/.data and ${PROJECT_ROOT}/src/pypnm/settings/system.json"
+}
+
+install_gitleaks() {
+  if command -v gitleaks >/dev/null 2>&1; then
+    echo "✅ gitleaks already installed."
+    return
+  fi
+
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  gitleaks not found and no package manager available."
+    echo "    Install manually: https://github.com/gitleaks/gitleaks"
+    return
+  fi
+
+  echo "🔧 Installing gitleaks..."
+  case "$PM" in
+    apt-get) $PM_INSTALL gitleaks || true ;;
+    dnf|yum) $PM_INSTALL gitleaks || true ;;
+    zypper)  $PM_INSTALL gitleaks || true ;;
+    apk)     $PM_INSTALL gitleaks || true ;;
+    brew)    $PM_INSTALL gitleaks || true ;;
+    *)
+      echo "⚠️  Unknown package manager; install gitleaks manually."
+      echo "    https://github.com/gitleaks/gitleaks"
+      return
+      ;;
+  esac
+
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete (curl missing)."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+    if ! command -v tar >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete (tar missing)."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+
+    local os arch filename url tmp_dir target_dir bin_path
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    case "$os" in
+      linux|darwin) ;;
+      *)
+        echo "⚠️  Unsupported OS for gitleaks auto-install: ${os}"
+        echo "    Install manually: https://github.com/gitleaks/gitleaks"
+        return
+        ;;
+    esac
+
+    arch="$(uname -m)"
+    case "$arch" in
+      x86_64|amd64) arch="x64" ;;
+      aarch64|arm64) arch="arm64" ;;
+      *)
+        echo "⚠️  Unsupported architecture for gitleaks auto-install: ${arch}"
+        echo "    Install manually: https://github.com/gitleaks/gitleaks"
+        return
+        ;;
+    esac
+
+    filename="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
+    url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${filename}"
+    tmp_dir="$(mktemp -d)"
+    echo "⬇️  Downloading gitleaks ${GITLEAKS_VERSION}..."
+    if ! curl -fsSL "${url}" -o "${tmp_dir}/${filename}"; then
+      echo "⚠️  Failed to download gitleaks from ${url}"
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    if ! tar -xzf "${tmp_dir}/${filename}" -C "${tmp_dir}"; then
+      echo "⚠️  Failed to extract gitleaks archive."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    bin_path="${tmp_dir}/gitleaks"
+    if [[ ! -f "${bin_path}" ]]; then
+      echo "⚠️  gitleaks binary not found after extraction."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    target_dir="/usr/local/bin"
+    if [[ -w "${target_dir}" ]]; then
+      install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+    else
+      target_dir="${HOME}/.local/bin"
+      mkdir -p "${target_dir}"
+      install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+      echo "ℹ️  Added gitleaks to ${target_dir}; ensure it's on PATH."
+    fi
+
+    rm -rf "${tmp_dir}"
+    if ! command -v gitleaks >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+  fi
 }
 
 remove_secrets_key() {
@@ -353,7 +461,7 @@ case "$PM" in
 esac
 
 if [[ "$DEVELOPMENT_MODE" == "1" ]]; then
-  echo "🧰 Development setup: Docker + kind/kubectl..."
+  echo "🧰 Development setup: Docker + kind/kubectl + gitleaks..."
   if ! command -v curl >/dev/null 2>&1; then
     if [[ "$PM" == "none" ]]; then
       echo "❌ curl not found and no package manager available."
@@ -377,6 +485,7 @@ if [[ "$DEVELOPMENT_MODE" == "1" ]]; then
   fi
 
   bash "${PROJECT_ROOT}/tools/k8s/pypnm_kind_vm_bootstrap.sh"
+  install_gitleaks
   echo "ℹ️  Docker may require: sudo systemctl start docker"
   echo "ℹ️  For non-sudo Docker: sudo usermod -aG docker \"${USER}\" (then log out/in)"
 fi
