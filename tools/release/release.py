@@ -79,9 +79,9 @@ def _determine_bump_kind(current_version: str, new_version: str) -> str:
 
 
 def _prompt_release_candidate(bump_kind: str) -> str:
-    prompt = f"Release candidate for {bump_kind} bump? [y/N]: "
+    prompt = f"Is this a GA release for the {bump_kind} bump? [y/N]: "
     answer = input(prompt).strip().lower()
-    if answer not in ("y", "yes"):
+    if answer in ("y", "yes"):
         return ""
 
     rc_input = input(f"RC number (default {RC_DEFAULT_NUMBER}): ").strip()
@@ -962,7 +962,7 @@ def main() -> None:
             print(f" 11) Create annotated tag '{release_tag}'")
             print(f" 12) Push branch '{branch}' and tag to origin")
         if bump_kind in ("major", "minor", "maintenance"):
-            print("Note: you will be prompted to add a -rcX suffix for a release candidate.")
+            print("Note: you will be prompted to confirm GA; otherwise an -rcX suffix is used.")
         sys.exit(0)
 
     _ensure_virtualenv()

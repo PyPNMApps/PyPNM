@@ -131,7 +131,7 @@ All four segments must be numeric. Both `src/pypnm/version.py` and `pyproject.to
 
 ### Release candidate tags
 
-For major, minor, and maintenance bumps, the release script will ask whether you want a release candidate tag. If you opt in, it adds a `-rcX` suffix to the git tag (for example `v0.3.0.0-rc1`). The version files remain numeric (`0.3.0.0`); only the git tag (and README/docs TAG placeholders) carry the RC suffix. Build bumps do not prompt for RC tags.
+For major, minor, and maintenance bumps, the release script asks whether the release is GA. If you answer no, it treats the tag as a release candidate and adds a `-rcX` suffix (for example `v0.3.0.0-rc1`). The version files remain numeric (`0.3.0.0`); only the git tag (and README/docs TAG placeholders) carry the RC suffix. Build bumps do not prompt for RC tags.
 
 GitHub releases are created from tags. RC tags create GitHub prereleases, while GA tags create normal releases.
 
@@ -221,7 +221,7 @@ Behavior:
 * Runs the release flow after you confirm.
 
 Use this when you want to clearly indicate the type of release (major, minor, maintenance, build) without manually typing the version string.
-For major, minor, and maintenance bumps, you will also be prompted to add an optional `-rcX` suffix to the tag. Build bumps do not prompt for RC tags.
+For major, minor, and maintenance bumps, you will be prompted to confirm GA; if you answer no, the script will add an `-rcX` suffix to the tag. Build bumps do not prompt for RC tags.
 
 ### 5.3 Explicit Version (`--version`)
 
