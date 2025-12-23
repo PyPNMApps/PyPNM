@@ -1,36 +1,9 @@
 {
     "FastApiRequestDefault": {
-        "mac_address": "aa:bb:cc:dd:ee:ff",
-        "ip_address": "192.168.0.1"
-    },
-    "SNMP": {
-        "timeout": 2,
-        "version": {
-            "2c": {
-                "enable": true,
-                "retries": 3,
-                "read_community": "public",
-                "write_community": "private"
-            },
-            "3": {
-                "enable": false,
-                "retries": 3,
-                "username": "user",
-                "securityLevel": "authPriv",
-                "authProtocol": "SHA",
-                "authPassword": "",
-                "privProtocol": "AES",
-                "privPassword": ""
-            }
-        }
+        "ip_address": "192.168.0.1",
+        "mac_address": "aa:bb:cc:dd:ee:ff"
     },
     "PnmBulkDataTransfer": {
-        "method": "tftp",
-        "tftp": {
-            "ip_v4": "192.168.0.10",
-            "ip_v6": "::1",
-            "remote_dir": ""
-        },
         "http": {
             "base_url": "http://files.example.com/",
             "port": 80
@@ -38,89 +11,116 @@
         "https": {
             "base_url": "https://files.example.com/",
             "port": 443
+        },
+        "method": "tftp",
+        "tftp": {
+            "ip_v4": "192.168.0.10",
+            "ip_v6": "::1",
+            "remote_dir": ""
         }
     },
     "PnmFileRetrieval": {
-        "pnm_dir": ".data/pnm",
+        "archive_dir": ".data/archive",
+        "capture_group_db": ".data/db/capture_group.json",
         "csv_dir": ".data/csv",
         "json_dir": ".data/json",
-        "xlsx_dir": ".data/xlsx",
-        "png_dir": ".data/png",
-        "archive_dir": ".data/archive",
-        "msg_rsp_dir": ".data/msg_rsp",
-        "transaction_db": ".data/db/transactions.json",
-        "capture_group_db": ".data/db/capture_group.json",
-        "session_group_db": ".data/db/session_group.json",
-        "operation_db": ".data/db/operation_capture.json",
         "json_transaction_db": ".data/db/json_transactions.json",
+        "msg_rsp_dir": ".data/msg_rsp",
+        "operation_db": ".data/db/operation_capture.json",
+        "png_dir": ".data/png",
+        "pnm_dir": ".data/pnm",
         "retries": 5,
         "retrival_method": {
-            "method": "sftp",
+            "method": "local",
             "methods": {
-                "local": {
-                    "src_dir": "/srv/tftp",
-                    "password_enc": "",
-                    "password": ""
-                },
-                "tftp": {
-                    "host": "localhost",
-                    "port": 69,
-                    "timeout": 5,
-                    "remote_dir": "",
-                    "password_enc": "",
-                    "password": ""
-                },
                 "ftp": {
                     "host": "localhost",
+                    "password": "",
+                    "password_enc": "",
                     "port": 21,
-                    "tls": false,
+                    "remote_dir": "/srv/tftp",
                     "timeout": 5,
-                    "user": "user",
-                    "password_enc": "",
-                    "remote_dir": "/srv/tftp",
-                    "password": ""
-                },
-                "sftp": {
-                    "host": "localhost",
-                    "port": 22,
-                    "user": "dev01",
-                    "password_enc": "",
-                    "private_key_path": "~/.ssh/id_rsa_pypnm",
-                    "remote_dir": "/srv/tftp",
-                    "password": ""
+                    "tls": false,
+                    "user": "user"
                 },
                 "http": {
                     "base_url": "http://STUB/",
-                    "port": 80,
+                    "password": "",
                     "password_enc": "",
-                    "password": ""
+                    "port": 80
                 },
                 "https": {
                     "base_url": "https://STUB/",
-                    "port": 443,
+                    "password": "",
                     "password_enc": "",
-                    "password": ""
+                    "port": 443
+                },
+                "local": {
+                    "password": "",
+                    "password_enc": "",
+                    "src_dir": "/srv/tftp"
+                },
+                "sftp": {
+                    "host": "localhost",
+                    "password": "",
+                    "password_enc": "",
+                    "port": 22,
+                    "private_key_path": "~/.ssh/id_rsa_pypnm",
+                    "remote_dir": "/srv/tftp",
+                    "user": "dev01"
+                },
+                "tftp": {
+                    "host": "localhost",
+                    "password": "",
+                    "password_enc": "",
+                    "port": 69,
+                    "remote_dir": "",
+                    "timeout": 5
                 }
+            }
+        },
+        "session_group_db": ".data/db/session_group.json",
+        "transaction_db": ".data/db/transactions.json",
+        "xlsx_dir": ".data/xlsx"
+    },
+    "SNMP": {
+        "timeout": 2,
+        "version": {
+            "2c": {
+                "enable": true,
+                "read_community": "public",
+                "retries": 3,
+                "write_community": "private"
+            },
+            "3": {
+                "authPassword": "",
+                "authProtocol": "SHA",
+                "enable": false,
+                "privPassword": "",
+                "privProtocol": "AES",
+                "retries": 3,
+                "securityLevel": "authPriv",
+                "username": "user"
             }
         }
     },
-    "logging": {
-        "log_level": "INFO",
-        "log_dir": "logs",
-        "log_filename": "pypnm.log"
-    },
     "TestMode": {
-        "global": {
-            "mode": {
-                "enable": true
-            }
-        },
         "class_name": {
             "DsScQamChannelSpectrumAnalyzer": {
                 "mode": {
                     "enable": true
                 }
             }
+        },
+        "global": {
+            "mode": {
+                "enable": true
+            }
         }
+    },
+    "logging": {
+        "log_dir": "logs",
+        "log_filename": "pypnm.log",
+        "log_level": "INFO"
     }
 }
