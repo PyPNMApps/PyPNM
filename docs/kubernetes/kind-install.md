@@ -27,7 +27,7 @@ kubectl get nodes
 ## Script-only deploy (no repo clone)
 
 ```bash
-TAG="v1.0.6.0"
+TAG="v1.0.7.0"
 NAMESPACE="pypnm-cmts-a"
 curl -fsSL https://raw.githubusercontent.com/PyPNMApps/PyPNM/main/tools/k8s/pypnm_k8s_remote_deploy.sh \
   -o /tmp/pypnm_k8s_remote_deploy.sh

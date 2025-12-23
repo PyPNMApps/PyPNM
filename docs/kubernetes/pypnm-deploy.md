@@ -25,7 +25,7 @@ This workflow pulls the manifests from GitHub and deploys the GHCR image directl
 ```bash
 curl -fsSL https://raw.githubusercontent.com/PyPNMApps/PyPNM/main/tools/k8s/pypnm_k8s_remote_deploy.sh \\
   -o /tmp/pypnm_k8s_remote_deploy.sh
-TAG="v1.0.6.0"
+TAG="v1.0.7.0"
 NAMESPACE="pypnm-cmts-a"
 
 bash /tmp/pypnm_k8s_remote_deploy.sh --create --tag "${TAG}" --namespace "${NAMESPACE}" --replicas 1
