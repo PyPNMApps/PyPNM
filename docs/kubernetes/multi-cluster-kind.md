@@ -16,7 +16,7 @@ kind create cluster --name "${CLUSTER_B}"
 ## Deploy to each cluster
 
 ```bash
-TAG="v1.0.8.0"
+TAG="v1.0.9.0"
 NAMESPACE="pypnm-default"
 
 kubectl config use-context kind-pypnm-dev-a

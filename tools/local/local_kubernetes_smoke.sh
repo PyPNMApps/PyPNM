@@ -171,10 +171,25 @@ if ! ensure_port_forward_ready; then
 fi
 
 PF_LOCAL_PORT="${PF_REQUESTED_PORT}"
+PF_LOCAL_HOST=""
 if [[ "${PF_REQUESTED_PORT}" == "0" ]]; then
-  PF_LOCAL_PORT=$(awk '/Forwarding from 127\\.0\\.0\\.1:/ { split($3, parts, ":"); print parts[2]; exit }' "${PF_LOG}")
+  if grep -q "Forwarding from \\[::1\\]:" "${PF_LOG}"; then
+    PF_LOCAL_HOST="::1"
+    PF_LOCAL_PORT=$(sed -nE 's/.*Forwarding from \\[::1\\]:([0-9]+).*/\\1/p' "${PF_LOG}" | head -n1)
+  else
+    PF_LOCAL_HOST="127.0.0.1"
+    PF_LOCAL_PORT=$(sed -nE 's/.*Forwarding from ([0-9.]+):([0-9]+).*/\\2/p' "${PF_LOG}" | head -n1)
+  fi
 elif [[ -z "${PF_LOCAL_PORT}" ]]; then
   PF_LOCAL_PORT="8000"
+fi
+
+if [[ -z "${PF_LOCAL_HOST}" ]]; then
+  if grep -q "Forwarding from \\[::1\\]:" "${PF_LOG}"; then
+    PF_LOCAL_HOST="::1"
+  else
+    PF_LOCAL_HOST="127.0.0.1"
+  fi
 fi
 
 if [[ -z "${PF_LOCAL_PORT}" ]]; then
@@ -184,6 +199,10 @@ if [[ -z "${PF_LOCAL_PORT}" ]]; then
   exit 1
 fi
 
-curl -fsS "http://127.0.0.1:${PF_LOCAL_PORT}/health" >/dev/null
+if [[ "${PF_LOCAL_HOST}" == *":"* ]]; then
+  curl -fsS --max-time 10 "http://[${PF_LOCAL_HOST}]:${PF_LOCAL_PORT}/health" >/dev/null
+else
+  curl -fsS --max-time 10 "http://${PF_LOCAL_HOST}:${PF_LOCAL_PORT}/health" >/dev/null
+fi
 
 echo "✅ Kubernetes smoke test passed."
