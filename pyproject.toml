@@ -45,7 +45,7 @@ dependencies = [
   "pandas==2.2.3",
   "paramiko==3.5.1",
   "tftpy==0.8.5",
-  "matplotlib==3.10.5",
+  "matplotlib==3.10.8",
   "typing-extensions>=4.10.0",
 ]
 
