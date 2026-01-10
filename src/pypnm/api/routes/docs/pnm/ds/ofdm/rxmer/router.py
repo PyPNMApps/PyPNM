@@ -18,12 +18,12 @@ from pypnm.api.routes.common.classes.analysis.analysis import Analysis, Analysis
 from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import (
     OutputType,
 )
+from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults import (
+    RequestDefaultsResolver,
+)
 from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
     PnmAnalysisResponse,
     PnmSingleCaptureRequest,
-)
-from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults import (
-    RequestDefaultsResolver,
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import (
     SnmpResponse,
