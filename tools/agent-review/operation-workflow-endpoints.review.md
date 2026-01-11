@@ -1,3 +1,34 @@
+### Summary
+Added a generic operation workflow router with start/status/result/cancel endpoints, an in-memory operation registry for cancellation hooks, and updated capture-service registration/unregistration. Extended workflow service start/result logic, added router tests, and documented the new POST endpoints.
+
+### Modified Files
+- src/pypnm/api/routes/advance/common/capture_service.py
+- src/pypnm/api/routes/advance/common/operation_registry.py
+- src/pypnm/api/routes/advance/common/operation_workflow_service.py
+- src/pypnm/api/routes/advance/common/operation_workflow_schemas.py
+- src/pypnm/api/routes/advance/common/operation_workflow_router.py
+- docs/api/fast-api/multi/capture-operation.md
+- tests/test_operation_workflow_router.py
+
+### Commands Executed And Results
+- `python3 -m compileall src` → pass
+- `ruff check .` → pass
+- `ruff format --check .` → pass (360 files already formatted)
+- `pytest -q` → pass (552 passed, 4 skipped)
+
+### Tests
+- `pytest -q` → pass (552 passed, 4 skipped)
+- `ruff check .` → pass
+- `ruff format --check .` → pass
+- `python3 -m compileall src` → pass
+
+### Notes / Warnings
+- pytest emitted expected warning logs from existing tests and integrations.
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: src/pypnm/api/routes/advance/common/capture_service.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
@@ -544,3 +575,635 @@ class AbstractCaptureService(ABC):
           ``status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE``.
         """
         ...
+
+# FILE: src/pypnm/api/routes/advance/common/operation_registry.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+import threading
+from typing import TYPE_CHECKING
+
+from pypnm.lib.types import OperationId
+
+if TYPE_CHECKING:
+    from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+
+
+class OperationRegistry:
+    """
+    In-memory registry mapping operation IDs to running capture services.
+    """
+
+    _lock = threading.Lock()
+    _services: dict[OperationId, AbstractCaptureService] = {}
+
+    @classmethod
+    def register(
+        cls, operation_id: OperationId, service: AbstractCaptureService
+    ) -> None:
+        logger = logging.getLogger(cls.__name__)
+        with cls._lock:
+            cls._services[operation_id] = service
+        logger.debug("Registered operation service for operation_id=%s", operation_id)
+
+    @classmethod
+    def get(cls, operation_id: OperationId) -> AbstractCaptureService | None:
+        with cls._lock:
+            return cls._services.get(operation_id)
+
+    @classmethod
+    def unregister(cls, operation_id: OperationId) -> None:
+        logger = logging.getLogger(cls.__name__)
+        with cls._lock:
+            removed = cls._services.pop(operation_id, None)
+        if removed is not None:
+            logger.debug(
+                "Unregistered operation service for operation_id=%s", operation_id
+            )
+
+
+__all__ = ["OperationRegistry"]
+
+# FILE: src/pypnm/api/routes/advance/common/operation_workflow_service.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.operations.operation_models import OperationStatusModel
+from pypnm.lib.operations.operation_store import OperationStore
+from pypnm.lib.types import OperationId
+from pypnm.lib.utils import Generate
+
+
+class OperationWorkflowService:
+    """
+    Shared workflow helpers for status, cancel, and result endpoints.
+    """
+
+    _DEFAULT_PROGRESS_TOTAL: int = 1
+    _DEFAULT_START_MESSAGE: str = "Operation created"
+    _RUNNING_MESSAGE: str = "Operation running"
+    _DEFAULT_OPERATION_ID_LENGTH: int = 16
+
+    @staticmethod
+    def start(progress_total: int, message: str | None = None) -> OperationStatusModel:
+        store = OperationStore()
+        operation_id = OperationId(
+            str(
+                Generate.operation_id(
+                    length=OperationWorkflowService._DEFAULT_OPERATION_ID_LENGTH
+                )
+            )
+        )
+        total = max(OperationWorkflowService._DEFAULT_PROGRESS_TOTAL, progress_total)
+        created = store.create_operation(
+            operation_id=operation_id,
+            progress_total=total,
+            message=message or OperationWorkflowService._DEFAULT_START_MESSAGE,
+        )
+        return store.update_operation(
+            operation_id=operation_id,
+            state=OperationExecutionState.RUNNING,
+            progress_current=0,
+            progress_total=total,
+            message=OperationWorkflowService._RUNNING_MESSAGE,
+            error=created.error,
+            artifact_paths=created.artifact_paths,
+        )
+
+    @staticmethod
+    def get_status(operation_id: OperationId) -> OperationStatusModel:
+        store = OperationStore()
+        status = store.get_operation(operation_id)
+        if status is None:
+            raise KeyError(f"Operation not found: {operation_id}")
+        return status
+
+    @staticmethod
+    def cancel(
+        operation_id: OperationId, service: AbstractCaptureService | None = None
+    ) -> OperationStatusModel:
+        store = OperationStore()
+        status = store.mark_canceled(operation_id, "Operation canceled")
+        if status is None:
+            raise KeyError(f"Operation not found: {operation_id}")
+        if service is not None:
+            service.stop(operation_id)
+        return status
+
+    @staticmethod
+    def get_result(operation_id: OperationId) -> OperationStatusModel:
+        store = OperationStore()
+        status = store.get_operation(operation_id)
+        if status is None:
+            raise KeyError(f"Operation not found: {operation_id}")
+        if status.state not in {
+            OperationExecutionState.COMPLETED,
+            OperationExecutionState.CANCELED,
+        }:
+            raise ValueError("Operation not completed")
+        return status
+
+
+__all__ = ["OperationWorkflowService"]
+
+# FILE: src/pypnm/api/routes/advance/common/operation_workflow_schemas.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
+    CommonResponse,
+)
+from pypnm.lib.operations.operation_models import OperationStatusModel
+from pypnm.lib.types import OperationId
+
+
+class OperationStartRequest(BaseModel):
+    """
+    Request body for creating a generic operation entry.
+    """
+
+    progress_total: int = Field(..., ge=1, description="Total expected work units.")
+    message: str | None = Field(
+        default=None, description="Optional message for operation creation."
+    )
+
+
+class OperationRequest(BaseModel):
+    """
+    Request body carrying an operation identifier.
+    """
+
+    operation_id: OperationId = Field(
+        ..., description="Operation ID for status/cancel/result calls."
+    )
+
+
+class OperationStartResponse(CommonResponse):
+    """
+    Response returned after creating a generic operation entry.
+    """
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+    time_remaining: int = Field(
+        ..., description="Seconds remaining for the operation (0 when unknown)."
+    )
+
+
+class OperationStatusResponse(CommonResponse):
+    """
+    Response containing the latest operation status record.
+    """
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+    time_remaining: int = Field(
+        ..., description="Seconds remaining for the operation (0 when unknown)."
+    )
+
+
+class OperationCancelResponse(CommonResponse):
+    """
+    Response returned after a cancel request.
+    """
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+
+
+class OperationResultResponse(CommonResponse):
+    """
+    Response returned for result requests.
+    """
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+
+
+__all__ = [
+    "OperationStartRequest",
+    "OperationRequest",
+    "OperationStartResponse",
+    "OperationStatusResponse",
+    "OperationCancelResponse",
+    "OperationResultResponse",
+]
+
+# FILE: src/pypnm/api/routes/advance/common/operation_workflow_router.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, HTTPException
+
+from pypnm.api.routes.advance.common.abstract.service import AbstractService
+from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
+from pypnm.api.routes.advance.common.operation_workflow_schemas import (
+    OperationCancelResponse,
+    OperationRequest,
+    OperationResultResponse,
+    OperationStartRequest,
+    OperationStartResponse,
+    OperationStatusResponse,
+)
+from pypnm.api.routes.advance.common.operation_workflow_service import (
+    OperationWorkflowService,
+)
+from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
+
+
+class OperationWorkflowRouter(AbstractService):
+    """
+    Generic operation workflow endpoints (start/status/result/cancel).
+    """
+
+    _DEFAULT_TIME_REMAINING: int = 0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.router = APIRouter(
+            prefix="/advance/operation",
+            tags=["PNM Operations - Workflow"],
+        )
+        self._add_routes()
+
+    def _add_routes(self) -> None:
+        @self.router.post(
+            "/start",
+            response_model=OperationStartResponse,
+            summary="Create a generic operation entry",
+            responses=FAST_API_RESPONSE,
+        )
+        def start_operation(request: OperationStartRequest) -> OperationStartResponse:
+            status = OperationWorkflowService.start(
+                progress_total=request.progress_total,
+                message=request.message,
+            )
+            return OperationStartResponse(
+                status="success",
+                message=None,
+                operation=status,
+                time_remaining=self._DEFAULT_TIME_REMAINING,
+            )
+
+        @self.router.post(
+            "/status",
+            response_model=OperationStatusResponse,
+            summary="Get status for an operation ID",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_status(request: OperationRequest) -> OperationStatusResponse:
+            try:
+                status = OperationWorkflowService.get_status(request.operation_id)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            time_remaining = self._DEFAULT_TIME_REMAINING
+            service = OperationRegistry.get(request.operation_id)
+            if service is not None:
+                op_status = service.status(request.operation_id)
+                time_remaining = int(op_status.get("time_remaining", time_remaining))
+            return OperationStatusResponse(
+                status="success",
+                message=None,
+                operation=status,
+                time_remaining=time_remaining,
+            )
+
+        @self.router.post(
+            "/result",
+            response_model=OperationResultResponse,
+            summary="Get the final result for an operation ID",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_result(request: OperationRequest) -> OperationResultResponse:
+            try:
+                status = OperationWorkflowService.get_result(request.operation_id)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            except ValueError as err:
+                raise HTTPException(status_code=400, detail=str(err)) from err
+            return OperationResultResponse(
+                status="success",
+                message=None,
+                operation=status,
+            )
+
+        @self.router.post(
+            "/cancel",
+            response_model=OperationCancelResponse,
+            summary="Cancel an operation by ID",
+            responses=FAST_API_RESPONSE,
+        )
+        def cancel(request: OperationRequest) -> OperationCancelResponse:
+            service = OperationRegistry.get(request.operation_id)
+            try:
+                status = OperationWorkflowService.cancel(request.operation_id, service)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            return OperationCancelResponse(
+                status="success",
+                message=None,
+                operation=status,
+            )
+
+
+router = OperationWorkflowRouter().router
+
+
+__all__ = ["OperationWorkflowRouter", "router"]
+
+# FILE: docs/api/fast-api/multi/capture-operation.md
+# Multi‑Capture Operation Overview
+
+When you initiate a **multi-capture** session (e.g., Multi‑RxMER or Multi‑DS‑Channel‑Estimation), PyPNM maintains a lightweight file‑based tracking system and stages resulting PNM binaries for downstream workflows.
+
+**Directory Layout**:
+
+```text
+.data/
+├── db/
+│   ├── operation_capture.json      # Maps operations to capture groups
+│   ├── capture_group.json          # Records capture groups
+│   └── transactions.json           # Lists each staged file transaction
+├── operations/
+│   └── <operation_id>.json         # Status + progress for async operations
+└── pnm/
+    └── <.bin files>                # Raw PNM captures retrieved via TFTP
+```
+
+## 1. Operation Status Registry (`operations/<operation_id>.json`)
+
+Each operation has its own status file to support `status`, `result`, and `cancel` endpoints.
+
+**Example**:
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c",
+  "state": "running",
+  "created_ts": 1730000000,
+  "updated_ts": 1730000010,
+  "progress_current": 1,
+  "progress_total": 6,
+  "message": "Operation running",
+  "error": null,
+  "artifact_paths": [
+    "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+  ]
+}
+```
+
+## 2. Operation Database (`operation_capture.json`)
+
+Records each background **operation** and its connection to a capture group.
+
+**Example**:
+
+```json
+{
+  "f6afb2d7df2c4a5c": {
+    "capture_group": "10b6ea239641487c",
+    "created": 1748280293
+  }
+}
+```
+
+* **Key**: `operation_id` (e.g., `f6afb2d7df2c4a5c`).
+* **capture\_group**: Associated `capture_group_id`.
+* **created**: Unix timestamp when the operation started.
+
+## 3. Capture Group Database (`capture_group.json`)
+
+Tracks each high‑level invocation as a distinct **capture group**.
+
+**Example**:
+
+```json
+{
+  "10b6ea239641487c": {
+    "created": 1748280293,
+    "transactions": [
+      "2ee6138bbc1b3c3d",
+      "65c04a28d0add931",
+      "df4d2b3e3146ef30",
+      "6773c9ebc097a579"
+    ]
+  }
+}
+```
+
+* **Key**: `capture_group_id` (e.g., `10b6ea239641487c`).
+* **created**: Unix timestamp when the group was created.
+* **transactions**: List of associated `transaction_id`s (one per file).
+
+## 4. Transactions Manifest (`transactions.json`)
+
+A detailed manifest of every PNM file moved into `.data/pnm/` during the capture.
+
+**Example**:
+
+```json
+{
+  "2ee6138bbc1b3c3d": {
+      "timestamp": 1748280294,
+      "mac_address": "aa:bb:cc:dd:ee:ff",
+      "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
+      "filename": "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_34_1748280294.bin",
+      "device_details": {
+          "sys_descr": {
+              "HW_REV": "1.0",
+              "VENDOR": "LANCity",
+              "BOOTR": "NONE",
+              "SW_REV": "1.0.0",
+              "MODEL": "LCPET-3"
+          }
+      }
+  }
+}
+```
+
+* **Key**: `transaction_id` (e.g., `2ee6138bbc1b3c3d`).
+* **timestamp**: Unix epoch when the file was staged.
+* **mac\_address**: Sanitized MAC of the target modem.
+* **pnm\_test\_type**: Identifier of the PNM capture type.
+* **filename**: Name of the `.bin` file in `.data/pnm/`.
+* **device\_details.sys\_descr**: Snapshot of modem metadata at capture time.
+
+Transaction IDs must be non-empty. Blank or whitespace-only IDs are dropped with a warning and are never persisted.
+The `mac_address` field is intentionally stored in `transaction_records` (it is not treated as redundant in the SQL-backed schema direction).
+
+## 5. Operation Workflow Endpoints (POST)
+
+Generic workflow endpoints provide a consistent interface for operation status, result, and cancellation.
+
+**Request** `POST /advance/operation/start`
+
+```json
+{
+  "progress_total": 6,
+  "message": "Operation created"
+}
+```
+
+**Request** `POST /advance/operation/status`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+**Request** `POST /advance/operation/result`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+**Request** `POST /advance/operation/cancel`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+## Workflow Summary
+
+1. **Start Multi‑Capture**: System generates a new `operation_id` linked to a new `capture_group_id`.
+2. **Periodic Triggers**: SNMP instructs the modem to TFTP-upload the PNM blob.
+3. **File Staging**: PyPNM copies each `.bin` into `.data/pnm/` and appends a JSON entry.
+4. **Database Updates**: Timestamps and transaction lists are updated in both `operation_capture.json` and `capture_group.json`.
+5. **Completion**: After the capture ends, the three JSON tables fully describe what was captured, when, and for which operation/group.
+
+> Downstream tools can monitor `transactions.json` as a manifest to automatically discover and process new PNM files—no manual polling required.
+
+# FILE: tests/test_operation_workflow_router.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
+from pypnm.api.routes.advance.common.operation_workflow_router import router
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.operations.operation_store import OperationStore
+from pypnm.lib.types import OperationId
+
+
+def _build_app() -> FastAPI:
+    app = FastAPI()
+    app.include_router(router)
+    return app
+
+
+def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pnm_dir = tmp_path / ".data" / "pnm"
+    pnm_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "pnm_dir",
+        classmethod(lambda cls: str(pnm_dir)),
+    )
+
+
+def test_operation_status_and_result_flow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_operation_paths(tmp_path, monkeypatch)
+    client = TestClient(_build_app())
+
+    start_resp = client.post("/advance/operation/start", json={"progress_total": 1})
+    assert start_resp.status_code == 200
+    operation_id = start_resp.json()["operation"]["operation_id"]
+    assert start_resp.json()["operation"]["state"] == OperationExecutionState.RUNNING
+
+    status_resp = client.post(
+        "/advance/operation/status", json={"operation_id": operation_id}
+    )
+    assert status_resp.status_code == 200
+    assert status_resp.json()["operation"]["operation_id"] == operation_id
+
+    result_resp = client.post(
+        "/advance/operation/result", json={"operation_id": operation_id}
+    )
+    assert result_resp.status_code == 400
+
+    store = OperationStore()
+    store.update_operation(
+        operation_id=OperationId(operation_id),
+        state=OperationExecutionState.COMPLETED,
+        progress_current=1,
+        progress_total=1,
+        message="Operation completed",
+        error=None,
+        artifact_paths=None,
+    )
+
+    result_ok = client.post(
+        "/advance/operation/result", json={"operation_id": operation_id}
+    )
+    assert result_ok.status_code == 200
+    assert result_ok.json()["operation"]["state"] == OperationExecutionState.COMPLETED
+
+
+def test_operation_cancel_invokes_registry_stop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_operation_paths(tmp_path, monkeypatch)
+    client = TestClient(_build_app())
+
+    start_resp = client.post("/advance/operation/start", json={"progress_total": 1})
+    assert start_resp.status_code == 200
+    operation_id = start_resp.json()["operation"]["operation_id"]
+
+    class _FakeService:
+        def __init__(self) -> None:
+            self.stopped = False
+
+        def stop(self, _operation_id: OperationId) -> None:
+            self.stopped = True
+
+    service = _FakeService()
+    OperationRegistry.register(OperationId(operation_id), service)
+
+    cancel_resp = client.post(
+        "/advance/operation/cancel", json={"operation_id": operation_id}
+    )
+    assert cancel_resp.status_code == 200
+    assert cancel_resp.json()["operation"]["state"] == OperationExecutionState.CANCELED
+    assert service.stopped is True
+    OperationRegistry.unregister(OperationId(operation_id))

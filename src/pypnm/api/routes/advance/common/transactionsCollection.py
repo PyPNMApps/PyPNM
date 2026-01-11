@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -62,6 +62,13 @@ class TransactionCollection:
         bool
             True if added successfully.
         """
+        tx_id = str(record.transaction_id)
+        if not tx_id.strip():
+            self.logger.warning(
+                "Skipping TransactionCollection add for empty transaction_id"
+            )
+            return False
+
         tcm = TransactionCollectionModel(
             transaction_id=record.transaction_id,
             timestamp=record.timestamp,

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -354,6 +354,14 @@ class PnmFileTransaction:
         timestamp = int(time.time())
         hash_input = f"{filename}{timestamp}".encode()
         transaction_id = TransactionId(hashlib.sha256(hash_input).hexdigest()[:16])
+        tx_id = str(transaction_id)
+        if not tx_id.strip():
+            self.logger.warning(
+                "Skipping transaction_db insert for empty transaction_id (filename=%s, mac=%s)",
+                filename,
+                mac_address,
+            )
+            return TransactionId("")
 
         db = self._load_db()
         db[transaction_id] = {
@@ -385,9 +393,23 @@ class PnmFileTransaction:
         """
         try:
             with self.transaction_db_path.open("r") as f:
-                return json.load(f)
+                data = json.load(f)
         except json.JSONDecodeError:
             return {}
+        if not isinstance(data, dict):
+            self.logger.error(
+                "Transaction DB root is not an object: %s",
+                type(data).__name__,
+            )
+            return {}
+
+        cleaned: dict = {}
+        for key, value in data.items():
+            if not str(key).strip():
+                self.logger.warning("Skipping empty transaction_id in transaction_db")
+                continue
+            cleaned[key] = value
+        return cleaned
 
     def _save_db(self, db: dict) -> None:
         """

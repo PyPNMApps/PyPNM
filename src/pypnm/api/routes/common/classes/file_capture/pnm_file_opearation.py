@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 import json
@@ -106,13 +106,20 @@ class OperationCaptureGroupResolver:
 
         capture_group_id = rec.get("capture_group_id")
         if not capture_group_id:
+            legacy_capture_group = rec.get("capture_group")
+            if legacy_capture_group:
+                self.logger.warning(
+                    "Operation record for %s uses legacy 'capture_group' field",
+                    operation_id,
+                )
+                return GroupId(str(legacy_capture_group))
             self.logger.warning(
                 "Operation record for %s is missing 'capture_group_id' field",
                 operation_id,
             )
             return None
 
-        return capture_group_id
+        return GroupId(str(capture_group_id))
 
     def get_transaction_ids_for_capture_group(
         self, capture_group_id: GroupId
@@ -141,7 +148,17 @@ class OperationCaptureGroupResolver:
             )
             return []
 
-        return [TransactionId(str(tid)) for tid in txns]
+        transaction_ids: list[TransactionId] = []
+        for tid in txns:
+            tx_id = str(tid)
+            if not tx_id.strip():
+                self.logger.warning(
+                    "Skipping empty transaction_id in capture_group_db for capture_group_id=%s",
+                    capture_group_id,
+                )
+                continue
+            transaction_ids.append(TransactionId(tx_id))
+        return transaction_ids
 
     def get_transaction_ids_for_operation(
         self, operation_id: OperationId
@@ -183,7 +200,8 @@ class OperationCaptureGroupResolver:
         for tid in txn_ids:
             model = txn_store.getRecordModel(tid)
             # Assuming TransactionRecordModel.null() sets transaction_id to an empty string.
-            if getattr(model, "transaction_id", ""):
+            tx_id = str(getattr(model, "transaction_id", "")).strip()
+            if tx_id:
                 models.append(model)
             else:
                 self.logger.warning(

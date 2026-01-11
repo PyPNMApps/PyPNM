@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -145,6 +145,12 @@ class SessionGroup:
         Append a transaction ID to this session, saving the DB.
         Raises ValueError if session missing.
         """
+        if not txn_id or not txn_id.strip():
+            self.logger.warning(
+                "Skipping empty transaction_id persistence in session_group_db for session_id=%s",
+                self.get_session_id(),
+            )
+            return
         gid = self.get_session_id()
         if gid not in self._db:
             raise ValueError("session not found; create_session() first")

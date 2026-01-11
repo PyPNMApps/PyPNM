@@ -1,3 +1,28 @@
+### Summary
+Aligned OperationManager.get_capture_group to return GroupId | None with canonical/legacy key support, removed empty-string sentinels, and added tests for canonical, legacy, and missing record behavior.
+
+### Modified Files
+- src/pypnm/api/routes/advance/common/operation_manager.py
+- tests/test_operation_manager_get_capture_group.py
+
+### Commands Executed And Results
+- `python3 -m compileall src` → pass
+- `ruff check .` → pass
+- `ruff format --check .` → pass
+- `pytest -q` → pass (560 passed, 4 skipped)
+
+### Tests
+- `pytest` → pass (560 passed, 4 skipped)
+- `ruff` → pass
+- `python3 -m compileall src` → pass
+
+### Notes / Warnings
+- Pytest logs include expected warnings from existing tests; no deprecation warnings observed.
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: src/pypnm/api/routes/advance/common/operation_manager.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
@@ -180,3 +205,88 @@ class OperationManager:
         except Exception as e:
             logging.getLogger(cls.__name__).error(f"Error listing operations: {e}")
             return []
+
+# FILE: tests/test_operation_manager_get_capture_group.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from pypnm.api.routes.advance.common.operation_manager import OperationManager
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.types import GroupId, OperationId
+
+
+def _configure_operation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    base_dir = tmp_path / ".data"
+    db_dir = base_dir / "db"
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    operation_db = db_dir / "operation_capture.json"
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "operation_db",
+        classmethod(lambda cls: str(operation_db)),
+    )
+    return operation_db
+
+
+def test_get_capture_group_returns_group_id_for_canonical_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operation_db = _configure_operation_db(tmp_path, monkeypatch)
+    operation_id = OperationId("op-200")
+    capture_group_id = GroupId("group-200")
+
+    operation_db.write_text(
+        json.dumps(
+            {
+                str(operation_id): {
+                    "capture_group_id": str(capture_group_id),
+                    "created": 1,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resolved = OperationManager.get_capture_group(operation_id)
+    assert resolved == capture_group_id
+
+
+def test_get_capture_group_returns_group_id_for_legacy_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operation_db = _configure_operation_db(tmp_path, monkeypatch)
+    operation_id = OperationId("op-201")
+    capture_group_id = GroupId("group-201")
+
+    operation_db.write_text(
+        json.dumps(
+            {
+                str(operation_id): {
+                    "capture_group": str(capture_group_id),
+                    "created": 1,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resolved = OperationManager.get_capture_group(operation_id)
+    assert resolved == capture_group_id
+
+
+def test_get_capture_group_returns_none_when_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_operation_db(tmp_path, monkeypatch)
+    operation_id = OperationId("op-202")
+
+    resolved = OperationManager.get_capture_group(operation_id)
+    assert resolved is None

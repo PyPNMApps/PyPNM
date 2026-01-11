@@ -145,17 +145,18 @@ class CaptureGroup:
         Append a transaction ID to this group, saving the DB.
         Raises ValueError if group missing.
         """
-        if not txn_id or not txn_id.strip():
+        tx_id = str(txn_id).strip()
+        if not tx_id:
             self.logger.warning("Skipping empty transaction_id persistence")
             return
         gid = self.get_group_id()
         if gid not in self._db:
             raise ValueError("Group not found; create_group() first")
         txns = self._db[gid].setdefault("transactions", [])
-        if txn_id not in txns:
-            txns.append(txn_id)
+        if tx_id not in txns:
+            txns.append(tx_id)
             self._save_db()
-            self.logger.debug(f"Added txn {txn_id} to group {gid}")
+            self.logger.debug(f"Added txn {tx_id} to group {gid}")
 
     def getTransactionIds(self) -> list[TransactionId]:
         """

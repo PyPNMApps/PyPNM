@@ -1,3 +1,101 @@
+### Summary
+Added canonical service_status fields to operation registry responses while preserving legacy status strings, updated multi-ChannelEstimation registry endpoints to populate both fields, and documented dual-status semantics. Added tests to assert registry status/cancel responses include service_status alongside legacy status.
+
+### Modified Files
+- src/pypnm/api/routes/advance/common/schema/operation_schema.py
+- src/pypnm/api/routes/advance/multi_ds_chan_est/router.py
+- docs/api/fast-api/multi/capture-operation.md
+- tests/test_multi_channel_estimation_start_and_analysis.py
+
+### Commands Executed And Results
+- `python3 -m compileall src` → pass
+- `ruff check .` → pass
+- `ruff format --check .` → pass
+- `pytest -q` → pass (569 passed, 4 skipped)
+
+### Tests
+- `pytest` → pass (569 passed, 4 skipped)
+- `ruff` → pass
+- `python3 -m compileall src` → pass
+
+### Notes / Warnings
+- Pytest logs include expected warnings from existing tests; no deprecation warnings observed.
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: src/pypnm/api/routes/advance/common/schema/operation_schema.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
+    CommonResponse,
+)
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.lib.operations.operation_models import OperationStatusModel
+from pypnm.lib.types import OperationId
+
+
+class OperationRequest(BaseModel):
+    """
+    Request body carrying a PyPNM operation identifier.
+    """
+
+    operation_id: OperationId = Field(
+        ..., description="Operation ID for status/cancel/result calls."
+    )
+
+
+class OperationStatusResponse(CommonResponse):
+    """
+    Response containing the latest operation status record.
+    """
+
+    service_status: ServiceStatusCode = Field(
+        default=ServiceStatusCode.SUCCESS,
+        description="Canonical ServiceStatusCode for this response.",
+    )
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+
+
+class OperationCancelResponse(CommonResponse):
+    """
+    Response returned after a cancel request.
+    """
+
+    service_status: ServiceStatusCode = Field(
+        default=ServiceStatusCode.SUCCESS,
+        description="Canonical ServiceStatusCode for this response.",
+    )
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+
+
+class OperationResultResponse(CommonResponse):
+    """
+    Response returned for result requests.
+    """
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+
+
+__all__ = [
+    "OperationRequest",
+    "OperationStatusResponse",
+    "OperationCancelResponse",
+    "OperationResultResponse",
+]
+
+# FILE: src/pypnm/api/routes/advance/multi_ds_chan_est/router.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
@@ -23,15 +121,14 @@ from pypnm.api.routes.advance.common.capture_data_aggregator import (
 )
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
-from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.common.operation_state import OperationState
-from pypnm.api.routes.advance.common.operation_workflow_schemas import (
+from pypnm.api.routes.advance.common.operation_workflow_service import (
+    OperationWorkflowService,
+)
+from pypnm.api.routes.advance.common.schema.operation_schema import (
     OperationCancelResponse,
     OperationRequest,
     OperationStatusResponse,
-)
-from pypnm.api.routes.advance.common.operation_workflow_service import (
-    OperationWorkflowService,
 )
 from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
     AnalysisDataModel,
@@ -74,8 +171,6 @@ from pypnm.lib.types import MacAddressStr, OperationId
 
 class MultiDsChanEstRouter(AbstractService):
     """Router for handling Multi-DS-Channel-Estimation operations."""
-
-    _DEFAULT_TIME_REMAINING: int = 0
 
     def __init__(self) -> None:
         super().__init__()
@@ -192,22 +287,11 @@ class MultiDsChanEstRouter(AbstractService):
                 raise HTTPException(
                     status_code=404, detail="Operation not found"
                 ) from err
-            time_remaining = self._DEFAULT_TIME_REMAINING
-            service = OperationRegistry.get(request.operation_id)
-            if service is not None:
-                op_status = service.status(request.operation_id)
-                try:
-                    time_remaining = int(
-                        op_status.get("time_remaining", time_remaining)
-                    )
-                except (TypeError, ValueError):
-                    time_remaining = self._DEFAULT_TIME_REMAINING
             return OperationStatusResponse(
                 status="success",
                 service_status=ServiceStatusCode.SUCCESS,
                 message=None,
                 operation=status,
-                time_remaining=time_remaining,
             )
 
         @self.router.get(
@@ -460,3 +544,524 @@ class MultiDsChanEstRouter(AbstractService):
 
 # Auto-register
 router = MultiDsChanEstRouter().router
+
+# FILE: docs/api/fast-api/multi/capture-operation.md
+# Multi‑Capture Operation Overview
+
+When you initiate a **multi-capture** session (e.g., Multi‑RxMER or Multi‑DS‑Channel‑Estimation), PyPNM maintains a lightweight file‑based tracking system and stages resulting PNM binaries for downstream workflows.
+
+**Directory Layout**:
+
+```text
+.data/
+├── db/
+│   ├── operation_capture.json      # Maps operations to capture groups
+│   ├── capture_group.json          # Records capture groups
+│   └── transactions.json           # Lists each staged file transaction
+├── operations/
+│   └── <operation_id>.json         # Status + progress for async operations
+└── pnm/
+    └── <.bin files>                # Raw PNM captures retrieved via TFTP
+```
+
+## 1. Operation Status Registry (`operations/<operation_id>.json`)
+
+Each operation has its own status file to support `status`, `result`, and `cancel` endpoints.
+
+**Example**:
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c",
+  "state": "running",
+  "created_ts": 1730000000,
+  "updated_ts": 1730000010,
+  "progress_current": 1,
+  "progress_total": 6,
+  "message": "Operation running",
+  "error": null,
+  "artifact_paths": [
+    "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+  ]
+}
+```
+
+## 2. Operation Database (`operation_capture.json`)
+
+Records each background **operation** and its connection to a capture group.
+
+**Example**:
+
+```json
+{
+  "f6afb2d7df2c4a5c": {
+    "capture_group_id": "10b6ea239641487c",
+    "created": 1748280293
+  }
+}
+```
+
+* **Key**: `operation_id` (e.g., `f6afb2d7df2c4a5c`).
+* **capture\_group\_id**: Associated `capture_group_id`.
+* **created**: Unix timestamp when the operation started.
+* **legacy**: Older records may use `capture_group` and are still read for compatibility.
+
+## 3. Capture Group Database (`capture_group.json`)
+
+Tracks each high‑level invocation as a distinct **capture group**.
+
+**Example**:
+
+```json
+{
+  "10b6ea239641487c": {
+    "created": 1748280293,
+    "transactions": [
+      "2ee6138bbc1b3c3d",
+      "65c04a28d0add931",
+      "df4d2b3e3146ef30",
+      "6773c9ebc097a579"
+    ]
+  }
+}
+```
+
+* **Key**: `capture_group_id` (e.g., `10b6ea239641487c`).
+* **created**: Unix timestamp when the group was created.
+* **transactions**: List of associated `transaction_id`s (one per file).
+
+## 4. Transactions Manifest (`transactions.json`)
+
+A detailed manifest of every PNM file moved into `.data/pnm/` during the capture.
+
+**Example**:
+
+```json
+{
+  "2ee6138bbc1b3c3d": {
+      "timestamp": 1748280294,
+      "mac_address": "aa:bb:cc:dd:ee:ff",
+      "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
+      "filename": "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_34_1748280294.bin",
+      "device_details": {
+          "system_description": {
+              "HW_REV": "1.0",
+              "VENDOR": "LANCity",
+              "BOOTR": "NONE",
+              "SW_REV": "1.0.0",
+              "MODEL": "LCPET-3"
+          }
+      }
+  }
+}
+```
+
+* **Key**: `transaction_id` (e.g., `2ee6138bbc1b3c3d`).
+* **timestamp**: Unix epoch when the file was staged.
+* **mac\_address**: Sanitized MAC of the target modem.
+* **pnm\_test\_type**: Identifier of the PNM capture type.
+* **filename**: Name of the `.bin` file in `.data/pnm/`.
+* **device\_details.system\_description**: Snapshot of modem metadata at capture time.
+
+Transaction IDs must be non-empty. Blank or whitespace-only IDs are dropped with a warning and are never persisted.
+The `mac_address` field is intentionally stored in `transaction_records` (it is not treated as redundant in the SQL-backed schema direction).
+
+## 5. Operation Workflow Endpoints (POST)
+
+Generic workflow endpoints provide a consistent interface for operation status, result, and cancellation.
+These endpoints rely on an in-memory OperationRegistry for live stop/status hooks and a filesystem-backed
+OperationStore for authoritative state. Cancel requests are best-effort in-process; the OperationStore
+status remains authoritative across restarts.
+
+**Request** `POST /advance/operation/start`
+
+```json
+{
+  "progress_total": 6,
+  "message": "Operation created"
+}
+```
+
+**Request** `POST /advance/operation/status`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+**Request** `POST /advance/operation/result`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+**Request** `POST /advance/operation/cancel`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+## 6. Multi-RxMER Workflow Endpoints (POST)
+
+**Request** `POST /advance/ds/ofdm/rxmer/multi/start`
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "ip_address": "192.168.0.100",
+  "duration": 60,
+  "interval": 5
+}
+```
+
+**Request** `POST /advance/ds/ofdm/rxmer/multi/result`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+## 7. Multi-ChannelEstimation Workflow Endpoints (POST)
+
+**Request** `POST /advance/multiChannelEstimation/start`
+
+```json
+{
+  "cable_modem": {
+    "mac_address": "aa:bb:cc:dd:ee:ff",
+    "ip_address": "192.168.0.100"
+  },
+  "capture": {
+    "parameters": {
+      "measurement_duration": 60,
+      "sample_interval": 5
+    }
+  }
+}
+```
+
+Note: The legacy `measure` payload is currently ignored and will be removed in a future release.
+
+**Request** `POST /advance/multiChannelEstimation/result`
+
+```json
+{
+  "operation_id": "f6afb2d7df2c4a5c"
+}
+```
+
+Result behavior:
+- Missing transaction records are skipped with warnings.
+- If no transaction records resolve, the endpoint returns HTTP 404.
+
+Start response fields:
+- capture_group_id is canonical.
+- group_id is legacy and will be deprecated.
+- status is ServiceStatusCode.SUCCESS when the operation starts; operation_state indicates RUNNING.
+Status semantics:
+- Top-level status is always a ServiceStatusCode value.
+- operation.state carries running/stopped/completed semantics.
+- Registry endpoints return legacy status string plus service_status as the canonical ServiceStatusCode.
+
+## Workflow Summary
+
+1. **Start Multi‑Capture**: System generates a new `operation_id` linked to a new `capture_group_id`.
+2. **Periodic Triggers**: SNMP instructs the modem to TFTP-upload the PNM blob.
+3. **File Staging**: PyPNM copies each `.bin` into `.data/pnm/` and appends a JSON entry.
+4. **Database Updates**: Timestamps and transaction lists are updated in both `operation_capture.json` and `capture_group.json`.
+5. **Completion**: After the capture ends, the three JSON tables fully describe what was captured, when, and for which operation/group.
+
+> Downstream tools can monitor `transactions.json` as a manifest to automatically discover and process new PNM files—no manual polling required.
+
+# FILE: tests/test_multi_channel_estimation_start_and_analysis.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+import pypnm.api.routes.advance.multi_ds_chan_est.router as ds_router
+from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
+from pypnm.api.routes.advance.multi_ds_chan_est.router import router
+from pypnm.api.routes.advance.multi_ds_chan_est.service import (
+    MultiChannelEstimationService,
+)
+from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
+    CableModemServicePreCheck,
+)
+from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.types import OperationId
+
+
+def _build_app() -> FastAPI:
+    app = FastAPI()
+    app.include_router(router)
+    return app
+
+
+def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base_dir = tmp_path / ".data"
+    pnm_dir = base_dir / "pnm"
+    db_dir = base_dir / "db"
+    pnm_dir.mkdir(parents=True, exist_ok=True)
+    db_dir.mkdir(parents=True, exist_ok=True)
+
+    capture_group_db = db_dir / "capture_group.json"
+    operation_db = db_dir / "operation_capture.json"
+    transaction_db = db_dir / "transactions.json"
+
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "pnm_dir",
+        classmethod(lambda cls: str(pnm_dir)),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "capture_group_db",
+        classmethod(lambda cls: str(capture_group_db)),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "operation_db",
+        classmethod(lambda cls: str(operation_db)),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "transaction_db",
+        classmethod(lambda cls: str(transaction_db)),
+    )
+
+
+def _start_request_payload() -> dict[str, object]:
+    return {
+        "cable_modem": {
+            "mac_address": "aa:bb:cc:dd:ee:ff",
+            "ip_address": "192.168.0.100",
+            "pnm_parameters": {
+                "tftp": {
+                    "ipv4": None,
+                    "ipv6": None,
+                },
+                "capture": {
+                    "channel_ids": None,
+                },
+            },
+            "snmp": {
+                "snmp_v2c": {
+                    "community": "public",
+                }
+            },
+        },
+        "capture": {
+            "parameters": {
+                "measurement_duration": 1,
+                "sample_interval": 1,
+            }
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_returns_success_status_and_group_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+
+    async def _fake_precheck(
+        self: CableModemServicePreCheck,
+    ) -> tuple[ServiceStatusCode, str]:
+        return ServiceStatusCode.SUCCESS, "ok"
+
+    async def _fake_capture(self: MultiChannelEstimationService) -> MessageResponse:
+        return MessageResponse(ServiceStatusCode.SUCCESS, payload=[])
+
+    monkeypatch.setattr(CableModemServicePreCheck, "run_precheck", _fake_precheck)
+    monkeypatch.setattr(
+        MultiChannelEstimationService, "_capture_message_response", _fake_capture
+    )
+
+    client = TestClient(_build_app())
+    response = client.post(
+        "/advance/multiChannelEstimation/start",
+        json=_start_request_payload(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == ServiceStatusCode.SUCCESS
+    assert payload["operation_id"]
+    assert payload["capture_group_id"]
+    assert payload["group_id"] == payload["capture_group_id"]
+    assert payload["operation_state"] == "running"
+    OperationRegistry.unregister(OperationId(payload["operation_id"]))
+
+
+def test_analysis_returns_capture_group_not_found_when_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+    db_path = Path(SystemConfigSettings.operation_db())
+    db_path.write_text(json.dumps({}), encoding="utf-8")
+
+    client = TestClient(_build_app())
+    response = client.post(
+        "/advance/multiChannelEstimation/analysis",
+        json={"operation_id": "op-missing"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND
+    assert "No capture group found for operation" in payload["message"]
+
+
+class _StubMac:
+    mac_address = "aa:bb:cc:dd:ee:ff"
+
+
+class _StubCm:
+    get_mac_address = _StubMac()
+
+
+class _StubService:
+    def __init__(self) -> None:
+        self.cm = _StubCm()
+        self._state = "running"
+
+    def status(self, operation_id: OperationId) -> dict[str, object]:
+        return {
+            "state": self._state,
+            "collected": 0,
+            "time_remaining": 0,
+        }
+
+    def stop(self, operation_id: OperationId) -> None:
+        self._state = "stopped"
+
+
+def test_status_endpoint_uses_service_status_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+    stub = _StubService()
+    monkeypatch.setattr(
+        ds_router.MultiDsChanEstRouter,
+        "getService",
+        lambda self, operation_id: stub,
+    )
+
+    client = TestClient(_build_app())
+    response = client.get("/advance/multiChannelEstimation/status/op-500")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == ServiceStatusCode.SUCCESS
+    assert payload["operation"]["operation_id"] == "op-500"
+
+
+def test_stop_endpoint_uses_service_status_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+    stub = _StubService()
+    monkeypatch.setattr(
+        ds_router.MultiDsChanEstRouter,
+        "getService",
+        lambda self, operation_id: stub,
+    )
+
+    client = TestClient(_build_app())
+    response = client.delete("/advance/multiChannelEstimation/stop/op-501")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == ServiceStatusCode.SUCCESS
+    assert payload["operation"]["state"] == "stopped"
+
+
+def test_registry_status_endpoint_returns_dual_status_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+
+    def _fake_status(operation_id: OperationId) -> object:
+        return {
+            "operation_id": str(operation_id),
+            "state": "running",
+            "created_ts": 1,
+            "updated_ts": 1,
+            "progress_current": 0,
+            "progress_total": 1,
+            "message": "Operation running",
+            "error": None,
+            "artifact_paths": None,
+        }
+
+    monkeypatch.setattr(
+        ds_router.OperationWorkflowService,
+        "get_status",
+        staticmethod(_fake_status),
+    )
+
+    client = TestClient(_build_app())
+    response = client.post(
+        "/advance/multiChannelEstimation/status",
+        json={"operation_id": "op-600"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["service_status"] == ServiceStatusCode.SUCCESS
+
+
+def test_registry_cancel_endpoint_returns_dual_status_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_paths(tmp_path, monkeypatch)
+
+    def _fake_cancel(
+        operation_id: OperationId, service: object | None = None
+    ) -> object:
+        return {
+            "operation_id": str(operation_id),
+            "state": "canceled",
+            "created_ts": 1,
+            "updated_ts": 2,
+            "progress_current": 1,
+            "progress_total": 1,
+            "message": "Operation canceled",
+            "error": None,
+            "artifact_paths": None,
+        }
+
+    monkeypatch.setattr(
+        ds_router.OperationWorkflowService,
+        "cancel",
+        staticmethod(_fake_cancel),
+    )
+
+    client = TestClient(_build_app())
+    response = client.post(
+        "/advance/multiChannelEstimation/cancel",
+        json={"operation_id": "op-601"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["service_status"] == ServiceStatusCode.SUCCESS

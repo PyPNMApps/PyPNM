@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,10 @@ from pypnm.api.routes.advance.common.capture_service import AbstractCaptureServi
 from pypnm.api.routes.advance.common.operation_workflow_service import (
     OperationWorkflowService,
 )
-from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
+from pypnm.api.routes.common.extended.common_messaging_service import (
+    MessageResponse,
+    MessageResponseType,
+)
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
@@ -23,6 +27,36 @@ from pypnm.lib.types import OperationId
 class _FakeCaptureService(AbstractCaptureService):
     async def _capture_message_response(self) -> MessageResponse:
         return MessageResponse(ServiceStatusCode.SUCCESS, payload=[])
+
+
+class _FakeCaptureServiceEmptyTxn(AbstractCaptureService):
+    async def _capture_message_response(self) -> MessageResponse:
+        payload = [
+            {
+                "status": ServiceStatusCode.SUCCESS.name,
+                "message_type": MessageResponseType.PNM_FILE_TRANSACTION.name,
+                "message": {
+                    "transaction_id": "",
+                    "filename": "rxmer.bin",
+                },
+            }
+        ]
+        return MessageResponse(ServiceStatusCode.SUCCESS, payload=payload)
+
+
+class _FakeCaptureServiceWhitespaceTxn(AbstractCaptureService):
+    async def _capture_message_response(self) -> MessageResponse:
+        payload = [
+            {
+                "status": ServiceStatusCode.SUCCESS.name,
+                "message_type": MessageResponseType.PNM_FILE_TRANSACTION.name,
+                "message": {
+                    "transaction_id": "   ",
+                    "filename": "rxmer.bin",
+                },
+            }
+        ]
+        return MessageResponse(ServiceStatusCode.SUCCESS, payload=payload)
 
 
 def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -121,3 +155,39 @@ def test_result_requires_completed(
     )
     status = OperationWorkflowService.get_result(operation_id)
     assert status.state == OperationExecutionState.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_capture_service_skips_empty_transaction_id_linking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    _configure_operation_paths(tmp_path, monkeypatch)
+    caplog.set_level("WARNING")
+    service = _FakeCaptureServiceEmptyTxn(duration=0, interval=0)
+    group_id, _ = await service.start()
+
+    await asyncio.sleep(0)
+
+    db_path = Path(SystemConfigSettings.capture_group_db())
+    with db_path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    assert data[group_id]["transactions"] == []
+    assert "Skipping capture_group link for empty transaction_id" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_capture_service_skips_whitespace_transaction_id_linking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    _configure_operation_paths(tmp_path, monkeypatch)
+    caplog.set_level("WARNING")
+    service = _FakeCaptureServiceWhitespaceTxn(duration=0, interval=0)
+    group_id, _ = await service.start()
+
+    await asyncio.sleep(0)
+
+    db_path = Path(SystemConfigSettings.capture_group_db())
+    with db_path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    assert data[group_id]["transactions"] == []
+    assert "Skipping capture_group link for empty transaction_id" in caplog.text

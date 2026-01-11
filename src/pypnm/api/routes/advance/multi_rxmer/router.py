@@ -23,15 +23,16 @@ from pypnm.api.routes.advance.common.capture_data_aggregator import (
 )
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
+from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.common.operation_state import OperationState
-from pypnm.api.routes.advance.common.operation_workflow_service import (
-    OperationWorkflowService,
-)
-from pypnm.api.routes.advance.common.schema.operation_schema import (
+from pypnm.api.routes.advance.common.operation_workflow_schemas import (
     OperationCancelResponse,
     OperationRequest,
     OperationResultResponse,
     OperationStatusResponse,
+)
+from pypnm.api.routes.advance.common.operation_workflow_service import (
+    OperationWorkflowService,
 )
 from pypnm.api.routes.advance.multi_rxmer.schemas import (
     MultiRxMerAnalysisRequest,
@@ -92,6 +93,8 @@ class MultiRxMerRouter(AbstractService):
     AbstractService
         Provides `loadService(...)` and `getService(...)` for service lifecycle and operation lookup.
     """
+
+    _DEFAULT_TIME_REMAINING: int = 0
 
     def __init__(self) -> None:
         super().__init__()
@@ -279,10 +282,21 @@ class MultiRxMerRouter(AbstractService):
                 raise HTTPException(
                     status_code=404, detail="Operation not found"
                 ) from err
+            time_remaining = self._DEFAULT_TIME_REMAINING
+            service = OperationRegistry.get(request.operation_id)
+            if service is not None:
+                op_status = service.status(request.operation_id)
+                try:
+                    time_remaining = int(
+                        op_status.get("time_remaining", time_remaining)
+                    )
+                except (TypeError, ValueError):
+                    time_remaining = self._DEFAULT_TIME_REMAINING
             return OperationStatusResponse(
                 status="success",
                 message=None,
                 operation=status,
+                time_remaining=time_remaining,
             )
 
         @self.router.get(

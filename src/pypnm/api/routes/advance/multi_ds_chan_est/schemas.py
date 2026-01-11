@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
+from enum import IntEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -10,18 +11,20 @@ from pydantic import BaseModel, Field
 from pypnm.api.routes.advance.analysis.signal_analysis.multi_chan_est_singnal_analysis import (
     MultiChanEstAnalysisType,
 )
+from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.common.schema.common_capture_schema import (
     MultiCaptureParametersResponse,
     MultiCaptureRequest,
 )
-from pypnm.api.routes.advance.multi_rxmer.schemas import ChanEstMeasureParameters
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
     CommonAnalysisResponse,
     CommonMatPlotConfigRequest,
     CommonOutput,
     CommonResponse,
 )
-from pypnm.lib.types import GroupId, OperationId
+from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
+from pypnm.lib.operations.operation_models import OperationStatusModel
+from pypnm.lib.types import GroupId, OperationId, PathArray
 
 
 ################################# HELPER MODEL ############################
@@ -32,6 +35,17 @@ class AnalysisDataModel(BaseModel):
     results: list[dict[str, Any]] = Field(
         ...,
         description="List of per-channel analysis results (min/avg/max, group delay, anomalies, etc.).",
+    )
+
+
+class MultiChanEstModes(IntEnum):
+    STANDARD = 0
+
+
+class MultiChanEstMeasureParameters(BaseModel):
+    mode: MultiChanEstModes = Field(
+        default=MultiChanEstModes.STANDARD,
+        description="Measurement mode: 0 for standard channel estimation capture",
     )
 
 
@@ -81,9 +95,9 @@ class MultiChanEstAnalysisRequest(BaseModel):
 class MultiChanEstRequest(MultiCaptureRequest):
     """Request schema for initiating a Multi-ChannelEstimation operation."""
 
-    measure: ChanEstMeasureParameters = Field(
-        ...,
-        description="Measurement parameters for the Multi-ChannelEstimation operation.",
+    measure: MultiChanEstMeasureParameters | None = Field(
+        default=None,
+        description="Legacy measurement parameters (deprecated; currently unused).",
     )
 
 
@@ -96,9 +110,15 @@ class MultiChanEstimationResponseStatus(MultiCaptureParametersResponse):
 class MultiChanEstimationStartResponse(CommonResponse):
     """Response returned when a multi-ChannelEstimation capture is kicked off."""
 
-    group_id: GroupId = Field(..., description="Capture group ID for this session")
+    group_id: GroupId = Field(..., description="Legacy capture group ID (deprecated).")
+    capture_group_id: GroupId = Field(
+        ..., description="Capture group ID for this session (canonical)."
+    )
     operation_id: OperationId = Field(
         ..., description="Operation ID to query status/results"
+    )
+    operation_state: OperationState | None = Field(
+        default=None, description="Operation state (legacy convenience field)."
     )
 
 
@@ -117,4 +137,19 @@ class MultiChanEstimationAnalysisResponse(CommonAnalysisResponse):
     data: AnalysisDataModel = Field(
         ...,
         description="Structured analysis result container including the analysis_type and its corresponding per-channel results.",
+    )
+
+
+class MultiChanEstimationResultResponse(CommonResponse):
+    """Response schema for completed Multi-ChannelEstimation capture results."""
+
+    operation: OperationStatusModel = Field(
+        ..., description="Filesystem-backed operation status."
+    )
+    capture_group_id: GroupId = Field(..., description="Capture group identifier.")
+    transactions: list[TransactionRecordModel] = Field(
+        ..., description="Resolved transaction record models."
+    )
+    artifact_paths: PathArray | None = Field(
+        None, description="Optional artifact paths persisted for the operation."
     )
