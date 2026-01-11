@@ -26,13 +26,22 @@ from pypnm.lib.types import ArrayLike, ChannelId, FloatSeries, IntSeries
 
 class DsHistrogramParameters(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    symmetry: int              = Field(..., description="Histogram symmetry flag (implementation-defined)")
-    dwell_counts: IntSeries    = Field(..., description="Total capture dwell count in samples")
-    hit_counts: IntSeries      = Field(default_factory=list, description="Histogram bin hit counts (one value per bin)")
+    symmetry: int = Field(
+        ..., description="Histogram symmetry flag (implementation-defined)"
+    )
+    dwell_counts: IntSeries = Field(
+        ..., description="Total capture dwell count in samples"
+    )
+    hit_counts: IntSeries = Field(
+        default_factory=list, description="Histogram bin hit counts (one value per bin)"
+    )
 
 
 class DsHistrogramAnalysisRpt(CommonAnalysis):
-    parameters: DsHistrogramParameters = Field(..., description="Downstream Histogram parameters and bin counts")
+    parameters: DsHistrogramParameters = Field(
+        ..., description="Downstream Histogram parameters and bin counts"
+    )
+
 
 class DsHistrogramReport(AnalysisReport):
     """
@@ -46,9 +55,12 @@ class DsHistrogramReport(AnalysisReport):
 
     FNAME_TAG: str = "DsHistrogram"
 
-    def __init__(self, analysis: Analysis,
-                 analysis_matplot_config: AnalysisRptMatplotConfig | None = None,
-                 **kwargs: object) -> None:
+    def __init__(
+        self,
+        analysis: Analysis,
+        analysis_matplot_config: AnalysisRptMatplotConfig | None = None,
+        **kwargs: object,
+    ) -> None:
         """
         Initialize the report builder.
 
@@ -85,17 +97,26 @@ class DsHistrogramReport(AnalysisReport):
 
             try:
                 csv_mgr: CSVManager = self.csv_manager_factory()
-                csv_mgr.set_header(["ChannelID", "BinIndex", "HitCount", "Symmetry", "DwellCount"])
-                csv_fname = self.create_csv_fname(tags=[str(channel_id), self.FNAME_TAG])
+                csv_mgr.set_header(
+                    ["ChannelID", "BinIndex", "HitCount", "Symmetry", "DwellCount"]
+                )
+                csv_fname = self.create_csv_fname(
+                    tags=[str(channel_id), self.FNAME_TAG]
+                )
                 csv_mgr.set_path_fname(csv_fname)
 
                 for idx, hit in enumerate(hit_counts):
-                    csv_mgr.insert_row([channel_id, idx, int(hit), symmetry, dwell_counts])
+                    csv_mgr.insert_row(
+                        [channel_id, idx, int(hit), symmetry, dwell_counts]
+                    )
 
                 csv_mgr_list.append(csv_mgr)
 
             except Exception as exc:
-                self.logger.exception(f"Failed to create CSV for channel {channel_id}: {exc}", exc_info=True)
+                self.logger.exception(
+                    f"Failed to create CSV for channel {channel_id}: {exc}",
+                    exc_info=True,
+                )
 
         return csv_mgr_list
 
@@ -149,7 +170,9 @@ class DsHistrogramReport(AnalysisReport):
         for common_model in self.get_common_analysis_model():
             model = cast(DsHistrogramAnalysisRpt, common_model)
             channel_id: ChannelId = ChannelId(model.channel_id)
-            hit_counts: FloatSeries = [float(v) for v in (model.parameters.hit_counts or [])]
+            hit_counts: FloatSeries = [
+                float(v) for v in (model.parameters.hit_counts or [])
+            ]
 
             if not hit_counts:
                 continue
@@ -179,30 +202,30 @@ class DsHistrogramReport(AnalysisReport):
             png = self.create_png_fname(tags=png_tags)
 
             cfg = PlotConfig(
-                title       =   title,
-                x           =   cast(ArrayLike, bin_indices),
-                xlabel      =   xlabel,
-                y           =   cast(ArrayLike, hit_counts),
-                ylabel      =   ylabel,
-                grid        =   True,
-                legend      =   False,
-                transparent =   False,
-                theme       =   self.getAnalysisRptMatplotConfig().theme,
+                title=title,
+                x=cast(ArrayLike, bin_indices),
+                xlabel=xlabel,
+                y=cast(ArrayLike, hit_counts),
+                ylabel=ylabel,
+                grid=True,
+                legend=False,
+                transparent=False,
+                theme=self.getAnalysisRptMatplotConfig().theme,
             )
 
             mgr = MatplotManager(default_cfg=cfg)
             mgr.plot_histogram(
-                data        =   cast(ArrayLike, bin_indices),
-                filename    =   png,
-                bins        =   bins_arg,
-                density     =   normalized,
-                weights     =   cast(ArrayLike, hit_counts),
-                orientation =   orientation,
-                cumulative  =   cumulative,
-                histtype    =   histtype,
-                align       =   align,
-                label       =   label,
-                cfg         =   cfg,
+                data=cast(ArrayLike, bin_indices),
+                filename=png,
+                bins=bins_arg,
+                density=normalized,
+                weights=cast(ArrayLike, hit_counts),
+                orientation=orientation,
+                cumulative=cumulative,
+                histtype=histtype,
+                align=align,
+                label=label,
+                cfg=cfg,
             )
             out.append(mgr)
 
@@ -220,31 +243,38 @@ class DsHistrogramReport(AnalysisReport):
             "hit_counts": List[int]
         }
         """
-        models: list[DsHistogramAnalysisModel] = cast(list[DsHistogramAnalysisModel], self.get_analysis_model())
+        models: list[DsHistogramAnalysisModel] = cast(
+            list[DsHistogramAnalysisModel], self.get_analysis_model()
+        )
 
         try:
             for _idx, src in enumerate(models):
-                channel_id: ChannelId   = ChannelId(getattr(src, "channel_id", INVALID_CHANNEL_ID))
-                symmetry: int           = int(src.symmetry)
+                channel_id: ChannelId = ChannelId(
+                    getattr(src, "channel_id", INVALID_CHANNEL_ID)
+                )
+                symmetry: int = int(src.symmetry)
                 dwell_counts: IntSeries = list(src.dwell_counts)
-                hit_counts: IntSeries   = list(src.hit_counts)
+                hit_counts: IntSeries = list(src.hit_counts)
 
                 raw_x: IntSeries = list(range(len(hit_counts)))
                 raw_y: IntSeries = hit_counts
 
                 model = DsHistrogramAnalysisRpt(
-                    channel_id  =   channel_id,
-                    raw_x       =   raw_x,
-                    raw_y       =   raw_y,
-                    parameters  =   DsHistrogramParameters(
-                        symmetry        =   symmetry,
-                        dwell_counts    =   dwell_counts,
-                        hit_counts      =   hit_counts,),
+                    channel_id=channel_id,
+                    raw_x=raw_x,
+                    raw_y=raw_y,
+                    parameters=DsHistrogramParameters(
+                        symmetry=symmetry,
+                        dwell_counts=dwell_counts,
+                        hit_counts=hit_counts,
+                    ),
                 )
                 self.register_common_analysis_model(channel_id, model)
 
         except Exception as exc:
-            self.logger.exception(f"Failed to process DS Histogram items: {exc}", exc_info=True)
+            self.logger.exception(
+                f"Failed to process DS Histogram items: {exc}", exc_info=True
+            )
 
     @staticmethod
     def _align_len(seq: Iterable[T] | list[T], n: int, *, fill: T) -> list[T]:

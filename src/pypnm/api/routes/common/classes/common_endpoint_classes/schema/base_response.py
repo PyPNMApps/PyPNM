@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -22,9 +21,17 @@ class BaseDeviceResponse(BaseModel):
         message (str, optional): Additional information or error details.
     """
 
-    mac_address: MacAddressStr                              = Field(default_factory=SCSC.default_mac_address, description="MAC address of the cable modem, validated and normalized")
-    status: ServiceStatusCode | OperationState | str   = Field(default="success", description="Status of the operation (e.g., 'success', 'error')")
-    message: str | None                                  = Field(default=None, description="Additional informational or error message")
+    mac_address: MacAddressStr = Field(
+        default_factory=SCSC.default_mac_address,
+        description="MAC address of the cable modem, validated and normalized",
+    )
+    status: ServiceStatusCode | OperationState | str = Field(
+        default="success",
+        description="Status of the operation (e.g., 'success', 'error')",
+    )
+    message: str | None = Field(
+        default=None, description="Additional informational or error message"
+    )
 
     @field_validator("mac_address", mode="before")
     def _normalize_mac(cls, v: str) -> str:

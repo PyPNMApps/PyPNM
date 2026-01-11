@@ -28,7 +28,9 @@ def test_fec_summary_parses_and_model_shape(fec_bytes: bytes) -> None:
 
     # top-level fields exist
     assert fec.channel_id >= 0
-    assert isinstance(fec.mac_address, str) and len(fec.mac_address) >= 11  # "aa:bb:cc:dd:ee:ff"
+    assert (
+        isinstance(fec.mac_address, str) and len(fec.mac_address) >= 11
+    )  # "aa:bb:cc:dd:ee:ff"
     assert fec.num_profiles >= 0
     assert len(fec.fec_summary_data) == fec.num_profiles
 
@@ -40,8 +42,12 @@ def test_profiles_and_sets_are_consistent(fec_bytes: bytes) -> None:
 
     for p in model.fec_summary_data:
         assert p.number_of_sets == len(p.codeword_entries.timestamp)
-        assert len(p.codeword_entries.timestamp) == len(p.codeword_entries.total_codewords) == \
-               len(p.codeword_entries.corrected) == len(p.codeword_entries.uncorrectable)
+        assert (
+            len(p.codeword_entries.timestamp)
+            == len(p.codeword_entries.total_codewords)
+            == len(p.codeword_entries.corrected)
+            == len(p.codeword_entries.uncorrectable)
+        )
 
         # timestamps monotonic non-decreasing
         ts = p.codeword_entries.timestamp

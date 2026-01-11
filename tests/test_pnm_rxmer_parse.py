@@ -14,9 +14,11 @@ DATA_DIR = Path(__file__).parent / "files"
 RXMER_PATH = DATA_DIR / "rxmer.bin"
 NON_RXMER_PATH = DATA_DIR / "fec_summary.bin"  # negative test sample
 
+
 @pytest.fixture(scope="session")
 def rxmer_bytes() -> bytes:
     return RXMER_PATH.read_bytes()
+
 
 @pytest.mark.pnm
 def test_rxmer_file_loads_and_models_ok(rxmer_bytes: bytes) -> None:
@@ -49,6 +51,7 @@ def test_rxmer_file_loads_and_models_ok(rxmer_bytes: bytes) -> None:
     mod = rx.modulation_statistics
     assert isinstance(mod, dict) and mod
 
+
 @pytest.mark.pnm
 def test_rxmer_values_in_range_and_cached() -> None:
     raw = RXMER_PATH.read_bytes()
@@ -61,6 +64,7 @@ def test_rxmer_values_in_range_and_cached() -> None:
     # Cached behavior: second call returns identical content
     vals2 = rxmer.get_rxmer_values()
     assert vals1 is vals2 or vals1 == vals2  # either same object or same content
+
 
 @pytest.mark.pnm
 def test_rxmer_frequencies_monotonic_and_sized() -> None:
@@ -77,6 +81,7 @@ def test_rxmer_frequencies_monotonic_and_sized() -> None:
         assert step == model.subcarrier_spacing
         assert all(freqs[i] < freqs[i + 1] for i in range(len(freqs) - 1))
 
+
 @pytest.mark.pnm
 def test_rxmer_serialization_roundtrip() -> None:
     raw = RXMER_PATH.read_bytes()
@@ -88,6 +93,7 @@ def test_rxmer_serialization_roundtrip() -> None:
     # JSON should be valid and represent same keys as dict (at least top-level)
     parsed = json.loads(j)
     assert set(parsed.keys()) == set(d.keys())
+
 
 @pytest.mark.pnm
 def test_non_rxmer_file_rejected() -> None:

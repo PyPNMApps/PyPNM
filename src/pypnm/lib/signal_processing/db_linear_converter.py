@@ -59,9 +59,9 @@ class DbLinearConverter:
         denom = max(float(ref), eps) if ref is not None else 1.0
 
         out = np.empty_like(arr, dtype=float)
-        neg_mask  = arr < 0.0
+        neg_mask = arr < 0.0
         zero_mask = arr == 0.0
-        pos_mask  = arr > 0.0
+        pos_mask = arr > 0.0
 
         # negatives -> NaN
         out[neg_mask] = np.nan
@@ -72,6 +72,7 @@ class DbLinearConverter:
             out[pos_mask] = 10.0 * np.log10(arr[pos_mask] / denom)
 
         return out.tolist()
+
     @staticmethod
     def complex_to_Linear(values: ComplexArray) -> FloatSeries:
         """

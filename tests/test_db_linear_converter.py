@@ -14,6 +14,7 @@ from pypnm.lib.types import ComplexArray, FloatSeries
 
 # ---------- Absolute linear/dB roundtrips ----------
 
+
 def test_db_to_linear_basic() -> None:
     db: FloatSeries = [-10.0, 0.0, 10.0, 20.0]
     lin = DbLinearConverter.db_to_linear(db)
@@ -52,16 +53,22 @@ def test_roundtrip_db_linear_db_absolute() -> None:
 
 # ---------- Relative dB (reference) ----------
 
+
 def test_linear_to_db_with_reference_value() -> None:
     vals: FloatSeries = [1.0, 0.5, 0.25]
     out_abs = DbLinearConverter.linear_to_db(vals)  # absolute
     out_rel = DbLinearConverter.linear_to_db(vals, ref=max(vals))  # relative to max
     # use a slightly looser tolerance to avoid false failures from fp noise
-    assert out_abs == pytest.approx([0.0, -3.0102999566, -6.0205999133], rel=1e-10, abs=1e-10)
-    assert out_rel == pytest.approx([0.0, -3.0102999566, -6.0205999133], rel=1e-10, abs=1e-10)
+    assert out_abs == pytest.approx(
+        [0.0, -3.0102999566, -6.0205999133], rel=1e-10, abs=1e-10
+    )
+    assert out_rel == pytest.approx(
+        [0.0, -3.0102999566, -6.0205999133], rel=1e-10, abs=1e-10
+    )
 
 
 # ---------- Complex power (linear) ----------
+
 
 def test_complex_to_linear_power_basic() -> None:
     pairs: ComplexArray = [[1.0, 0.0], [0.0, 1.0], [3.0, 4.0]]
@@ -87,6 +94,7 @@ def test_complex_to_linear_shape_validation() -> None:
 
 
 # ---------- Complex power (dB), absolute vs relative ----------
+
 
 def test_complex_to_db_basic_absolute_and_zero() -> None:
     pairs: ComplexArray = [[1.0, 0.0], [0.0, 1.0], [3.0, 4.0], [0.0, 0.0]]
@@ -120,7 +128,9 @@ def test_complex_to_db_accepts_numpy_and_empty() -> None:
     pairs: ComplexArray = cast(ComplexArray, arr.tolist())
     out = DbLinearConverter.complex_to_db(pairs, ref="max")
     assert isinstance(out, list)
-    assert math.isinf(DbLinearConverter.complex_to_db(cast(ComplexArray, [[0.0, 0.0]]))[0])
+    assert math.isinf(
+        DbLinearConverter.complex_to_db(cast(ComplexArray, [[0.0, 0.0]]))[0]
+    )
     assert DbLinearConverter.complex_to_db(cast(ComplexArray, [])) == []
 
 

@@ -49,8 +49,8 @@ def test_measurement_status_invalid_returns_other(value: object) -> None:
         (1, True),
         ("0", False),
         ("1", True),
-        ("2", True),      # bool(2) is True
-        ("", False),      # fallback to bool("") -> False
+        ("2", True),  # bool(2) is True
+        ("", False),  # fallback to bool("") -> False
         ("false", True),  # int() fails, so bool("false") -> True
     ],
 )
@@ -68,7 +68,9 @@ def test_as_bool_behaviour(value: ScalarValue, expected: bool) -> None:
         ("-3", -3),
     ],
 )
-def test_as_int_converts_numeric_strings_and_ints(value: ScalarValue, expected: int) -> None:
+def test_as_int_converts_numeric_strings_and_ints(
+    value: ScalarValue, expected: int
+) -> None:
     assert as_int(value) == expected
 
 
@@ -110,7 +112,9 @@ def test_as_float0_basic_conversion(value: ScalarValue, expected: float) -> None
         (-100, -1.00),
     ],
 )
-def test_as_float2_fixed_point_two_decimals(value: ScalarValue, expected: float) -> None:
+def test_as_float2_fixed_point_two_decimals(
+    value: ScalarValue, expected: float
+) -> None:
     assert as_float2(value) == pytest.approx(expected, rel=1e-9, abs=1e-9)
 
 
@@ -142,8 +146,12 @@ def test_scale_with_and_without_rounding(
         (123, 1, 1.2),
     ],
 )
-def test_per_hundred_normalization(value: ScalarValue, ndigits: int, expected: float) -> None:
-    assert per_hundred(value, ndigits=ndigits) == pytest.approx(expected, rel=1e-9, abs=1e-9)
+def test_per_hundred_normalization(
+    value: ScalarValue, ndigits: int, expected: float
+) -> None:
+    assert per_hundred(value, ndigits=ndigits) == pytest.approx(
+        expected, rel=1e-9, abs=1e-9
+    )
 
 
 @pytest.mark.parametrize(
@@ -156,5 +164,9 @@ def test_per_hundred_normalization(value: ScalarValue, ndigits: int, expected: f
         (1234, 2, 1.23),
     ],
 )
-def test_per_thousand_normalization(value: ScalarValue, ndigits: int, expected: float) -> None:
-    assert per_thousand(value, ndigits=ndigits) == pytest.approx(expected, rel=1e-9, abs=1e-9)
+def test_per_thousand_normalization(
+    value: ScalarValue, ndigits: int, expected: float
+) -> None:
+    assert per_thousand(value, ndigits=ndigits) == pytest.approx(
+        expected, rel=1e-9, abs=1e-9
+    )

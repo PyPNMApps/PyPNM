@@ -67,8 +67,8 @@ class Ping:
             try:
                 result = subprocess.run(
                     cmd,
-                    stdout = subprocess.DEVNULL,
-                    stderr = subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 if result.returncode == 0:
                     return True

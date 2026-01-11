@@ -28,12 +28,20 @@ TFTP_IPV4_DEFAULT_DESC = "null uses system.json PnmBulkDataTransfer.tftp.ip_v4"
 TFTP_IPV6_DEFAULT_DESC = "null uses system.json PnmBulkDataTransfer.tftp.ip_v6"
 ERROR_TFTP_BLANK = "tftp.{field} must be null or a valid IP address"
 
+
 class CommonOutput(BaseModel):
-    type: OutputType = Field(default=OutputType.JSON, description="Desired output type for analysis results")
+    type: OutputType = Field(
+        default=OutputType.JSON, description="Desired output type for analysis results"
+    )
+
 
 class TftpConfig(BaseModel):
-    ipv4: IPv4Str | None = Field(..., description=f"TFTP server IPv4 address ({TFTP_IPV4_DEFAULT_DESC})")
-    ipv6: IPv6Str | None = Field(..., description=f"TFTP server IPv6 address ({TFTP_IPV6_DEFAULT_DESC})")
+    ipv4: IPv4Str | None = Field(
+        ..., description=f"TFTP server IPv4 address ({TFTP_IPV4_DEFAULT_DESC})"
+    )
+    ipv6: IPv6Str | None = Field(
+        ..., description=f"TFTP server IPv6 address ({TFTP_IPV6_DEFAULT_DESC})"
+    )
 
     @field_validator("ipv4", "ipv6", mode="before")
     def _reject_blank(cls, v: object, info: ValidationInfo) -> object:
@@ -42,6 +50,7 @@ class TftpConfig(BaseModel):
         if isinstance(v, str) and v.strip() == "":
             raise ValueError(ERROR_TFTP_BLANK.format(field=info.field_name))
         return v
+
 
 class PnmCaptureConfig(BaseModel):
     channel_ids: list[ChannelId] | None = Field(
@@ -53,16 +62,25 @@ class PnmCaptureConfig(BaseModel):
     def _dedupe_channel_ids(cls, v: list[ChannelId] | None) -> list[ChannelId] | None:
         return RequestListNormalizer.dedupe_preserve_order(v)
 
+
 class PnmParameters(BaseModel):
     tftp: TftpConfig = Field(..., description="TFTP configuration")
-    capture: PnmCaptureConfig = Field(default_factory=PnmCaptureConfig, description="Capture parameters")
+    capture: PnmCaptureConfig = Field(
+        default_factory=PnmCaptureConfig, description="Capture parameters"
+    )
 
 
 class CableModemPnmConfig(BaseModel):
-    mac_address: MacAddressStr    = Field(default=default_mac, description="MAC address of the cable modem")
-    ip_address: InetAddressStr    = Field(default=default_ip, description="Inet address of the cable modem")
-    pnm_parameters: PnmParameters = Field(description="PNM parameters such as TFTP server configuration")
-    snmp: SNMPConfig              = Field(description="SNMP configuration")
+    mac_address: MacAddressStr = Field(
+        default=default_mac, description="MAC address of the cable modem"
+    )
+    ip_address: InetAddressStr = Field(
+        default=default_ip, description="Inet address of the cable modem"
+    )
+    pnm_parameters: PnmParameters = Field(
+        description="PNM parameters such as TFTP server configuration"
+    )
+    snmp: SNMPConfig = Field(description="SNMP configuration")
 
     @field_validator("mac_address")
     def validate_mac(cls, v: str) -> MacAddressStr:
@@ -73,10 +91,17 @@ class CableModemPnmConfig(BaseModel):
 
 
 class CommonMatPlotUiConfig(BaseModel):
-    theme: ThemeType = Field(default="dark", description="Matplotlib theme selection for plot rendering")
+    theme: ThemeType = Field(
+        default="dark", description="Matplotlib theme selection for plot rendering"
+    )
+
 
 class CommonMatPlotConfigRequest(BaseModel):
-    ui: CommonMatPlotUiConfig = Field(default=CommonMatPlotUiConfig(), description="Matplotlib UI configuration for plot generation")
+    ui: CommonMatPlotUiConfig = Field(
+        default=CommonMatPlotUiConfig(),
+        description="Matplotlib UI configuration for plot generation",
+    )
+
 
 class CommonFileSearchRequest(BaseModel):
     mac_address: MacAddressStr = Field(description="MAC address of the cable modem")
@@ -88,39 +113,59 @@ class CommonFileSearchRequest(BaseModel):
         except Exception as e:
             raise ValueError(f"Invalid MAC address: {v}, reason: ({e})") from e
 
+
 class CommonRequest(BaseModel):
-    cable_modem: CableModemPnmConfig = Field(description="Cable modem configuration for basic PNM operations")
+    cable_modem: CableModemPnmConfig = Field(
+        description="Cable modem configuration for basic PNM operations"
+    )
 
 
 class CommonAnalysisType(BaseModel):
-    type: int = Field(description="Analysis type to perform, implementation-specific integer value")
+    type: int = Field(
+        description="Analysis type to perform, implementation-specific integer value"
+    )
+
 
 class CommonMultiAnalysisRequest(BaseModel):
     cable_modem: CableModemPnmConfig = Field(description="Cable modem configuration")
-    analysis: CommonAnalysisType     = Field(description="Analysis type to perform")
+    analysis: CommonAnalysisType = Field(description="Analysis type to perform")
 
 
 class CommonAnalysisRequest(BaseModel):
     cable_modem: CableModemPnmConfig = Field(description="Cable modem configuration")
-    analysis: CommonAnalysisType     = Field(description="Analysis type or mode to perform")
-    output: CommonOutput             = Field(description="Output type control: JSON or archive")
+    analysis: CommonAnalysisType = Field(description="Analysis type or mode to perform")
+    output: CommonOutput = Field(description="Output type control: JSON or archive")
 
 
 class CommonSingleCaptureAnalysisType(BaseModel):
-    type: AnalysisType              = Field(default=AnalysisType.BASIC, description="Analysis type to perform")
-    output: CommonOutput            = Field(description="Output format selection for single capture analysis")
-    plot: CommonMatPlotConfigRequest = Field(description="Plot configuration for single capture analysis")
+    type: AnalysisType = Field(
+        default=AnalysisType.BASIC, description="Analysis type to perform"
+    )
+    output: CommonOutput = Field(
+        description="Output format selection for single capture analysis"
+    )
+    plot: CommonMatPlotConfigRequest = Field(
+        description="Plot configuration for single capture analysis"
+    )
 
 
 class CommonSingleCaptureAnalysisRequest(BaseModel):
-    cable_modem: CableModemPnmConfig          = Field(description="Cable modem configuration")
-    analysis: CommonSingleCaptureAnalysisType = Field(description="Single capture analysis configuration")
+    cable_modem: CableModemPnmConfig = Field(description="Cable modem configuration")
+    analysis: CommonSingleCaptureAnalysisType = Field(
+        description="Single capture analysis configuration"
+    )
 
 
 class CommonResponse(BaseModel):
-    mac_address: MacAddressStr                                      = Field(default=default_mac, description="MAC address of the cable modem")
-    status: ServiceStatusCode | OperationState | str | None = Field(default="success", description="Operation status code or state")
-    message: str | None                                          = Field(default=None, description="Additional information or error details")
+    mac_address: MacAddressStr = Field(
+        default=default_mac, description="MAC address of the cable modem"
+    )
+    status: ServiceStatusCode | OperationState | str | None = Field(
+        default="success", description="Operation status code or state"
+    )
+    message: str | None = Field(
+        default=None, description="Additional information or error details"
+    )
 
     @field_validator("mac_address")
     def validate_mac(cls, v: str) -> MacAddressStr:
@@ -132,4 +177,5 @@ class CommonResponse(BaseModel):
 
 class CommonAnalysisResponse(CommonResponse):
     """Basic analysis response model."""
+
     pass

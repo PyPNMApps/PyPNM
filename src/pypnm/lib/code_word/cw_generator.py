@@ -72,7 +72,7 @@ class CodeWordGenerator:
             for bit_pos in range(bps):
                 state, bit = lfsr_step(state)
                 if bit:
-                    sym |= (1 << bit_pos)
+                    sym |= 1 << bit_pos
             # (Optional) mask to be safe, although sym is already bounded by construction
             sym &= max_codeword
             code_words.append(sym)
@@ -102,7 +102,7 @@ class CodeWordGenerator:
                 state, bit = self._lfsr_step(state)
                 # Place newest bit at position (7 - bit_idx) to yield MSB-first in the byte
                 if bit:
-                    b |= (1 << (7 - bit_idx))
+                    b |= 1 << (7 - bit_idx)
             out.append(b & 0xFF)
 
         return out

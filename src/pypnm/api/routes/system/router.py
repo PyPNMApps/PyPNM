@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -33,10 +32,8 @@ class SystemRouter:
       - POST /system/sysDescr : Retrieve device sysDescr
       - POST /system/upTime  : Retrieve device sysUpTime
     """
-    def __init__(
-        self,
-        prefix: str = "/system",
-        tags: list[str | Enum] = None) -> None:
+
+    def __init__(self, prefix: str = "/system", tags: list[str | Enum] = None) -> None:
         if tags is None:
             tags = ["DOCSIS System"]
         self.router = APIRouter(prefix=prefix, tags=tags)
@@ -44,11 +41,13 @@ class SystemRouter:
         self._register_routes()
 
     def _register_routes(self) -> None:
-        @self.router.post("/sysDescr",
-                          response_model=SysDescrResponse | SnmpResponse,
-                          summary="Retrieve DOCSIS System Description",
-                          description="Fetches the system description from a DOCSIS modem.",
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/sysDescr",
+            response_model=SysDescrResponse | SnmpResponse,
+            summary="Retrieve DOCSIS System Description",
+            description="Fetches the system description from a DOCSIS modem.",
+            responses=FAST_API_RESPONSE,
+        )
         async def get_sysdescr(request: SysRequest) -> SysDescrResponse | SnmpResponse:
             """
             **Retrieve DOCSIS System Description**
@@ -63,9 +62,9 @@ class SystemRouter:
             self.logger.info(f"Retrieving sysDescr for MAC: {mac}, IP: {ip}")
 
             try:
-                status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                              ip_address=ip,
-                                                              snmp_config=request.cable_modem.snmp).run_precheck()
+                status, msg = await CableModemServicePreCheck(
+                    mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+                ).run_precheck()
                 if status != ServiceStatusCode.SUCCESS:
                     self.logger.error(msg)
                     return SnmpResponse(mac_address=mac, status=status, message=msg)
@@ -73,14 +72,17 @@ class SystemRouter:
                 return await SystemSnmpService.get_sysdescr(request)
 
             except Exception as exc:
-                self.logger.error(f"sysDescr error for {request.cable_modem.mac_address}@{request.cable_modem.ip_address}: {exc}")
+                self.logger.error(
+                    f"sysDescr error for {request.cable_modem.mac_address}@{request.cable_modem.ip_address}: {exc}"
+                )
                 # You can return more detailed errors based on exception type if you like
                 raise HTTPException(
                     status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve sysDescr") from exc
+                    detail="Failed to retrieve sysDescr",
+                ) from exc
 
         @self.router.post("/upTime", response_model=SysUpTimeResponse | SnmpResponse)
-        async def get_uptime(request: SysRequest) -> SysUpTimeResponse | SnmpResponse :
+        async def get_uptime(request: SysRequest) -> SysUpTimeResponse | SnmpResponse:
             """
             **Fetch DOCSIS Device System Uptime**
 
@@ -95,9 +97,9 @@ class SystemRouter:
             self.logger.info(f"Retrieving sysUpTime for MAC: {mac}, IP: {ip}")
 
             try:
-                status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                              ip_address=ip,
-                                                              snmp_config=request.cable_modem.snmp).run_precheck()
+                status, msg = await CableModemServicePreCheck(
+                    mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+                ).run_precheck()
                 if status != ServiceStatusCode.SUCCESS:
                     self.logger.error(msg)
                     return SnmpResponse(mac_address=mac, status=status, message=msg)
@@ -106,6 +108,10 @@ class SystemRouter:
 
             except Exception as exc:
                 self.logger.error(f"sysUpTime error for {mac}@{ip}: {exc}")
-                raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to retrieve sysUpTime") from exc
+                raise HTTPException(
+                    status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                    detail="Failed to retrieve sysUpTime",
+                ) from exc
+
 
 router = SystemRouter().router

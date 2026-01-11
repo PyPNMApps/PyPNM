@@ -73,7 +73,9 @@ def test_hexdump_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 @pytest.mark.pnm
-def test_hexdump_missing_transaction_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_hexdump_missing_transaction_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """
     Ensure that a missing transaction ID results in an HTTP 404 error.
     """

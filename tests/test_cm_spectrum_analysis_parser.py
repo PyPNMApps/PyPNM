@@ -13,9 +13,9 @@ from pypnm.pnm.parser.CmSpectrumAnalysis import (
     CmSpectrumAnalyzerModel,
 )
 
-DATA_DIR: Path          = Path(__file__).parent / "files"
-SPECTRUM_PATH: Path     = DATA_DIR / "spectrum_analyzer.bin"
-US_PREEQ_PATH: Path     = DATA_DIR / "us_pre_equalizer_coef.bin"
+DATA_DIR: Path = Path(__file__).parent / "files"
+SPECTRUM_PATH: Path = DATA_DIR / "spectrum_analyzer.bin"
+US_PREEQ_PATH: Path = DATA_DIR / "us_pre_equalizer_coef.bin"
 
 
 @pytest.mark.pnm
@@ -77,14 +77,20 @@ def test_cm_spectrum_analysis_bin_spacing_and_data_length_consistency() -> None:
     model: CmSpectrumAnalyzerModel = parser.to_model()
 
     # Bin spacing relationship
-    expected_bin_spacing: int = int(model.segment_frequency_span / model.num_bins_per_segment)
+    expected_bin_spacing: int = int(
+        model.segment_frequency_span / model.num_bins_per_segment
+    )
     assert model.bin_frequency_spacing == expected_bin_spacing
 
     # Total bins vs raw data length
     from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalysis as _CSA
 
-    total_bins_from_segments: int = sum(len(seg) for seg in model.amplitude_bin_segments_float)
-    expected_total_bins: int      = model.spectrum_analysis_data_length // _CSA.AMPLITUDE_BIN_SIZE
+    total_bins_from_segments: int = sum(
+        len(seg) for seg in model.amplitude_bin_segments_float
+    )
+    expected_total_bins: int = (
+        model.spectrum_analysis_data_length // _CSA.AMPLITUDE_BIN_SIZE
+    )
 
     # For a well-formed capture these should match
     assert total_bins_from_segments == expected_total_bins

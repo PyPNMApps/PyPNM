@@ -31,7 +31,9 @@ def test_constellation_file_parses_and_model_shape(const_bytes: bytes) -> None:
     assert m.pnm_header is not None
     # required top-level fields
     assert isinstance(m.channel_id, int)
-    assert isinstance(m.mac_address, str) and len(m.mac_address) >= 11  # "aa:bb:cc:dd:ee:ff"
+    assert (
+        isinstance(m.mac_address, str) and len(m.mac_address) >= 11
+    )  # "aa:bb:cc:dd:ee:ff"
     assert isinstance(m.subcarrier_zero_frequency, int)
     assert isinstance(m.subcarrier_spacing, int) and m.subcarrier_spacing > 0
 
@@ -44,8 +46,10 @@ def test_constellation_file_parses_and_model_shape(const_bytes: bytes) -> None:
     # samples shape: list of [I, Q] float pairs
     assert isinstance(m.samples, list)
     assert all(isinstance(pair, (list, tuple)) and len(pair) == 2 for pair in m.samples)
-    assert all(all(isinstance(v, (int, float)) and math.isfinite(v) for v in pair) for pair in m.samples)
-
+    assert all(
+        all(isinstance(v, (int, float)) and math.isfinite(v) for v in pair)
+        for pair in m.samples
+    )
 
     # length consistency: payload bytes / 4 => number of complex pairs
     assert len(m.samples) == m.sample_length // 4
@@ -79,6 +83,7 @@ def test_constellation_serialization_roundtrip() -> None:
         assert key in d
 
     import json
+
     parsed = json.loads(j)
     assert set(parsed.keys()) == set(d.keys())
 

@@ -27,7 +27,7 @@ class FTPConnector:
         username: str = "",
         password: str = "",
         use_tls: bool = False,
-        timeout: int = 30
+        timeout: int = 30,
     ) -> None:
         """
         Initialize FTPConnector parameters.
@@ -163,7 +163,7 @@ class FTPConnector:
 
             self.logger.debug(f"Starting upload: {local_path} -> {remote_path}")
             with open(local_path, "rb") as f:
-                self.ftp.storbinary(f'STOR {remote_path}', f)
+                self.ftp.storbinary(f"STOR {remote_path}", f)
             self.logger.debug(f"Upload completed: {local_path} -> {remote_path}")
             return True
 
@@ -199,7 +199,7 @@ class FTPConnector:
         try:
             self.logger.debug(f"Starting download: {remote_path} -> {local_file_path}")
             with open(local_file_path, "wb") as f:
-                self.ftp.retrbinary(f'RETR {remote_path}', f.write)
+                self.ftp.retrbinary(f"RETR {remote_path}", f.write)
             self.logger.debug(f"Download completed: {remote_path} -> {local_file_path}")
             return True
 

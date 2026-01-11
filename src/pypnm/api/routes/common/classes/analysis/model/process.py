@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -9,9 +8,11 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import SpectrumAnalysisE
 class SpectrumAnalysisProcess(SpectrumAnalysisExtention):
     pass
 
+
 class AnalysisProcessParameters(SpectrumAnalysisProcess):
-    '''
-        Extend the differnt types of processing of Analysis
-        Use Models that are defined in the FastAPI request/response schemas
-    '''
+    """
+    Extend the differnt types of processing of Analysis
+    Use Models that are defined in the FastAPI request/response schemas
+    """
+
     pass

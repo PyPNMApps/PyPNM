@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -7,4 +6,4 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import PnmR
 
 
 class PnmRxMerPlotRequest(PnmRequest):
-   analysis_type:int
+    analysis_type: int

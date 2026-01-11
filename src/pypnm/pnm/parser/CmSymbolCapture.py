@@ -18,8 +18,10 @@ from pypnm.pnm.parser.pnm_header import PnmHeader
 
 
 class CmSymbolCaptureModel(PnmBaseModel):
-    ''' Pydantic model for Symbol Capture Report data'''
+    """Pydantic model for Symbol Capture Report data"""
+
     pass
+
 
 class CmSymbolCapture(PnmHeader):
     def __init__(self, binary_data: bytes) -> None:
@@ -42,47 +44,61 @@ class CmSymbolCapture(PnmHeader):
             cann = PnmFileType.SYMBOL_CAPTURE.get_pnm_cann()
             actual_type = self.get_pnm_file_type()
             error_cann = actual_type.get_pnm_cann() if actual_type else "Unknown"
-            raise ValueError(f"PNM File Stream is not RxMER file type: {cann}, Error: {error_cann}")
+            raise ValueError(
+                f"PNM File Stream is not RxMER file type: {cann}, Error: {error_cann}"
+            )
 
         # Extract CmSymbolCapture fields using struct.unpack
-        cm_symbol_capture_format = '<B6sII2HI'
-        cm_symbol_capture_size = unpack(cm_symbol_capture_format,
-                                        self.pnm_data[:calcsize(cm_symbol_capture_format)])
+        cm_symbol_capture_format = "<B6sII2HI"
+        cm_symbol_capture_size = unpack(
+            cm_symbol_capture_format,
+            self.pnm_data[: calcsize(cm_symbol_capture_format)],
+        )
 
         # Assign values to attributes
         self.channel_id = cm_symbol_capture_size[0]
-        self.mac_address = cm_symbol_capture_size[1].hex(':')
+        self.mac_address = cm_symbol_capture_size[1].hex(":")
         self.subcarrier_zero_frequency = cm_symbol_capture_size[2]
         self.sample_rate = cm_symbol_capture_size[3]
         self.fft_size = cm_symbol_capture_size[4]
         self.trigger_group_id = cm_symbol_capture_size[5]
         self.transaction_id = cm_symbol_capture_size[6]
         self.capture_data_length = cm_symbol_capture_size[7]
-        self.capture_data = self.pnm_data[calcsize(cm_symbol_capture_format):]
+        self.capture_data = self.pnm_data[calcsize(cm_symbol_capture_format) :]
 
-    def process_capture_data(self, sm_n_format: tuple[IntegerBits, FractionalBits] = (IntegerBits(3), FractionalBits(12))) -> ComplexSeries | None:
+    def process_capture_data(
+        self,
+        sm_n_format: tuple[IntegerBits, FractionalBits] = (
+            IntegerBits(3),
+            FractionalBits(12),
+        ),
+    ) -> ComplexSeries | None:
         """
         Process Capture Data.
         Returns a list of complex numbers containing the data (I, Q) for each sample.
         """
         if self.capture_data is None:
             return None
-        capture_data = FixedPointDecoder.decode_complex_data(self.capture_data, sm_n_format)
+        capture_data = FixedPointDecoder.decode_complex_data(
+            self.capture_data, sm_n_format
+        )
         return capture_data
 
     def get_cm_symbol_capture(self) -> dict | None:
         return {
-            'DS Channel Id': self.channel_id,
-            'CM MAC Address': self.mac_address,
-            'Subcarrier Zero Frequency': self.subcarrier_zero_frequency,
-            'Sample Rate': self.sample_rate,
-            'FFT Size': self.fft_size,
-            'Trigger Group Id': self.trigger_group_id,
-            'Transaction ID': self.transaction_id,
-            'Capture Data Length': self.capture_data_length,
-            'Capture Data': self.capture_data.hex() if self.capture_data is not None else None
+            "DS Channel Id": self.channel_id,
+            "CM MAC Address": self.mac_address,
+            "Subcarrier Zero Frequency": self.subcarrier_zero_frequency,
+            "Sample Rate": self.sample_rate,
+            "FFT Size": self.fft_size,
+            "Trigger Group Id": self.trigger_group_id,
+            "Transaction ID": self.transaction_id,
+            "Capture Data Length": self.capture_data_length,
+            "Capture Data": self.capture_data.hex()
+            if self.capture_data is not None
+            else None,
         }
 
     def to_model(self) -> CmSymbolCaptureModel:
-        ''' Convert parsed data to a Pydantic model '''
+        """Convert parsed data to a Pydantic model"""
         return CmSymbolCaptureModel()

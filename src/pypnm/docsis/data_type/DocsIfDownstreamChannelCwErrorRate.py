@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -15,10 +14,17 @@ class CodewordTotals(BaseModel):
     """
     Nested model representing codeword counters, computed error rate, and rates per second.
     """
+
     total_codewords: int = Field(..., description="Total codewords in the interval")
-    total_errors: int = Field(..., description="Total uncorrectable errors in the interval")
-    time_elapsed: float = Field(..., description="Time elapsed between samples, in seconds")
-    error_rate: float = Field(..., description="Uncorrectable codeword error rate (errors/codewords)")
+    total_errors: int = Field(
+        ..., description="Total uncorrectable errors in the interval"
+    )
+    time_elapsed: float = Field(
+        ..., description="Time elapsed between samples, in seconds"
+    )
+    error_rate: float = Field(
+        ..., description="Uncorrectable codeword error rate (errors/codewords)"
+    )
     codewords_per_second: float = Field(..., description="Codewords per second (s⁻¹)")
     errors_per_second: float = Field(..., description="Errors per second (s⁻¹)")
 
@@ -27,6 +33,7 @@ class DocsIfDownstreamCwErrorRateEntry(BaseModel):
     """
     Represents a single channel's codeword error statistics.
     """
+
     index: int = Field(..., description="SNMP index of the downstream channel")
     channel_id: int = Field(..., description="DOCSIS Channel ID")
     codeword_totals: CodewordTotals
@@ -48,7 +55,9 @@ class DocsIfDownstreamChannelCwErrorRate:
         self.time_elapsed = time_elapsed
 
         try:
-            self.entries = self._build_entries(entries_1, entries_2, channel_id_index_stack)
+            self.entries = self._build_entries(
+                entries_1, entries_2, channel_id_index_stack
+            )
         except Exception:
             self.logger.error("Failed to build CW error rate entries", exc_info=True)
             self.entries = []
@@ -71,7 +80,9 @@ class DocsIfDownstreamChannelCwErrorRate:
         cw_entries: list[DocsIfDownstreamCwErrorRateEntry] = []
 
         if not entries_1 or not entries_2:
-            self.logger.warning("One or both entry lists are empty; returning no CW error rate entries.")
+            self.logger.warning(
+                "One or both entry lists are empty; returning no CW error rate entries."
+            )
             return cw_entries
 
         entry_map_1 = self._create_mapping(entries_1)
@@ -87,7 +98,9 @@ class DocsIfDownstreamChannelCwErrorRate:
                 self.logger.debug(f"Ent1: {ent1}, Ent2: {ent2}")
 
                 if ent1 is None or ent2 is None:
-                    self.logger.warning(f"Channel ID {chan_id} not found in both snapshots; skipping.")
+                    self.logger.warning(
+                        f"Channel ID {chan_id} not found in both snapshots; skipping."
+                    )
                     continue
 
                 u1 = getattr(ent1.entry, "docsIfSigQExtUnerroreds", 0) or 0
@@ -113,10 +126,18 @@ class DocsIfDownstreamChannelCwErrorRate:
 
                 total_codewords = delta_unerrored + delta_corrected + delta_uncorrected
                 total_errors = delta_uncorrected
-                error_rate = total_errors / total_codewords if total_codewords > 0 else 0.0
+                error_rate = (
+                    total_errors / total_codewords if total_codewords > 0 else 0.0
+                )
 
-                codewords_per_sec = total_codewords / self.time_elapsed if self.time_elapsed > 0 else 0.0
-                errors_per_sec = total_errors / self.time_elapsed if self.time_elapsed > 0 else 0.0
+                codewords_per_sec = (
+                    total_codewords / self.time_elapsed
+                    if self.time_elapsed > 0
+                    else 0.0
+                )
+                errors_per_sec = (
+                    total_errors / self.time_elapsed if self.time_elapsed > 0 else 0.0
+                )
 
                 totals = CodewordTotals(
                     total_codewords=total_codewords,
@@ -127,7 +148,9 @@ class DocsIfDownstreamChannelCwErrorRate:
                     errors_per_second=errors_per_sec,
                 )
 
-                self.logger.debug(f"Channel {chan_id}: {totals.total_codewords} codewords, {totals.total_errors} errors, rate={totals.error_rate:.6f}")
+                self.logger.debug(
+                    f"Channel {chan_id}: {totals.total_codewords} codewords, {totals.total_errors} errors, rate={totals.error_rate:.6f}"
+                )
 
                 cw_entries.append(
                     DocsIfDownstreamCwErrorRateEntry(
@@ -138,7 +161,9 @@ class DocsIfDownstreamChannelCwErrorRate:
                 )
 
             except Exception:
-                self.logger.error(f"Exception while processing channel ID {chan_id}", exc_info=True)
+                self.logger.error(
+                    f"Exception while processing channel ID {chan_id}", exc_info=True
+                )
                 continue
 
         return cw_entries
@@ -173,12 +198,13 @@ class DocsIfDownstreamChannelCwErrorRate:
                 "aggregate_error_rate": self.aggregate_error_rate,
             }
         except Exception:
-            self.logger.error("Failed to serialize CW error rate to dict", exc_info=True)
+            self.logger.error(
+                "Failed to serialize CW error rate to dict", exc_info=True
+            )
             return {"entries": [], "aggregate_error_rate": 0.0}
 
     def _create_mapping(
-        self,
-        entries: list[DocsIfDownstreamChannelEntry]
+        self, entries: list[DocsIfDownstreamChannelEntry]
     ) -> dict[int, DocsIfDownstreamChannelEntry]:
         """
         Create a mapping of channel ID → entry for quick lookup.
@@ -189,7 +215,9 @@ class DocsIfDownstreamChannelCwErrorRate:
         mapping: dict[int, DocsIfDownstreamChannelEntry] = {}
         for entry in entries:
             if not isinstance(entry, DocsIfDownstreamChannelEntry):
-                self.logger.warning(f"Skipping non-DocsIfDownstreamChannelEntry: {entry!r}")
+                self.logger.warning(
+                    f"Skipping non-DocsIfDownstreamChannelEntry: {entry!r}"
+                )
                 continue
 
             if not entry.entry:
@@ -198,13 +226,19 @@ class DocsIfDownstreamChannelCwErrorRate:
 
             channel_id = getattr(entry.entry, "docsIfDownChannelId", None)
             if channel_id is None:
-                self.logger.warning(f"Skipping entry with no docsIfDownChannelId: {entry!r}")
+                self.logger.warning(
+                    f"Skipping entry with no docsIfDownChannelId: {entry!r}"
+                )
                 continue
 
             if channel_id in mapping:
-                self.logger.warning(f"Duplicate docsIfDownChannelId {channel_id}; overwriting previous entry")
+                self.logger.warning(
+                    f"Duplicate docsIfDownChannelId {channel_id}; overwriting previous entry"
+                )
 
             mapping[int(channel_id)] = entry
 
-        self.logger.debug(f"Created mapping of {len(mapping)} entries - Keys: {list(mapping.keys())}")
+        self.logger.debug(
+            f"Created mapping of {len(mapping)} entries - Keys: {list(mapping.keys())}"
+        )
         return mapping

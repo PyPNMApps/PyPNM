@@ -28,19 +28,29 @@ from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer
 
 
 class RxMerCaptureModel(BaseModel):
-    capture_time: CaptureTime    = Field(..., ge=0, description="Epoch seconds.")
-    channel_id: ChannelId        = Field(..., ge=0, description="OFDM channel id.")
-    mac_address: MacAddressStr   = Field(default=MacAddress.null(), description="Normalized MAC (e.g., 00:1a:2b:3c:4d:5e).")
-    frequency: FrequencySeriesHz = Field(..., description="Per-subcarrier center frequencies (Hz).")
-    values: MagnitudeSeries      = Field(..., description="Per-subcarrier RxMER values (dB).")
+    capture_time: CaptureTime = Field(..., ge=0, description="Epoch seconds.")
+    channel_id: ChannelId = Field(..., ge=0, description="OFDM channel id.")
+    mac_address: MacAddressStr = Field(
+        default=MacAddress.null(),
+        description="Normalized MAC (e.g., 00:1a:2b:3c:4d:5e).",
+    )
+    frequency: FrequencySeriesHz = Field(
+        ..., description="Per-subcarrier center frequencies (Hz)."
+    )
+    values: MagnitudeSeries = Field(
+        ..., description="Per-subcarrier RxMER values (dB)."
+    )
 
     @model_validator(mode="after")
     def _check_lengths(self) -> RxMerCaptureModel:
         if not self.frequency or not self.values:
             raise ValueError("`frequency` and `values` must be non-empty.")
         if len(self.frequency) != len(self.values):
-            raise ValueError(f"Length mismatch: frequency={len(self.frequency)} vs values={len(self.values)}.")
+            raise ValueError(
+                f"Length mismatch: frequency={len(self.frequency)} vs values={len(self.values)}."
+            )
         return self
+
 
 class DsRxMerAggregator(MultiPnmCollection):
     """
@@ -66,10 +76,14 @@ class DsRxMerAggregator(MultiPnmCollection):
     @override
     def add(self, obj: MultiPnmCollectionObject) -> None:
         if not isinstance(obj, CmDsOfdmRxMer):
-            raise TypeError(f"DsRxMerAggregator only accepts CmDsOfdmRxMer instances, got {type(obj)}")
+            raise TypeError(
+                f"DsRxMerAggregator only accepts CmDsOfdmRxMer instances, got {type(obj)}"
+            )
         super().add(obj)
 
-    def get_min_avg_max(self, channel_id: ChannelId, precision: int = 2) -> MinAvgMaxModel:
+    def get_min_avg_max(
+        self, channel_id: ChannelId, precision: int = 2
+    ) -> MinAvgMaxModel:
         """
         Compute Min/Avg/Max statistics for RxMER values in a channel.
 
@@ -79,18 +93,24 @@ class DsRxMerAggregator(MultiPnmCollection):
             Structured model containing min/avg/max arrays and aggregate stats.
         """
 
-        captures: Sequence[tuple[CaptureTime, CmDsOfdmRxMer]] = self.get(channel_id=channel_id)
-        mags:list[MagnitudeSeries] = []
+        captures: Sequence[tuple[CaptureTime, CmDsOfdmRxMer]] = self.get(
+            channel_id=channel_id
+        )
+        mags: list[MagnitudeSeries] = []
 
         for capture_time, dorm in captures:
             values = dorm.get_rxmer_values()
-            self.logger.debug(f'Calculating MinAvgMaxChannel=({channel_id}) - CaptureTime=({capture_time}) - Getting RxMER ValueCount=({len(values)})')
+            self.logger.debug(
+                f"Calculating MinAvgMaxChannel=({channel_id}) - CaptureTime=({capture_time}) - Getting RxMER ValueCount=({len(values)})"
+            )
             mags.append(values)
 
         return MinAvgMax(mags, precision=precision).to_model()
 
     def get_frequencies(self, channel_id: ChannelId) -> FrequencySeriesHz:
-        captures: Sequence[tuple[CaptureTime, CmDsOfdmRxMer]] = self.get(channel_id=channel_id)
+        captures: Sequence[tuple[CaptureTime, CmDsOfdmRxMer]] = self.get(
+            channel_id=channel_id
+        )
         _, obj = captures[0]
         return obj.get_frequencies()
 
@@ -99,9 +119,15 @@ class DsRxMerAggregator(MultiPnmCollection):
     @overload
     def get_basic_analysis(self, channel_id: ChannelId) -> DsRxMerAnalysisModel: ...
     @overload
-    def get_basic_analysis(self, channel_id: ChannelId, capture_time: CaptureTime) -> DsRxMerAnalysisModel: ...
+    def get_basic_analysis(
+        self, channel_id: ChannelId, capture_time: CaptureTime
+    ) -> DsRxMerAnalysisModel: ...
 
-    def get_basic_analysis(self, channel_id: ChannelId | None = None, capture_time: CaptureTime | None = None) -> DsRxMerAnalysisModel:
+    def get_basic_analysis(
+        self,
+        channel_id: ChannelId | None = None,
+        capture_time: CaptureTime | None = None,
+    ) -> DsRxMerAnalysisModel:
         """
         Perform basic RxMER analysis using `Analysis.basic_analysis_rxmer`.
 
@@ -134,10 +160,21 @@ class DsRxMerAggregator(MultiPnmCollection):
         captures: list[CmDsOfdmRxMer] = []
         if channel_id is None:
             for ch_map in self._store.values():
-                captures.extend([obj for obj in ch_map.values() if isinstance(obj, CmDsOfdmRxMer)])
+                captures.extend(
+                    [obj for obj in ch_map.values() if isinstance(obj, CmDsOfdmRxMer)]
+                )
         else:
             if capture_time is None:
-                captures.extend([obj for _, obj in sorted(self._store.get(channel_id, {}).items(), key=lambda kv: kv[0]) if isinstance(obj, CmDsOfdmRxMer)])
+                captures.extend(
+                    [
+                        obj
+                        for _, obj in sorted(
+                            self._store.get(channel_id, {}).items(),
+                            key=lambda kv: kv[0],
+                        )
+                        if isinstance(obj, CmDsOfdmRxMer)
+                    ]
+                )
             else:
                 obj = self._store.get(channel_id, {}).get(capture_time)
                 if isinstance(obj, CmDsOfdmRxMer):
@@ -147,5 +184,3 @@ class DsRxMerAggregator(MultiPnmCollection):
 
         payload = [m.model_dump() for m in (o.to_model() for o in captures)]
         return Analysis.basic_analysis_rxmer(payload)
-
-

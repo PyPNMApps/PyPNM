@@ -56,13 +56,15 @@ class AbstractCaptureService(ABC):
         """
         self.duration = duration
         self.interval = interval
-        self.time_remaining:int = 0
+        self.time_remaining: int = 0
         self._ops: dict[str, dict[str, Any]] = {}
         self.logger = logging.getLogger(self.__class__.__name__)
         try:
             self._cap_group = CaptureGroup()
         except Exception as exc:
-            self.logger.error(f"Failed to initialize CaptureGroup, reason={exc}", exc_info=True)
+            self.logger.error(
+                f"Failed to initialize CaptureGroup, reason={exc}", exc_info=True
+            )
             raise
 
         self._capture_group_id: GroupId = GroupId("")
@@ -87,39 +89,44 @@ class AbstractCaptureService(ABC):
         try:
             group_id = self._cap_group.create_group()
         except Exception as exc:
-            self.logger.error(f"Failed to create capture group, reason={exc}", exc_info=True)
+            self.logger.error(
+                f"Failed to create capture group, reason={exc}", exc_info=True
+            )
             raise
 
         try:
             om = OperationManager(capture_group_id=group_id)
-            operation_id:OperationId = om.register()
+            operation_id: OperationId = om.register()
         except Exception as exc:
-            self.logger.error(f"Failed to create operation manager, reason={exc}", exc_info=True)
+            self.logger.error(
+                f"Failed to create operation manager, reason={exc}", exc_info=True
+            )
             raise
 
         start_time = time.time()
         self._ops[operation_id] = {
-            "group_id":         group_id,
-            "state":            OperationState.RUNNING,
-            "start_time":       start_time,
-            "duration":         self.duration,
-            "interval":         self.interval,
-            "time_remaining":   self.time_remaining,
-            "samples":          []
+            "group_id": group_id,
+            "state": OperationState.RUNNING,
+            "start_time": start_time,
+            "duration": self.duration,
+            "interval": self.interval,
+            "time_remaining": self.time_remaining,
+            "samples": [],
         }
 
         self.setOperationFinalInvocation(operation_id, False)
 
         self.logger.info(
             f"CaptureGroup={group_id} / Operation={operation_id} started "
-            f"({self.duration}s @ {self.interval}s interval)")
+            f"({self.duration}s @ {self.interval}s interval)"
+        )
 
         async def _runner() -> None:
-
             end_time = start_time + self.duration
 
-            while (time.time() < end_time) and self._ops[operation_id]["state"] == OperationState.RUNNING:
-
+            while (time.time() < end_time) and self._ops[operation_id][
+                "state"
+            ] == OperationState.RUNNING:
                 now = time.time()
                 remaining = max(0, int(end_time - now))
                 self._ops[operation_id]["time_remaining"] = remaining
@@ -134,59 +141,79 @@ class AbstractCaptureService(ABC):
                     for sample in samples:
                         self._ops[operation_id]["samples"].append(sample)
                         self._cap_group.add_transaction(sample.transaction_id)
-                        self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                        self.logger.debug(
+                            f"[{operation_id}] Captured sample txn={sample.transaction_id}"
+                        )
 
                 except Exception as exc:
                     error_msg = str(exc)
-                    self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
-                    self._ops[operation_id]["samples"].append(CaptureSample(timestamp       =   cast(TimeStamp, iteration_ts),
-                                                                            transaction_id  =   "",
-                                                                            filename        =   "",
-                                                                            error           =   error_msg))
+                    self.logger.error(
+                        f"[{operation_id}] Capture error: {error_msg}", exc_info=True
+                    )
+                    self._ops[operation_id]["samples"].append(
+                        CaptureSample(
+                            timestamp=cast(TimeStamp, iteration_ts),
+                            transaction_id="",
+                            filename="",
+                            error=error_msg,
+                        )
+                    )
 
             # Complete if still running
             if self._ops[operation_id]["state"] == OperationState.RUNNING:
-
                 self._ops[operation_id]["state"] = OperationState.COMPLETED
                 iteration_ts = time.time()
 
                 try:
-
-                    self.logger.info(f'Runner ended, Final Invocation , One Last Cycle before ending'
-                                    f'state={self._ops[operation_id]["state"]}'
-                                    f'time-remaining={self._ops[operation_id]["time_remaining"]}')
+                    self.logger.info(
+                        f"Runner ended, Final Invocation , One Last Cycle before ending"
+                        f"state={self._ops[operation_id]['state']}"
+                        f"time-remaining={self._ops[operation_id]['time_remaining']}"
+                    )
 
                     self.setOperationFinalInvocation(operation_id, True)
-                    msg_rsp:MessageResponse = await self._capture_message_response()
+                    msg_rsp: MessageResponse = await self._capture_message_response()
 
                     # This is here to before any last operation at the time of the completion of the task
                     if msg_rsp.status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE:
-                        self.logger.info('Skipping last _capture_message_response()')
+                        self.logger.info("Skipping last _capture_message_response()")
                     else:
                         samples = self._process_captures(msg_rsp)
                         for sample in samples:
                             self._ops[operation_id]["samples"].append(sample)
                             self._cap_group.add_transaction(sample.transaction_id)
-                            self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                            self.logger.info(
+                                f"[{operation_id}] Captured sample txn={sample.transaction_id}"
+                            )
 
                 except Exception as exc:
                     error_msg = str(exc)
-                    self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
+                    self.logger.error(
+                        f"[{operation_id}] Capture error: {error_msg}", exc_info=True
+                    )
                     self._ops[operation_id]["samples"].append(
-                        CaptureSample(timestamp         =   cast(TimeStamp, iteration_ts),
-                                      transaction_id    =   "",
-                                      filename          =   "",
-                                      error             =error_msg))
+                        CaptureSample(
+                            timestamp=cast(TimeStamp, iteration_ts),
+                            transaction_id="",
+                            filename="",
+                            error=error_msg,
+                        )
+                    )
 
-            self.logger.info(f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}")
+            self.logger.info(
+                f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}"
+            )
 
-                                            ###############
-                                            # Main RUNNER #
-                                            ###############
+            ###############
+            # Main RUNNER #
+            ###############
+
         try:
             asyncio.create_task(_runner())
         except Exception as exc:
-            self.logger.error(f"Failed to schedule capture runner task, reason={exc}", exc_info=True)
+            self.logger.error(
+                f"Failed to schedule capture runner task, reason={exc}", exc_info=True
+            )
             raise
 
         self._capture_group_id = group_id
@@ -200,18 +227,20 @@ class AbstractCaptureService(ABC):
     def getOperationID(self) -> OperationId:
         return self._operation_id
 
-    def getOperation(self, operation_id:OperationId) -> dict[str, dict[str, Any]]:
+    def getOperation(self, operation_id: OperationId) -> dict[str, dict[str, Any]]:
         return self._ops[operation_id]
 
-    def getOperationState(self,operation_id:OperationId) -> OperationState:
+    def getOperationState(self, operation_id: OperationId) -> OperationState:
         return self._ops[operation_id]["state"]
 
-    def setOperationFinalInvocation(self, operation_id:OperationId, state:bool) -> None:
-            "Indicate that Runner is done, and invocate any final operations"
-            self._ops[operation_id]["final_invocation"] = state
+    def setOperationFinalInvocation(
+        self, operation_id: OperationId, state: bool
+    ) -> None:
+        "Indicate that Runner is done, and invocate any final operations"
+        self._ops[operation_id]["final_invocation"] = state
 
-    def getOperationFinalInvocation(self, operation_id:OperationId) -> bool:
-            return self._ops[operation_id]["final_invocation"]
+    def getOperationFinalInvocation(self, operation_id: OperationId) -> bool:
+        return self._ops[operation_id]["final_invocation"]
 
     def status(self, operation_id: OperationId) -> dict[str, Any]:
         """
@@ -232,7 +261,7 @@ class AbstractCaptureService(ABC):
         return {
             "state": op["state"],
             "collected": len(op["samples"]),
-            "time_remaining": op.get("time_remaining", 0)
+            "time_remaining": op.get("time_remaining", 0),
         }
 
     def results(self, operation_id: OperationId) -> list[CaptureSample]:
@@ -280,32 +309,33 @@ class AbstractCaptureService(ABC):
         if not isinstance(payload, list):
             err = f"Unexpected payload type: {type(payload).__name__}"
             self.logger.error(err)
-            return [CaptureSample(timestamp         =   ts,
-                                  transaction_id    =   "",
-                                  filename          =   "",
-                                  error             =   err)]
+            return [
+                CaptureSample(timestamp=ts, transaction_id="", filename="", error=err)
+            ]
 
         samples: list[CaptureSample] = []
         for idx, entry in enumerate(payload):
             try:
-                status_str, msg_type, body = MessageResponse.get_payload_msg(entry) # type: ignore
+                status_str, msg_type, body = MessageResponse.get_payload_msg(entry)  # type: ignore
 
             except Exception as exc:
                 err = f"Failed to parse payload entry {idx}: {exc}"
                 self.logger.error(err, exc_info=True)
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   "",
-                                             filename       =   "",
-                                             error          =   err))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts, transaction_id="", filename="", error=err
+                    )
+                )
                 continue
 
             if status_str != ServiceStatusCode.SUCCESS.name:
                 err = f"Payload entry {idx} returned status {status_str}"
                 self.logger.error(err)
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   "",
-                                             filename       =   "",
-                                             error          =   err))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts, transaction_id="", filename="", error=err
+                    )
+                )
                 continue
 
             if msg_type != MessageResponseType.PNM_FILE_TRANSACTION.name:
@@ -317,10 +347,14 @@ class AbstractCaptureService(ABC):
             if not txn_id or not filename:
                 err = f"Missing txn_id or filename in entry {idx}"
                 self.logger.warning(f"{err}: {body}")
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   txn_id,
-                                             filename       =   filename,
-                                             error          =   "missing-txn-or-filename"))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts,
+                        transaction_id=txn_id,
+                        filename=filename,
+                        error="missing-txn-or-filename",
+                    )
+                )
                 continue
 
             try:
@@ -328,32 +362,48 @@ class AbstractCaptureService(ABC):
             except Exception as exc:
                 err = f"DB fetch error for txn {txn_id}: {exc}"
                 self.logger.error(err, exc_info=True)
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   txn_id,
-                                             filename       =   filename,
-                                             error          =   "db-fetch-error"))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts,
+                        transaction_id=txn_id,
+                        filename=filename,
+                        error="db-fetch-error",
+                    )
+                )
                 continue
 
             if rec is None:
                 err = f"No DB record found for txn {txn_id}"
                 self.logger.warning(err)
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   txn_id,
-                                             filename       =   filename,
-                                             error          =   "no-db-record"))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts,
+                        transaction_id=txn_id,
+                        filename=filename,
+                        error="no-db-record",
+                    )
+                )
             else:
-                samples.append(CaptureSample(timestamp      =   ts,
-                                             transaction_id =   txn_id,
-                                             filename       =   filename,
-                                             error          =   None))
+                samples.append(
+                    CaptureSample(
+                        timestamp=ts,
+                        transaction_id=txn_id,
+                        filename=filename,
+                        error=None,
+                    )
+                )
 
         if not samples:
             err = "No valid transactions found in payload"
             self.logger.warning(err)
-            return [CaptureSample(timestamp         =   ts,
-                                  transaction_id    =   "",
-                                  filename          =   "",
-                                  error             =   "no-transactions")]
+            return [
+                CaptureSample(
+                    timestamp=ts,
+                    transaction_id="",
+                    filename="",
+                    error="no-transactions",
+                )
+            ]
 
         return samples
 
@@ -381,4 +431,3 @@ class AbstractCaptureService(ABC):
           ``status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE``.
         """
         ...
-

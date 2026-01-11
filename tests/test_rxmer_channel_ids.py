@@ -29,17 +29,23 @@ class _FakeCableModem:
     def get_inet_address(self) -> str:
         return self._inet
 
-    async def getDocsIf31CmDsOfdmChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmDsOfdmChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return [
             (InterfaceIndex(1), ChannelId(1)),
             (InterfaceIndex(2), ChannelId(2)),
             (InterfaceIndex(3), ChannelId(3)),
         ]
 
-    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return []
 
-    async def getIfTypeIndex(self, *_args: object, **_kwargs: object) -> list[InterfaceIndex]:
+    async def getIfTypeIndex(
+        self, *_args: object, **_kwargs: object
+    ) -> list[InterfaceIndex]:
         return [InterfaceIndex(1)]
 
 

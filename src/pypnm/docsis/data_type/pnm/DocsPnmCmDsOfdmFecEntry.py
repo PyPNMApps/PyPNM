@@ -15,15 +15,26 @@ from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class DocsPnmCmDsOfdmFecEntryFields(BaseModel):
-    docsPnmCmDsOfdmFecSumType: str      = Field(..., description="Aggregation type/window (enum string, e.g., '24-hour interval')")
-    docsPnmCmDsOfdmFecFileEnable: bool  = Field(..., description="FEC summary file capture enable state")
-    docsPnmCmDsOfdmFecMeasStatus: str   = Field(..., description="Measurement status (enum string)")
-    docsPnmCmDsOfdmFecFileName: str     = Field(..., description="Result filename on the TFTP server")
+    docsPnmCmDsOfdmFecSumType: str = Field(
+        ...,
+        description="Aggregation type/window (enum string, e.g., '24-hour interval')",
+    )
+    docsPnmCmDsOfdmFecFileEnable: bool = Field(
+        ..., description="FEC summary file capture enable state"
+    )
+    docsPnmCmDsOfdmFecMeasStatus: str = Field(
+        ..., description="Measurement status (enum string)"
+    )
+    docsPnmCmDsOfdmFecFileName: str = Field(
+        ..., description="Result filename on the TFTP server"
+    )
 
 
 class DocsPnmCmDsOfdmFecEntry(BaseModel):
-    index: int                               = Field(..., description="SNMP row index (device-specific)")
-    entry: DocsPnmCmDsOfdmFecEntryFields     = Field(..., description="Flattened FEC summary control/status fields")
+    index: int = Field(..., description="SNMP row index (device-specific)")
+    entry: DocsPnmCmDsOfdmFecEntryFields = Field(
+        ..., description="Flattened FEC summary control/status fields"
+    )
 
     DEBUG: ClassVar[bool] = False
 
@@ -51,8 +62,9 @@ class DocsPnmCmDsOfdmFecEntry(BaseModel):
         """
         log = logging.getLogger(cls.__name__)
 
-        async def fetch(sym: str, caster: Callable[[Any], Any] | None = None
-                        ) -> str | int | float | bool | None:
+        async def fetch(
+            sym: str, caster: Callable[[Any], Any] | None = None
+        ) -> str | int | float | bool | None:
             try:
                 res = await snmp.get(f"{sym}.{index}")
                 raw = Snmp_v2c.get_result_value(res)
@@ -65,16 +77,25 @@ class DocsPnmCmDsOfdmFecEntry(BaseModel):
                     log.debug("idx=%s %s error=%r", index, sym, e)
                 return None
 
-        sum_type_i     = cast(int,  await fetch("docsPnmCmDsOfdmFecSumType", as_int))
-        file_enable    = cast(bool, await fetch("docsPnmCmDsOfdmFecFileEnable", as_bool))
-        meas_status_i  = cast(int,  await fetch("docsPnmCmDsOfdmFecMeasStatus", as_int))
-        file_name      = cast(str,  await fetch("docsPnmCmDsOfdmFecFileName", as_str))
+        sum_type_i = cast(int, await fetch("docsPnmCmDsOfdmFecSumType", as_int))
+        file_enable = cast(bool, await fetch("docsPnmCmDsOfdmFecFileEnable", as_bool))
+        meas_status_i = cast(int, await fetch("docsPnmCmDsOfdmFecMeasStatus", as_int))
+        file_name = cast(str, await fetch("docsPnmCmDsOfdmFecFileName", as_str))
 
-        missing = {k: v for k, v in dict(
-            sum_type_i=sum_type_i, file_enable=file_enable, meas_status_i=meas_status_i, file_name=file_name
-        ).items() if v is None}
+        missing = {
+            k: v
+            for k, v in dict(
+                sum_type_i=sum_type_i,
+                file_enable=file_enable,
+                meas_status_i=meas_status_i,
+                file_name=file_name,
+            ).items()
+            if v is None
+        }
         if missing:
-            raise ValueError(f"OFDM FEC idx={index}: missing required fields: {', '.join(missing.keys())}")
+            raise ValueError(
+                f"OFDM FEC idx={index}: missing required fields: {', '.join(missing.keys())}"
+            )
 
         # Convert MeasStatusType integer → readable string via enum
         try:
@@ -89,9 +110,12 @@ class DocsPnmCmDsOfdmFecEntry(BaseModel):
             from pypnm.docsis.cm_snmp_operation import (
                 FecSummaryType as _FecSummaryType,  # type: ignore
             )
+
             try:
                 if hasattr(_FecSummaryType, "from_value"):
-                    sum_type_s = str(_FecSummaryType.from_value(int(sum_type_i)))  # e.g., "24-hour interval"
+                    sum_type_s = str(
+                        _FecSummaryType.from_value(int(sum_type_i))
+                    )  # e.g., "24-hour interval"
                 else:
                     sum_type_s = str(_FecSummaryType(int(sum_type_i)))
             except Exception:
@@ -103,15 +127,17 @@ class DocsPnmCmDsOfdmFecEntry(BaseModel):
             sum_type_s = mapping.get(int(sum_type_i), f"unknown({sum_type_i})")
 
         entry = DocsPnmCmDsOfdmFecEntryFields(
-            docsPnmCmDsOfdmFecSumType      = sum_type_s,
-            docsPnmCmDsOfdmFecFileEnable   = bool(file_enable),
-            docsPnmCmDsOfdmFecMeasStatus   = meas_status_s,
-            docsPnmCmDsOfdmFecFileName     = str(file_name),
+            docsPnmCmDsOfdmFecSumType=sum_type_s,
+            docsPnmCmDsOfdmFecFileEnable=bool(file_enable),
+            docsPnmCmDsOfdmFecMeasStatus=meas_status_s,
+            docsPnmCmDsOfdmFecFileName=str(file_name),
         )
         return cls(index=index, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsPnmCmDsOfdmFecEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsPnmCmDsOfdmFecEntry]:
         """
         Batch fetch multiple OFDM FEC Summary rows.
 

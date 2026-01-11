@@ -115,6 +115,7 @@ def test_conjugate_and_scale() -> None:
         assert np.isfinite(inv_eps.as_array()[-1])
         assert np.allclose(inv_eps.as_array()[:-1], target[:-1], rtol=1e-12, atol=1e-12)
 
+
 def test_normalize_rms_global_and_masked() -> None:
     x = pairs(3, 4, 0, 0)  # RMS = 5/sqrt(2)
     ops = ComplexArrayOps(x)

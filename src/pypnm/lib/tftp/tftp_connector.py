@@ -20,10 +20,7 @@ class TFTPConnector:
     - Upload (put) files to a TFTP server
     """
 
-    def __init__(self,
-        host: Inet,
-        port: int = 69,
-        timeout: int = 5) -> None:
+    def __init__(self, host: Inet, port: int = 69, timeout: int = 5) -> None:
         """
         Args:
             host:    TFTP server hostname or IP.
@@ -49,7 +46,7 @@ class TFTPConnector:
         self.logger.debug(f"Starting TFTP download: {remote_filename} → {local_path}")
 
         try:
-            os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
+            os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
             client = TftpClient(self.host, self.port)
             client.download(remote_filename, local_path)
             self.logger.debug(f"TFTP download complete: {local_path}")

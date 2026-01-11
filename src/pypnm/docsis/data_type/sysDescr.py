@@ -15,12 +15,16 @@ class SystemDescriptorModel(BaseModel):
     """
     Pydantic v2 model that mirrors the `SystemDescriptor` dataclass.
     """
-    HW_REV:   str  = Field("",  description="Hardware revision.")
-    VENDOR:   str  = Field("",  description="Device vendor.")
-    BOOTR:    str  = Field("",  description="Bootloader revision.")
-    SW_REV:   str  = Field("",  description="Software/firmware revision.")
-    MODEL:    str  = Field("",  description="Device model.")
-    is_empty: bool = Field(default=True, description="True if derived from an empty descriptor.")
+
+    HW_REV: str = Field("", description="Hardware revision.")
+    VENDOR: str = Field("", description="Device vendor.")
+    BOOTR: str = Field("", description="Bootloader revision.")
+    SW_REV: str = Field("", description="Software/firmware revision.")
+    MODEL: str = Field("", description="Device model.")
+    is_empty: bool = Field(
+        default=True, description="True if derived from an empty descriptor."
+    )
+
 
 @dataclass(frozen=True)
 class SystemDescriptor:
@@ -34,12 +38,13 @@ class SystemDescriptor:
 
     Provides parsing, serialization, and an "empty" factory.
     """
-    hw_rev: str     = ""
-    vendor: str     = ""
-    boot_rev: str   = ""
-    sw_rev: str     = ""
-    model: str      = ""
-    _is_empty:bool  = True
+
+    hw_rev: str = ""
+    vendor: str = ""
+    boot_rev: str = ""
+    sw_rev: str = ""
+    model: str = ""
+    _is_empty: bool = True
 
     _PATTERN: ClassVar[re.Pattern] = re.compile(r"<<\s*(.*?)\s*>>")
 
@@ -57,45 +62,47 @@ class SystemDescriptor:
         entries = [item.strip() for item in content.split(";") if item.strip()]
         data: dict[str, str] = {}
         for entry in entries:
-            if ':' not in entry:
+            if ":" not in entry:
                 raise ValueError(f"Invalid field entry '{entry}' in sysDescr")
-            key, val = [part.strip() for part in entry.split(':', 1)]
+            key, val = [part.strip() for part in entry.split(":", 1)]
             data[key] = val
         try:
-            empty:bool = False
-            if data.get('HW_REV') == '':
+            empty: bool = False
+            if data.get("HW_REV") == "":
                 empty = True
 
             return cls(
-                hw_rev      =   data.get('HW_REV', ''),
-                vendor      =   data.get('VENDOR', ''),
-                boot_rev    =   data.get('BOOTR', ''),
-                sw_rev      =   data.get('SW_REV', ''),
-                model       =   data.get('MODEL', ''),
-                _is_empty   =   empty
+                hw_rev=data.get("HW_REV", ""),
+                vendor=data.get("VENDOR", ""),
+                boot_rev=data.get("BOOTR", ""),
+                sw_rev=data.get("SW_REV", ""),
+                model=data.get("MODEL", ""),
+                _is_empty=empty,
             )
 
         except KeyError as e:
-            raise ValueError(f"Missing expected field {e.args[0]} in sysDescr: {system_description}") from e
+            raise ValueError(
+                f"Missing expected field {e.args[0]} in sysDescr: {system_description}"
+            ) from e
 
     def to_model(self) -> SystemDescriptorModel:
         """
         Convert to a Pydantic model representation.
         """
         return SystemDescriptorModel(
-            HW_REV      =   self.hw_rev,
-            VENDOR      =   self.vendor,
-            BOOTR       =   self.boot_rev,
-            SW_REV      =   self.sw_rev,
-            MODEL       =   self.model,
-            is_empty    =   self.is_empty()
+            HW_REV=self.hw_rev,
+            VENDOR=self.vendor,
+            BOOTR=self.boot_rev,
+            SW_REV=self.sw_rev,
+            MODEL=self.model,
+            is_empty=self.is_empty(),
         )
 
     def to_dict(self) -> dict[str, str]:
         """
         Serialize the SysDescr fields to a dict.
         """
-        return self.to_model().model_dump(exclude={'is_empty'})
+        return self.to_model().model_dump(exclude={"is_empty"})
 
     def to_json(self) -> str:
         """
@@ -112,11 +119,11 @@ class SystemDescriptor:
         Load a SysDescr from a dictionary.
         """
         return cls(
-            hw_rev  =   data.get('HW_REV', ''),
-            vendor  =   data.get('VENDOR', ''),
-            boot_rev=   data.get('BOOTR', ''),
-            sw_rev  =   data.get('SW_REV', ''),
-            model   =   data.get('MODEL', '')
+            hw_rev=data.get("HW_REV", ""),
+            vendor=data.get("VENDOR", ""),
+            boot_rev=data.get("BOOTR", ""),
+            sw_rev=data.get("SW_REV", ""),
+            model=data.get("MODEL", ""),
         )
 
     @classmethod

@@ -9,7 +9,9 @@ import pytest
 try:
     from pypnm.pnm.lib.moving_average import MovingAverage
 except Exception:
-    pytest.skip("MovingAverage not importable in this environment", allow_module_level=True)
+    pytest.skip(
+        "MovingAverage not importable in this environment", allow_module_level=True
+    )
 
 
 def test_empty_returns_empty_list() -> None:

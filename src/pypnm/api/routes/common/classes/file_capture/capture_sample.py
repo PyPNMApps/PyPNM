@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -32,7 +31,17 @@ class CaptureSample(BaseModel):
         )
         ```
     """
-    timestamp: TimeStamp            = Field(..., description="Unix timestamp (seconds since epoch) when the capture was triggered")
-    transaction_id: TransactionId   = Field(...,description="TFTP transaction ID returned by the cable modem")
-    filename: str                   = Field(...,description="Name of the uploaded capture file containing RxMER data")
-    error: str | None            = Field(None, description="Error message if capture or upload failed (otherwise None)")
+
+    timestamp: TimeStamp = Field(
+        ...,
+        description="Unix timestamp (seconds since epoch) when the capture was triggered",
+    )
+    transaction_id: TransactionId = Field(
+        ..., description="TFTP transaction ID returned by the cable modem"
+    )
+    filename: str = Field(
+        ..., description="Name of the uploaded capture file containing RxMER data"
+    )
+    error: str | None = Field(
+        None, description="Error message if capture or upload failed (otherwise None)"
+    )

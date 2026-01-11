@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -23,6 +22,7 @@ class DocsPnmCmDsOfdmMerMarFields(BaseModel):
     docsPnmCmDsOfdmMerMarAvgMerMargin: int | None = None
     docsPnmCmDsOfdmMerMarMeasStatus: int | None = None
 
+
 class DocsPnmCmDsOfdmMerMarEntry(BaseModel):
     index: int
     channel_id: int
@@ -32,7 +32,9 @@ class DocsPnmCmDsOfdmMerMarEntry(BaseModel):
     async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsPnmCmDsOfdmMerMarEntry:
         logger = logging.getLogger(cls.__name__)
 
-        async def fetch(oid: str, cast: Callable | None = None) -> str | int | float | bool | None:
+        async def fetch(
+            oid: str, cast: Callable | None = None
+        ) -> str | int | float | bool | None:
             try:
                 result = await snmp.get(f"{oid}.{index}")
                 value = Snmp_v2c.get_result_value(result)
@@ -50,21 +52,41 @@ class DocsPnmCmDsOfdmMerMarEntry(BaseModel):
                 return None
 
         entry = DocsPnmCmDsOfdmMerMarFields(
-            docsPnmCmDsOfdmMerMarProfileId=await fetch("docsPnmCmDsOfdmMerMarProfileId", int),
-            docsPnmCmDsOfdmMerMarThrshldOffset=await fetch("docsPnmCmDsOfdmMerMarThrshldOffset", int),
-            docsPnmCmDsOfdmMerMarMeasEnable=await fetch("docsPnmCmDsOfdmMerMarMeasEnable", Snmp_v2c.truth_value),
-            docsPnmCmDsOfdmMerMarNumSymPerSubCarToAvg=await fetch("docsPnmCmDsOfdmMerMarNumSymPerSubCarToAvg", int),
-            docsPnmCmDsOfdmMerMarReqAvgMer=await fetch("docsPnmCmDsOfdmMerMarReqAvgMer", int),
-            docsPnmCmDsOfdmMerMarNumSubCarBelowThrshld=await fetch("docsPnmCmDsOfdmMerMarNumSubCarBelowThrshld", int),
-            docsPnmCmDsOfdmMerMarMeasuredAvgMer=await fetch("docsPnmCmDsOfdmMerMarMeasuredAvgMer", int),
-            docsPnmCmDsOfdmMerMarAvgMerMargin=await fetch("docsPnmCmDsOfdmMerMarAvgMerMargin", int),
-            docsPnmCmDsOfdmMerMarMeasStatus=await fetch("docsPnmCmDsOfdmMerMarMeasStatus", int),
+            docsPnmCmDsOfdmMerMarProfileId=await fetch(
+                "docsPnmCmDsOfdmMerMarProfileId", int
+            ),
+            docsPnmCmDsOfdmMerMarThrshldOffset=await fetch(
+                "docsPnmCmDsOfdmMerMarThrshldOffset", int
+            ),
+            docsPnmCmDsOfdmMerMarMeasEnable=await fetch(
+                "docsPnmCmDsOfdmMerMarMeasEnable", Snmp_v2c.truth_value
+            ),
+            docsPnmCmDsOfdmMerMarNumSymPerSubCarToAvg=await fetch(
+                "docsPnmCmDsOfdmMerMarNumSymPerSubCarToAvg", int
+            ),
+            docsPnmCmDsOfdmMerMarReqAvgMer=await fetch(
+                "docsPnmCmDsOfdmMerMarReqAvgMer", int
+            ),
+            docsPnmCmDsOfdmMerMarNumSubCarBelowThrshld=await fetch(
+                "docsPnmCmDsOfdmMerMarNumSubCarBelowThrshld", int
+            ),
+            docsPnmCmDsOfdmMerMarMeasuredAvgMer=await fetch(
+                "docsPnmCmDsOfdmMerMarMeasuredAvgMer", int
+            ),
+            docsPnmCmDsOfdmMerMarAvgMerMargin=await fetch(
+                "docsPnmCmDsOfdmMerMarAvgMerMargin", int
+            ),
+            docsPnmCmDsOfdmMerMarMeasStatus=await fetch(
+                "docsPnmCmDsOfdmMerMarMeasStatus", int
+            ),
         )
 
         return cls(index=index, channel_id=index, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsPnmCmDsOfdmMerMarEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsPnmCmDsOfdmMerMarEntry]:
         logger = logging.getLogger(cls.__name__)
         results: list[DocsPnmCmDsOfdmMerMarEntry] = []
 
@@ -75,7 +97,9 @@ class DocsPnmCmDsOfdmMerMarEntry(BaseModel):
 
         for idx, result in zip(indices, gathered_results, strict=False):
             if isinstance(result, Exception):
-                logger.warning(f"Failed to fetch OFDM MER Margin entry for index {idx}: {result}")
+                logger.warning(
+                    f"Failed to fetch OFDM MER Margin entry for index {idx}: {result}"
+                )
             else:
                 results.append(result)
 

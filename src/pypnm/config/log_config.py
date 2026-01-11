@@ -17,10 +17,13 @@ class LoggerConfigurator:
     with optional rotation and a standardized startup banner.
     """
 
-    def __init__(self,
-                 log_dir: PathLike,
-                 log_filename: FileNameStr,
-                 level: str = 'INFO', to_console: bool = False, rotate: bool = False
+    def __init__(
+        self,
+        log_dir: PathLike,
+        log_filename: FileNameStr,
+        level: str = "INFO",
+        to_console: bool = False,
+        rotate: bool = False,
     ) -> None:
         """
         Initialize the LoggerConfigurator.
@@ -49,16 +52,13 @@ class LoggerConfigurator:
         if self.rotate:
             # Rotate after ~10MB, keep up to 5 old log files
             handler = RotatingFileHandler(
-                log_file,
-                maxBytes=10 * 1024 * 1024,
-                backupCount=5
+                log_file, maxBytes=10 * 1024 * 1024, backupCount=5
             )
         else:
             handler = logging.FileHandler(log_file)
 
         # 3. Define log message format
-        fmt = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
         handler.setFormatter(fmt)
 
         # 4. Configure root logger

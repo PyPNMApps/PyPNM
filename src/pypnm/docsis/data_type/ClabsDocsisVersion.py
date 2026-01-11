@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -11,6 +10,7 @@ class ClabsDocsisVersion(IntEnum):
     Enum representing DOCSIS RF specification versions.
     Maps to the ClabsDocsisVersion textual convention used in SNMP MIBs.
     """
+
     OTHER = 0
     DOCSIS_10 = 1
     DOCSIS_11 = 2

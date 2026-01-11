@@ -152,13 +152,13 @@ def test_to_dict_uses_alias_and_is_serializable() -> None:
 @pytest.mark.pnm
 def test_validation_duplicate_freqs_and_mismatched_lengths() -> None:
     freqs = np.array([100.0, 100.0, 200.0])
-    H = np.array([1+0j, 1+0j, 1+0j])
+    H = np.array([1 + 0j, 1 + 0j, 1 + 0j])
     calc = GroupDelayCalculator(H, freqs)
     with pytest.raises(ValueError):
         _ = calc.compute_group_delay_full()
 
     freqs2 = np.array([1.0, 2.0, 3.0, 4.0])
-    H2 = np.array([1+0j, 1+0j, 1+0j])
+    H2 = np.array([1 + 0j, 1 + 0j, 1 + 0j])
     with pytest.raises(ValueError):
         _ = GroupDelayCalculator(H2, freqs2)
 

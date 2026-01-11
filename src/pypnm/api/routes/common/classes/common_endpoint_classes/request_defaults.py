@@ -33,8 +33,16 @@ class RequestDefaultsResolver:
                 Inet(SystemConfigSettings.bulk_tftp_ip_v4()),
                 Inet(SystemConfigSettings.bulk_tftp_ip_v6()),
             )
-        ipv4 = tftp.ipv4 if tftp.ipv4 is not None else SystemConfigSettings.bulk_tftp_ip_v4()
-        ipv6 = tftp.ipv6 if tftp.ipv6 is not None else SystemConfigSettings.bulk_tftp_ip_v6()
+        ipv4 = (
+            tftp.ipv4
+            if tftp.ipv4 is not None
+            else SystemConfigSettings.bulk_tftp_ip_v4()
+        )
+        ipv6 = (
+            tftp.ipv6
+            if tftp.ipv6 is not None
+            else SystemConfigSettings.bulk_tftp_ip_v6()
+        )
         return (Inet(ipv4), Inet(ipv6))
 
     @staticmethod

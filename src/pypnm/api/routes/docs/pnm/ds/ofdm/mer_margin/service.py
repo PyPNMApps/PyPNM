@@ -51,24 +51,32 @@ class CmDsOfdmMerMarginService:
         template: dict[str, list[dict]] = {}
 
         try:
-            profiles: list[tuple[int, OfdmProfiles]] = await self.cable_modem.getOfdmProfiles()
+            profiles: list[
+                tuple[int, OfdmProfiles]
+            ] = await self.cable_modem.getOfdmProfiles()
 
             for index, ofdm_profile in profiles:
                 template[str(index)] = []
 
                 for profile_id in ofdm_profile.list_profiles():
-                    self.logger.info(f'Idx: {index} - Profiles: {profile_id}')
+                    self.logger.info(f"Idx: {index} - Profiles: {profile_id}")
                     profile = MerMarginMeasurementProfile(
                         channel_id=index,
                         profile_id=profile_id,
                         params=MerMarginParams(
-                                MerMarThrshldOffset=4, MerMarMeasEnable=True,
-                                MerMarNumSymPerSubCarToAvg=8, MerMarReqAvgMer=360))
+                            MerMarThrshldOffset=4,
+                            MerMarMeasEnable=True,
+                            MerMarNumSymPerSubCarToAvg=8,
+                            MerMarReqAvgMer=360,
+                        ),
+                    )
 
                     template[str(index)].append(profile.model_dump())
 
         except Exception as e:
-            self.logger.exception("Failed to construct MER Margin measurement template, error: %s", e)
+            self.logger.exception(
+                "Failed to construct MER Margin measurement template, error: %s", e
+            )
 
         return template
 

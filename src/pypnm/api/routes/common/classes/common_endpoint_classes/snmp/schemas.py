@@ -24,6 +24,7 @@ class SnmpRequest(BaseDeviceConnectRequest):
     Inherits MAC and IP from CommonRequest.
     """
 
+
 class SnmpResponse(BaseDeviceResponse):
     """
     Generic SNMP response model supporting raw or structured output.
@@ -34,28 +35,42 @@ class SnmpResponse(BaseDeviceResponse):
             - `str` for plain-text outputs.
             - `Dict[str, Any]` or any structured data.
     """
+
     results: bytes | str | dict[str, Any] | Any | BaseModel | None = Field(
         default={},
         description=(
             "Raw or structured data resulting from the SNMP operation: "
             "bytes, text, or a structured dict/model."
-        )
+        ),
     )
+
 
 class SnmpAnalysisSpec(BaseModel):
     """
     Describes the specification of an SNMP analysis request.
     """
-    type: int = Field(..., description="Type identifier for the SNMP analysis to be performed.")
+
+    type: int = Field(
+        ..., description="Type identifier for the SNMP analysis to be performed."
+    )
+
 
 class SnmpAnalysisRequest(CommonRequest):
     """
     Request model for triggering SNMP-based analysis with specific parameters.
     """
-    analysis: SnmpAnalysisSpec = Field(..., description="Specification of the analysis to be run on the target device.")
+
+    analysis: SnmpAnalysisSpec = Field(
+        ..., description="Specification of the analysis to be run on the target device."
+    )
+
 
 class SnmpAnalysisResponse(CommonResponse):
     """
     Response model for SNMP-based analysis operations.
     """
-    data: bytes | str | None = Field(default=None, description="Structured or raw result of the SNMP analysis operation.")
+
+    data: bytes | str | None = Field(
+        default=None,
+        description="Structured or raw result of the SNMP analysis operation.",
+    )

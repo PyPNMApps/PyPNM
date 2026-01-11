@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -20,18 +19,18 @@ from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 
 
 class DiplexerConfigResult:
-
     def __init__(self) -> None:
-        self.router = APIRouter(prefix="/docs/if31/system",
-                                tags=["DOCSIS 3.1 System"])
+        self.router = APIRouter(prefix="/docs/if31/system", tags=["DOCSIS 3.1 System"])
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self._register_routes()
 
     def _register_routes(self) -> None:
-        @self.router.post("/diplexer",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/diplexer",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def diplexer_config(request: SnmpRequest) -> SnmpResponse:
             """
             **DOCSIS 3.1 System Diplexer Configuration**
@@ -48,26 +47,29 @@ class DiplexerConfigResult:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            self.logger.info(f"Retrieving diplexer configuration for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Retrieving diplexer configuration for MAC: {mac}, IP: {ip}"
+            )
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac,
+                ip_address=ip,
+                snmp_config=request.cable_modem.snmp,
+                validate_ofdm_exist=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             try:
+                config = await DiplexerConfigService.fetch_diplexer_config(
+                    mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+                )
 
-                config = await DiplexerConfigService.fetch_diplexer_config(mac_address=mac,
-                                                                           ip_address=ip,
-                                                                           snmp_config=request.cable_modem.snmp)
-
-                response = SnmpResponse(mac_address =   mac,
-                                        status      =   ServiceStatusCode.SUCCESS,
-                                        results     =   config)
+                response = SnmpResponse(
+                    mac_address=mac, status=ServiceStatusCode.SUCCESS, results=config
+                )
                 return response
 
             except HTTPException:
@@ -77,6 +79,8 @@ class DiplexerConfigResult:
                 self.logger.exception("Failed to fetch diplexer configuration")
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Internal error retrieving diplexer configuration, Reason: {exc}") from exc
+                    detail=f"Internal error retrieving diplexer configuration, Reason: {exc}",
+                ) from exc
+
 
 router = DiplexerConfigResult().router

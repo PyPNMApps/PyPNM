@@ -15,13 +15,13 @@ from pypnm.lib.types import PathLike
 __all__ = ["ArchiveManager"]
 
 
-CompressionKey          = Literal["zipstore", "zipdeflated", "zipbz2", "ziplzma"]
-TarFormatKey            = Literal["tar", "gztar", "bztar", "xztar"]
-ArchiveFormatKey        = Literal["zip"] | TarFormatKey
-ArchiveMemberName       = str
-ArchiveMemberIterable   = Iterable[ArchiveMemberName]
-ZipCompressionMap       = dict[CompressionKey, int]
-TarModeMap              = dict[TarFormatKey, str]
+CompressionKey = Literal["zipstore", "zipdeflated", "zipbz2", "ziplzma"]
+TarFormatKey = Literal["tar", "gztar", "bztar", "xztar"]
+ArchiveFormatKey = Literal["zip"] | TarFormatKey
+ArchiveMemberName = str
+ArchiveMemberIterable = Iterable[ArchiveMemberName]
+ZipCompressionMap = dict[CompressionKey, int]
+TarModeMap = dict[TarFormatKey, str]
 
 
 class ArchiveManager:
@@ -44,17 +44,17 @@ class ArchiveManager:
     """
 
     _ZIP_COMP: ZipCompressionMap = {
-        "zipstore":     zipfile.ZIP_STORED,
-        "zipdeflated":  zipfile.ZIP_DEFLATED,
-        "zipbz2":       zipfile.ZIP_BZIP2,
-        "ziplzma":      zipfile.ZIP_LZMA,
+        "zipstore": zipfile.ZIP_STORED,
+        "zipdeflated": zipfile.ZIP_DEFLATED,
+        "zipbz2": zipfile.ZIP_BZIP2,
+        "ziplzma": zipfile.ZIP_LZMA,
     }
 
     _TAR_MODE: TarModeMap = {
-        "tar":      "w",
-        "gztar":    "w:gz",
-        "bztar":    "w:bz2",
-        "xztar":    "w:xz",
+        "tar": "w",
+        "gztar": "w:gz",
+        "bztar": "w:bz2",
+        "xztar": "w:xz",
     }
 
     _LOG = logging.getLogger("ArchiveManager")
@@ -112,7 +112,9 @@ class ArchiveManager:
         elif fmt in ArchiveManager._TAR_MODE:
             with tarfile.open(archive_path, "r:*") as tf:
                 return [m.name for m in tf.getmembers()]
-        raise ValueError(f"Unsupported or undetected archive format for: {archive_path}")
+        raise ValueError(
+            f"Unsupported or undetected archive format for: {archive_path}"
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Create archives
@@ -173,7 +175,9 @@ class ArchiveManager:
                 src = Path(f)
                 if not src.exists():
                     if skip_missing:
-                        ArchiveManager._LOG.warning("zip_files: missing: %s (skipped)", src)
+                        ArchiveManager._LOG.warning(
+                            "zip_files: missing: %s (skipped)", src
+                        )
                         continue
                     raise FileNotFoundError(src)
 
@@ -181,7 +185,9 @@ class ArchiveManager:
                     arcname = arcname_map[f]
                 elif preserve_tree and arcbase is not None:
                     try:
-                        arcname = str(src.resolve().relative_to(Path(arcbase).resolve()))
+                        arcname = str(
+                            src.resolve().relative_to(Path(arcbase).resolve())
+                        )
                     except Exception:
                         arcname = src.name
                 else:
@@ -243,7 +249,9 @@ class ArchiveManager:
                 src = Path(f)
                 if not src.exists():
                     if skip_missing:
-                        ArchiveManager._LOG.warning("tar_files: missing: %s (skipped)", src)
+                        ArchiveManager._LOG.warning(
+                            "tar_files: missing: %s (skipped)", src
+                        )
                         continue
                     raise FileNotFoundError(src)
 
@@ -251,7 +259,9 @@ class ArchiveManager:
                     arcname = arcname_map[f]  # type: ignore[index]
                 elif preserve_tree and arcbase is not None:
                     try:
-                        arcname = str(src.resolve().relative_to(Path(arcbase).resolve()))
+                        arcname = str(
+                            src.resolve().relative_to(Path(arcbase).resolve())
+                        )
                     except Exception:
                         arcname = src.name
                 else:
@@ -339,12 +349,14 @@ class ArchiveManager:
         FileNotFoundError
             If archive_path does not exist.
         """
-        ap   = Path(archive_path)
+        ap = Path(archive_path)
         dest = Path(dest_dir)
-        fmt  = fmt or ArchiveManager.detect_format(ap) # pyright: ignore[reportAssignmentType]
+        fmt = fmt or ArchiveManager.detect_format(ap)  # pyright: ignore[reportAssignmentType]
 
         if fmt is None:
-            raise ValueError(f"Unsupported or undetected archive format for: {archive_path}")
+            raise ValueError(
+                f"Unsupported or undetected archive format for: {archive_path}"
+            )
 
         extracted: list[Path] = []
 
@@ -353,14 +365,18 @@ class ArchiveManager:
             with zipfile.ZipFile(ap, "r") as zf:
                 all_names = list(members) if members is not None else zf.namelist()
 
-                unsafe_present = any(ArchiveManager._is_unsafe_name(n) for n in all_names)
+                unsafe_present = any(
+                    ArchiveManager._is_unsafe_name(n) for n in all_names
+                )
                 base_dir = dest.parent / f"{dest.name}_safe" if unsafe_present else dest
 
                 base_dir.mkdir(parents=True, exist_ok=True)
 
                 for name in all_names:
                     if ArchiveManager._is_unsafe_name(name):
-                        ArchiveManager._LOG.warning("extract: skipping unsafe zip member: %s", name)
+                        ArchiveManager._LOG.warning(
+                            "extract: skipping unsafe zip member: %s", name
+                        )
                         continue
 
                     tgt = base_dir / name
@@ -387,18 +403,22 @@ class ArchiveManager:
                 all_members = tf.getmembers()
                 if members is not None:
                     wanted = set(members)
-                    sel    = [m for m in all_members if m.name in wanted]
+                    sel = [m for m in all_members if m.name in wanted]
                 else:
-                    sel    = all_members
+                    sel = all_members
 
-                unsafe_present = any(ArchiveManager._is_unsafe_name(m.name) for m in sel)
+                unsafe_present = any(
+                    ArchiveManager._is_unsafe_name(m.name) for m in sel
+                )
                 base_dir = dest.parent / f"{dest.name}_safe" if unsafe_present else dest
 
                 base_dir.mkdir(parents=True, exist_ok=True)
 
                 for m in sel:
                     if ArchiveManager._is_unsafe_name(m.name):
-                        ArchiveManager._LOG.warning("extract: skipping unsafe tar member: %s", m.name)
+                        ArchiveManager._LOG.warning(
+                            "extract: skipping unsafe tar member: %s", m.name
+                        )
                         continue
 
                     tgt = base_dir / m.name
@@ -422,13 +442,15 @@ class ArchiveManager:
 
             return extracted
 
-        raise ValueError(f"Unsupported or undetected archive format for: {archive_path}")
+        raise ValueError(
+            f"Unsupported or undetected archive format for: {archive_path}"
+        )
 
     @staticmethod
     def __remove_duplicates(files: Iterable[PathLike]) -> list[Path]:
         """Ensure each path exists and appears only once (order preserved)."""
         seen: set[Path] = set()
-        out:  list[Path] = []
+        out: list[Path] = []
         for f in files:
             p = Path(f)
             if not p.exists():

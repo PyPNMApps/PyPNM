@@ -41,9 +41,7 @@ def _reset_cfg(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_default_mac_address_from_config(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = FakeConfigManager(
-        {"FastApiRequestDefault.mac_address": "aa:bb:cc:dd:ee:ff"}
-    )
+    fake = FakeConfigManager({"FastApiRequestDefault.mac_address": "aa:bb:cc:dd:ee:ff"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     mac = SystemConfigSettings.default_mac_address()
@@ -71,9 +69,7 @@ def test_default_mac_address_missing_uses_null_and_logs_error(
 def test_default_ip_address_uses_config_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"FastApiRequestDefault.ip_address": "10.0.0.5"}
-    )
+    fake = FakeConfigManager({"FastApiRequestDefault.ip_address": "10.0.0.5"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     ip = SystemConfigSettings.default_ip_address()
@@ -103,23 +99,17 @@ def test_snmp_enable_boolean_and_string_handling(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Direct boolean True
-    fake = FakeConfigManager(
-        {"SNMP.version.2c.enable": True}
-    )
+    fake = FakeConfigManager({"SNMP.version.2c.enable": True})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
     assert SystemConfigSettings.snmp_enable() is True
 
     # String false
-    fake2 = FakeConfigManager(
-        {"SNMP.version.2c.enable": "false"}
-    )
+    fake2 = FakeConfigManager({"SNMP.version.2c.enable": "false"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake2)
     assert SystemConfigSettings.snmp_enable() is False
 
     # Invalid value falls back to default True and logs
-    fake3 = FakeConfigManager(
-        {"SNMP.version.2c.enable": "not-a-bool"}
-    )
+    fake3 = FakeConfigManager({"SNMP.version.2c.enable": "not-a-bool"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake3)
 
     logger_name = "SystemConfigSettings"
@@ -127,7 +117,10 @@ def test_snmp_enable_boolean_and_string_handling(
         value = SystemConfigSettings.snmp_enable()
 
     assert value is True
-    assert "Invalid boolean configuration value for 'SNMP.version.2c.enable'" in caplog.text
+    assert (
+        "Invalid boolean configuration value for 'SNMP.version.2c.enable'"
+        in caplog.text
+    )
 
 
 def test_snmp_retries_int_conversion_and_defaults(
@@ -135,9 +128,7 @@ def test_snmp_retries_int_conversion_and_defaults(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Valid integer string
-    fake = FakeConfigManager(
-        {"SNMP.version.2c.retries": "7"}
-    )
+    fake = FakeConfigManager({"SNMP.version.2c.retries": "7"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
     assert SystemConfigSettings.snmp_retries() == 7
 
@@ -153,16 +144,17 @@ def test_snmp_retries_int_conversion_and_defaults(
     assert "Missing configuration value for 'SNMP.version.2c.retries'" in caplog.text
 
     # Invalid => default 5 with log
-    fake3 = FakeConfigManager(
-        {"SNMP.version.2c.retries": "not-an-int"}
-    )
+    fake3 = FakeConfigManager({"SNMP.version.2c.retries": "not-an-int"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake3)
 
     with caplog.at_level(logging.ERROR, logger=logger_name):
         retries_invalid = SystemConfigSettings.snmp_retries()
 
     assert retries_invalid == 5
-    assert "Invalid integer configuration value for 'SNMP.version.2c.retries'" in caplog.text
+    assert (
+        "Invalid integer configuration value for 'SNMP.version.2c.retries'"
+        in caplog.text
+    )
 
 
 def test_database_backend_defaults_to_sqlite_when_missing(
@@ -178,12 +170,12 @@ def test_database_backend_defaults_to_sqlite_when_missing(
 def test_database_settings_env_override_for_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"Database.backend": "sqlite"}
-    )
+    fake = FakeConfigManager({"Database.backend": "sqlite"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
     monkeypatch.setenv("PYPNM_DB_BACKEND", "postgres")
-    monkeypatch.setenv("PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm")
+    monkeypatch.setenv(
+        "PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm"
+    )
 
     settings = SystemConfigSettings.database_settings()
     assert settings.backend == DatabaseBackend.POSTGRES
@@ -192,9 +184,7 @@ def test_database_settings_env_override_for_backend(
 def test_database_settings_rejects_invalid_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"Database.backend": "oracle"}
-    )
+    fake = FakeConfigManager({"Database.backend": "oracle"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     with pytest.raises(ValidationError):
@@ -204,9 +194,7 @@ def test_database_settings_rejects_invalid_backend(
 def test_database_settings_rejects_blank_sqlite_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"Database.sqlite.path": ""}
-    )
+    fake = FakeConfigManager({"Database.sqlite.path": ""})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     with pytest.raises(ValidationError):
@@ -223,7 +211,9 @@ def test_database_settings_env_override_for_postgres_dsn(
         }
     )
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
-    monkeypatch.setenv("PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm")
+    monkeypatch.setenv(
+        "PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm"
+    )
 
     settings = SystemConfigSettings.database_settings()
     assert settings.postgres.dsn == "postgresql://pypnm@localhost:5432/pypnm"
@@ -373,8 +363,14 @@ def test_scp_port_and_private_key_defaults_and_logs(
     assert key_path == ""
 
     text = caplog.text
-    assert "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.scp.port'" in text
-    assert "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.scp.private_key_path'" in text
+    assert (
+        "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.scp.port'"
+        in text
+    )
+    assert (
+        "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.scp.private_key_path'"
+        in text
+    )
 
 
 def test_sftp_settings_use_config_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -418,8 +414,14 @@ def test_sftp_port_and_private_key_defaults_and_logs(
     assert key_path == ""
 
     text = caplog.text
-    assert "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.sftp.port'" in text
-    assert "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.sftp.private_key_path'" in text
+    assert (
+        "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.sftp.port'"
+        in text
+    )
+    assert (
+        "Missing configuration value for 'PnmFileRetrieval.retrieval_method.methods.sftp.private_key_path'"
+        in text
+    )
 
 
 def test_snmp_read_community_defaults_to_public(
@@ -443,9 +445,7 @@ def test_snmp_write_community_defaults_to_empty(
 def test_snmp_read_community_falls_back_to_legacy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"SNMP.version.2c.community": "legacy"}
-    )
+    fake = FakeConfigManager({"SNMP.version.2c.community": "legacy"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     assert SystemConfigSettings.snmp_read_community() == "legacy"
@@ -468,9 +468,7 @@ def test_snmp_read_community_prefers_explicit(
 def test_snmp_write_community_does_not_use_legacy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"SNMP.version.2c.community": "legacy"}
-    )
+    fake = FakeConfigManager({"SNMP.version.2c.community": "legacy"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     assert SystemConfigSettings.snmp_write_community() == ""
@@ -479,9 +477,7 @@ def test_snmp_write_community_does_not_use_legacy(
 def test_snmp_write_community_uses_explicit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = FakeConfigManager(
-        {"SNMP.version.2c.write_community": "private"}
-    )
+    fake = FakeConfigManager({"SNMP.version.2c.write_community": "private"})
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
 
     assert SystemConfigSettings.snmp_write_community() == "private"

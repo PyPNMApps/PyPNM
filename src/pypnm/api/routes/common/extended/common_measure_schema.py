@@ -20,7 +20,9 @@ class InterfaceParameters(BaseModel, ABC):
     ensures that all concrete parameter classes implement necessary attributes for
     DOCSIS measurement operations.
     """
+
     pass
+
 
 class DownstreamOfdmParameters(InterfaceParameters):
     """
@@ -39,8 +41,9 @@ class DownstreamOfdmParameters(InterfaceParameters):
             - Targets all available OFDM channels (default behavior).
     """
 
-    type: Literal["ofdm"]                = Field(default="ofdm")
-    channel_id: list[ChannelId] | None   = Field(default=None)
+    type: Literal["ofdm"] = Field(default="ofdm")
+    channel_id: list[ChannelId] | None = Field(default=None)
+
 
 class UpstreamOfdmaParameters(InterfaceParameters):
     """
@@ -58,5 +61,6 @@ class UpstreamOfdmaParameters(InterfaceParameters):
         UpstreamOfdmaParameters()
             - Targets all available OFDMA channels (default behavior).
     """
-    type: Literal["ofdma"]                  = Field(default="ofdma")
-    channel_id: list[ChannelId] | None   = Field(default=None)
+
+    type: Literal["ofdma"] = Field(default="ofdma")
+    channel_id: list[ChannelId] | None = Field(default=None)

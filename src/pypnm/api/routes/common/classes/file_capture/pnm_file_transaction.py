@@ -60,10 +60,10 @@ class PnmFileTransaction:
         }
     """
 
-    PNM_TEST_TYPE  = "pnm_test_type"
-    FILE_NAME      = "filename"
+    PNM_TEST_TYPE = "pnm_test_type"
+    FILE_NAME = "filename"
     DEVICE_DETAILS = "device_details"
-    MAC_ADDRESS    = "mac_address"
+    MAC_ADDRESS = "mac_address"
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -72,7 +72,9 @@ class PnmFileTransaction:
         if not self.transaction_db_path.exists():
             self.transaction_db_path.write_text(json.dumps({}))
 
-    async def insert(self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str) -> TransactionId:
+    async def insert(
+        self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str
+    ) -> TransactionId:
         """
         Record A Transaction Initiated From An Actual Cable Modem Test.
 
@@ -102,14 +104,16 @@ class PnmFileTransaction:
         """
         sd: SystemDescriptor = await cable_modem.getSysDescr()
         return self._insert_generic(
-            mac_address        = cable_modem.get_mac_address,
-            pnm_test_type      = pnm_test_type,
-            filename           = filename,
-            system_description = sd.to_dict(),
+            mac_address=cable_modem.get_mac_address,
+            pnm_test_type=pnm_test_type,
+            filename=filename,
+            system_description=sd.to_dict(),
         )
 
     @staticmethod
-    def set_file_by_user(mac_address: MacAddress, pnm_test_type: DocsPnmCmCtlTest, filename: FileName) -> TransactionId:
+    def set_file_by_user(
+        mac_address: MacAddress, pnm_test_type: DocsPnmCmCtlTest, filename: FileName
+    ) -> TransactionId:
         """
         Record A Transaction For A Manually Supplied File (User Upload).
 
@@ -136,9 +140,9 @@ class PnmFileTransaction:
         """
         txn = PnmFileTransaction()
         return txn._insert_generic(
-            mac_address   = mac_address,
-            pnm_test_type = pnm_test_type,
-            filename      = filename,
+            mac_address=mac_address,
+            pnm_test_type=pnm_test_type,
+            filename=filename,
         )
 
     # ---------------------------
@@ -217,7 +221,9 @@ class PnmFileTransaction:
             return TransactionRecordModel.null()
         return TransactionRecordParser.from_id(transaction_id)
 
-    def get_file_info_via_macaddress(self, mac_address: MacAddress) -> list[TransactionRecordModel]:
+    def get_file_info_via_macaddress(
+        self, mac_address: MacAddress
+    ) -> list[TransactionRecordModel]:
         """
         Retrieve All Transaction Records Associated With A Given MAC Address.
 
@@ -252,7 +258,9 @@ class PnmFileTransaction:
 
         for txn_id, record in db.items():
             if record.get(self.MAC_ADDRESS, "").lower() != mac_str:
-                self.logger.info(f"Skipping file with MAC address: {record.get(self.MAC_ADDRESS, '').lower()}")
+                self.logger.info(
+                    f"Skipping file with MAC address: {record.get(self.MAC_ADDRESS, '').lower()}"
+                )
                 continue
             records.append(TransactionRecordParser.from_id(txn_id))
 
@@ -301,7 +309,9 @@ class PnmFileTransaction:
         try:
             return TransactionRecordParser.from_id(TransactionId(txn_id))
         except Exception as e:
-            self.logger.warning("Skipping transaction %s due to parse error: %s", txn_id, e)
+            self.logger.warning(
+                "Skipping transaction %s due to parse error: %s", txn_id, e
+            )
             return None
 
     # ---------------------------
@@ -341,16 +351,16 @@ class PnmFileTransaction:
         str
             Newly created transaction identifier associated with the record.
         """
-        timestamp       = int(time.time())
-        hash_input      = f"{filename}{timestamp}".encode()
-        transaction_id  = TransactionId(hashlib.sha256(hash_input).hexdigest()[:16])
+        timestamp = int(time.time())
+        hash_input = f"{filename}{timestamp}".encode()
+        transaction_id = TransactionId(hashlib.sha256(hash_input).hexdigest()[:16])
 
         db = self._load_db()
         db[transaction_id] = {
-            "timestamp":      timestamp,
-            "mac_address":    str(mac_address),
-            "pnm_test_type":  pnm_test_type.name,
-            "filename":       filename,
+            "timestamp": timestamp,
+            "mac_address": str(mac_address),
+            "pnm_test_type": pnm_test_type.name,
+            "filename": filename,
             "device_details": {
                 "system_description": system_description or {},
             },

@@ -21,6 +21,7 @@ from pypnm.lib.types import InetAddressStr, MacAddressStr
 
 PreCheckStatus = tuple[ServiceStatusCode, str]
 
+
 class CableModemServicePreCheck:
     """
     Performs preliminary connectivity and validation checks against a DOCSIS Cable Modem.
@@ -47,12 +48,12 @@ class CableModemServicePreCheck:
         ip_address: InetAddressStr | None = None,
         snmp_config: SNMPConfig | None = None,
         check_docsis_version: list[ClabsDocsisVersion] = None,
-        validate_ofdm_exist: bool       = False,
-        validate_ofdma_exist: bool      = False,
-        validate_scqam_exist: bool      = False,
-        validate_atdma_exist: bool      = False,
+        validate_ofdm_exist: bool = False,
+        validate_ofdma_exist: bool = False,
+        validate_scqam_exist: bool = False,
+        validate_atdma_exist: bool = False,
         validate_pnm_ready_status: bool = True,
-        ignore_mac_address_check: bool  = False,
+        ignore_mac_address_check: bool = False,
     ) -> None:
         """
         Initialize the pre-check service.
@@ -75,18 +76,19 @@ class CableModemServicePreCheck:
         if cable_modem:
             self.cm = cable_modem
         elif mac_address and ip_address:
-
             if snmp_config is None:
                 self.logger.debug("No SNMPConfig provided, using default settings")
                 snmp_config = SNMPConfig(snmp_v2c=SNMPv2c(community=None))
 
             self.cm = CableModem(
-                mac_address     =   MacAddress(mac_address),
-                inet            =   Inet(ip_address),
-                write_community =   snmp_config.snmp_v2c.community,
+                mac_address=MacAddress(mac_address),
+                inet=Inet(ip_address),
+                write_community=snmp_config.snmp_v2c.community,
             )
         else:
-            raise ValueError("Must provide either `cable_modem` or both `mac_address` and `ip_address`.")
+            raise ValueError(
+                "Must provide either `cable_modem` or both `mac_address` and `ip_address`."
+            )
 
         if check_docsis_version:
             if isinstance(check_docsis_version, ClabsDocsisVersion):
@@ -98,12 +100,12 @@ class CableModemServicePreCheck:
         else:
             self.check_docsis_version = []
 
-        self._validate_ofdma_exist      = validate_ofdma_exist
-        self._validate_ofdm_exist       = validate_ofdm_exist
-        self._validate_scqam_exist      = validate_scqam_exist
-        self._validate_atdma_exist      = validate_atdma_exist
-        self._validate_pnm_ready_stat   = validate_pnm_ready_status
-        self._ignore_mac_address_check  = ignore_mac_address_check
+        self._validate_ofdma_exist = validate_ofdma_exist
+        self._validate_ofdm_exist = validate_ofdm_exist
+        self._validate_scqam_exist = validate_scqam_exist
+        self._validate_atdma_exist = validate_atdma_exist
+        self._validate_pnm_ready_stat = validate_pnm_ready_status
+        self._ignore_mac_address_check = ignore_mac_address_check
 
     async def run_precheck(self) -> tuple[ServiceStatusCode, str]:
         """
@@ -133,11 +135,12 @@ class CableModemServicePreCheck:
         if not self._ignore_mac_address_check:
             status = await self.isMacCorrect()
             if status != ServiceStatusCode.SUCCESS:
-
                 try:
                     mac = await self.getRealMacAddress()
                 except Exception as e:
-                    self.logger.error(f"Error retrieving real MAC address: {e}", exc_info=True)
+                    self.logger.error(
+                        f"Error retrieving real MAC address: {e}", exc_info=True
+                    )
                     mac = "Unknown"
 
                 msg = f"Found: {mac} MAC address CableModem Mac check failed: {status}"
@@ -250,7 +253,7 @@ class CableModemServicePreCheck:
             SUCCESS if version is allowed, else INVALID_DOCSIS_VERSION.
         """
         try:
-            base_cap:ClabsDocsisVersion = await self.cm.getDocsisBaseCapability()
+            base_cap: ClabsDocsisVersion = await self.cm.getDocsisBaseCapability()
             if base_cap not in self.check_docsis_version:
                 msg = f"Invalid DOCSIS Version: {base_cap.name}"
                 self.logger.error(msg)
@@ -345,8 +348,7 @@ class CableModemServicePreCheck:
         return ServiceStatusCode.SUCCESS, "ATDMA upstream channels detected."
 
     async def validate_pnm_ready_status(self) -> PreCheckStatus:
-
-        out:PreCheckStatus = (ServiceStatusCode.SUCCESS, DocsPnmCmCtlStatus.READY.name)
+        out: PreCheckStatus = (ServiceStatusCode.SUCCESS, DocsPnmCmCtlStatus.READY.name)
 
         rst: DocsPnmCmCtlStatus = await self.cm.getDocsPnmCmCtlStatus()
 

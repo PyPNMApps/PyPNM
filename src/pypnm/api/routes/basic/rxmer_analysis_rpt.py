@@ -34,22 +34,37 @@ class RxMerParametersAnalysisRpt(BaseModel):
     - shannon_limit_db: Per-subcarrier Shannon/SNR limit (dB), len == len(raw_x)
     - regression_line : Per-subcarrier fitted values (ŷ) from linear regression over index domain
     """
+
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    shannon_limit_db: FloatSeries       = Field(..., description="Shannon/SNR limit per subcarrier (dB)")
-    regression_line: FloatSeries        = Field(..., description="Regression fitted values per subcarrier")
-    modulation_count: dict[str, int]    = Field(..., description="Number of supported modulation schemes")
+    shannon_limit_db: FloatSeries = Field(
+        ..., description="Shannon/SNR limit per subcarrier (dB)"
+    )
+    regression_line: FloatSeries = Field(
+        ..., description="Regression fitted values per subcarrier"
+    )
+    modulation_count: dict[str, int] = Field(
+        ..., description="Number of supported modulation schemes"
+    )
+
 
 class RxMerAnalysisRptModel(CommonAnalysis):
     """
     Analysis view over RxMER data (extends CommonAnalysis).
     """
-    parameters: RxMerParametersAnalysisRpt = Field(..., description="RxMER analysis parameters and limits.")
+
+    parameters: RxMerParametersAnalysisRpt = Field(
+        ..., description="RxMER analysis parameters and limits."
+    )
+
 
 class RxMerAnalysisReport(AnalysisReport):
     """Concrete report builder for RxMER measurements."""
 
-    def __init__(self, analysis: Analysis,
-                 analysis_matplot_config: AnalysisRptMatplotConfig | None = None) -> None:
+    def __init__(
+        self,
+        analysis: Analysis,
+        analysis_matplot_config: AnalysisRptMatplotConfig | None = None,
+    ) -> None:
         if analysis_matplot_config is None:
             analysis_matplot_config = AnalysisRptMatplotConfig()
         super().__init__(analysis, analysis_matplot_config)
@@ -69,37 +84,47 @@ class RxMerAnalysisReport(AnalysisReport):
             model = cast(RxMerAnalysisRptModel, common_model)
             chan = model.channel_id
 
-            x:FrequencySeriesHz   = cast(FrequencySeriesHz, model.raw_x)
-            y:FloatSeries           = model.raw_y
-            sh:FloatSeries          = model.parameters.shannon_limit_db
-            rl:FloatSeries          = model.parameters.regression_line
+            x: FrequencySeriesHz = cast(FrequencySeriesHz, model.raw_x)
+            y: FloatSeries = model.raw_y
+            sh: FloatSeries = model.parameters.shannon_limit_db
+            rl: FloatSeries = model.parameters.regression_line
 
             """
             Single Channel Capture
             """
             try:
-
                 csv_mgr: CSVManager = self.csv_manager_factory()
                 csv_fname = self.create_csv_fname(tags=[str(chan)])
                 csv_mgr.set_path_fname(csv_fname)
 
-                csv_mgr.set_header(["ChannelID", "Frequency(Hz)", "Magnitude(dB)", "Shannon Limit(dB)", "Regression Line(dB)"])
+                csv_mgr.set_header(
+                    [
+                        "ChannelID",
+                        "Frequency(Hz)",
+                        "Magnitude(dB)",
+                        "Shannon Limit(dB)",
+                        "Regression Line(dB)",
+                    ]
+                )
                 for rx, ry, s, r in zip(x, y, sh, rl, strict=False):
                     csv_mgr.insert_row([chan, rx, ry, s, r])
 
-                self.logger.debug("CSV created for channel %s: %s (rows=%d)", chan, csv_fname, len(x))
+                self.logger.debug(
+                    "CSV created for channel %s: %s (rows=%d)", chan, csv_fname, len(x)
+                )
                 csv_mgr_list.append(csv_mgr)
 
             except Exception as exc:
-                self.logger.exception("Failed to create CSV for channel %s: %s", chan, exc)
+                self.logger.exception(
+                    "Failed to create CSV for channel %s: %s", chan, exc
+                )
 
             """
             Signal Capture Aggregation - All OFDM DS Channels
             """
             try:
-
                 csv_mgr: CSVManager = self.csv_manager_factory()
-                csv_fname = self.create_csv_fname(tags=['signal_aggregate'])
+                csv_fname = self.create_csv_fname(tags=["signal_aggregate"])
                 csv_mgr.set_path_fname(csv_fname)
 
                 csv_mgr.set_header(["Frequency(Hz)", "Magnitude(dB)"])
@@ -125,45 +150,46 @@ class RxMerAnalysisReport(AnalysisReport):
         """
         out: list[MatplotManager] = []
         any_models = False
-        chan_id_list:list[int] = []
+        chan_id_list: list[int] = []
 
         for common_model in self.get_common_analysis_model():
             any_models = True
-            model       = cast(RxMerAnalysisRptModel, common_model)
-            channel_id  = model.channel_id
-            freq        = cast(ArrayLike, model.raw_x)
-            db          = cast(ArrayLike, model.raw_y)
-            rl          = cast(ArrayLike, model.parameters.regression_line)
-            mc          = model.parameters.modulation_count
+            model = cast(RxMerAnalysisRptModel, common_model)
+            channel_id = model.channel_id
+            freq = cast(ArrayLike, model.raw_x)
+            db = cast(ArrayLike, model.raw_y)
+            rl = cast(ArrayLike, model.parameters.regression_line)
+            mc = model.parameters.modulation_count
 
             chan_id_list.append(channel_id)
 
-            title_prefix = f'RxMER OFDM Channel: ({channel_id})'
+            title_prefix = f"RxMER OFDM Channel: ({channel_id})"
 
-            '''
+            """
             RxMER with Regression Line - All OFDM DS Channels
-            '''
+            """
             try:
-
                 cfg = PlotConfig(
-                    title           =   f"{title_prefix}",
-                    x               =   cast(ArrayLike, freq),
-                    y_multi         =   [db, rl],
-                    y_multi_label   =   ["RxMER", "Regression Line"],
-                    x_tick_mode     =   "unit",
-                    x_unit_from     =   "hz",
-                    x_unit_out      =   "mhz",
-                    x_tick_decimals =   0,
-                    xlabel_base     =   "Frequency",
-                    ylabel          =   "dB",
-                    grid            =   True,
-                    legend          =   True,
-                    transparent     =   False,
-                    theme           =   self.getAnalysisRptMatplotConfig().theme,
+                    title=f"{title_prefix}",
+                    x=cast(ArrayLike, freq),
+                    y_multi=[db, rl],
+                    y_multi_label=["RxMER", "Regression Line"],
+                    x_tick_mode="unit",
+                    x_unit_from="hz",
+                    x_unit_out="mhz",
+                    x_tick_decimals=0,
+                    xlabel_base="Frequency",
+                    ylabel="dB",
+                    grid=True,
+                    legend=True,
+                    transparent=False,
+                    theme=self.getAnalysisRptMatplotConfig().theme,
                 )
 
-                multi = self.create_png_fname(tags=[str(channel_id), 'rxmer'])
-                self.logger.debug("Creating MatPlot: %s for channel: %s", multi, channel_id)
+                multi = self.create_png_fname(tags=[str(channel_id), "rxmer"])
+                self.logger.debug(
+                    "Creating MatPlot: %s for channel: %s", multi, channel_id
+                )
 
                 mgr = MatplotManager(default_cfg=cfg)
                 mgr.plot_multi_line(filename=multi)
@@ -171,28 +197,34 @@ class RxMerAnalysisReport(AnalysisReport):
                 out.append(mgr)
 
             except Exception as exc:
-                self.logger.exception("Failed to create plot for channel %s: %s", channel_id, exc)
+                self.logger.exception(
+                    "Failed to create plot for channel %s: %s", channel_id, exc
+                )
 
-            '''
+            """
             Modulation Order Count - All OFDM DS Channels
-            '''
+            """
             try:
                 bpsym, order_count = self.__modulation_order_count_to_series(mc)
 
                 cfg = PlotConfig(
-                        title       =   f"{title_prefix} - Modulation Order Count",
-                        x           =   cast(ArrayLike, bpsym),
-                        xlabel      =   "Bits Per Symbol (bps)",
-                        y           =   cast(ArrayLike, order_count),
-                        ylabel      =   "Order Count",
-                        grid        =   True,
-                        legend      =   False,
-                        transparent =   False,
-                        theme       =   self.getAnalysisRptMatplotConfig().theme,
-                    )
+                    title=f"{title_prefix} - Modulation Order Count",
+                    x=cast(ArrayLike, bpsym),
+                    xlabel="Bits Per Symbol (bps)",
+                    y=cast(ArrayLike, order_count),
+                    ylabel="Order Count",
+                    grid=True,
+                    legend=False,
+                    transparent=False,
+                    theme=self.getAnalysisRptMatplotConfig().theme,
+                )
 
-                mod_count_fname = self.create_png_fname(tags=[str(channel_id), 'modulation_count'])
-                self.logger.debug("Creating MatPlot: %s for channel: %s", mod_count_fname, channel_id)
+                mod_count_fname = self.create_png_fname(
+                    tags=[str(channel_id), "modulation_count"]
+                )
+                self.logger.debug(
+                    "Creating MatPlot: %s for channel: %s", mod_count_fname, channel_id
+                )
 
                 mgr = MatplotManager(default_cfg=cfg)
                 mgr.plot_line(filename=mod_count_fname)
@@ -200,44 +232,49 @@ class RxMerAnalysisReport(AnalysisReport):
                 out.append(mgr)
 
             except Exception as exc:
-                self.logger.exception("Failed to create plot for channel %s: %s", channel_id, exc)
+                self.logger.exception(
+                    "Failed to create plot for channel %s: %s", channel_id, exc
+                )
 
-            '''
+            """
             Signal Capture Aggregation - All OFDM DS Channels
-            '''
+            """
             try:
                 freq, db = self._sig_cap_agg.get_series()
 
                 cfg = PlotConfig(
-                    title         = f"RxMER · OFDM Channel(s): {Format.join_paren(chan_id_list)}",
-                    x             = cast(ArrayLike, freq),
-                    y             = cast(ArrayLike, db),
-                    xlabel        = None,
-                    xlabel_base   = "Frequency",
-                    x_tick_mode   = "unit",
-                    x_unit_from   = "hz",
-                    x_unit_out    = "mhz",
-                    x_tick_decimals = 0,
-                    ylabel        = "dB",
-                    grid          = True,
-                    legend        = True,
-                    transparent   = False,
-                    theme         = self.getAnalysisRptMatplotConfig().theme,
+                    title=f"RxMER · OFDM Channel(s): {Format.join_paren(chan_id_list)}",
+                    x=cast(ArrayLike, freq),
+                    y=cast(ArrayLike, db),
+                    xlabel=None,
+                    xlabel_base="Frequency",
+                    x_tick_mode="unit",
+                    x_unit_from="hz",
+                    x_unit_out="mhz",
+                    x_tick_decimals=0,
+                    ylabel="dB",
+                    grid=True,
+                    legend=True,
+                    transparent=False,
+                    theme=self.getAnalysisRptMatplotConfig().theme,
                 )
 
-                signal_aggregate_fname = self.create_png_fname(tags=['signal_aggregate'])
-                self.logger.debug(f"Creating MatPlot: {signal_aggregate_fname} for aggregated RxMER capture")
+                signal_aggregate_fname = self.create_png_fname(
+                    tags=["signal_aggregate"]
+                )
+                self.logger.debug(
+                    f"Creating MatPlot: {signal_aggregate_fname} for aggregated RxMER capture"
+                )
 
                 mgr = MatplotManager(default_cfg=cfg)
-                mgr.plot_line(
-                    filename    =   signal_aggregate_fname,
-                    label       =   "Aggregated RxMER"
-                )
+                mgr.plot_line(filename=signal_aggregate_fname, label="Aggregated RxMER")
 
                 out.append(mgr)
 
             except Exception as exc:
-                self.logger.exception(f"Failed to create aggregated RxMER capture plot, reason: {exc}")
+                self.logger.exception(
+                    f"Failed to create aggregated RxMER capture plot, reason: {exc}"
+                )
 
         if not any_models:
             self.logger.warning("No analysis data available; no plots created.")
@@ -245,11 +282,12 @@ class RxMerAnalysisReport(AnalysisReport):
         return out
 
     def _process(self) -> None:
-
-        analysis_models: list[DsRxMerAnalysisModel] = cast(list[DsRxMerAnalysisModel], self.get_analysis_model())
+        analysis_models: list[DsRxMerAnalysisModel] = cast(
+            list[DsRxMerAnalysisModel], self.get_analysis_model()
+        )
 
         def coerce_finite(seq: ArrayLike, name: str) -> list[float]:
-            '''coerce -> float (and finiteness)'''
+            """coerce -> float (and finiteness)"""
             out: list[float] = []
             for v in seq:
                 fv = float(v)
@@ -258,14 +296,18 @@ class RxMerAnalysisReport(AnalysisReport):
                 out.append(fv)
             return out
 
-        def process_single_model(idx: int, data: DsRxMerAnalysisModel) -> tuple[bool, str]:
+        def process_single_model(
+            idx: int, data: DsRxMerAnalysisModel
+        ) -> tuple[bool, str]:
             """Process a single analysis model, returning success status and error message."""
             try:
-                channel_id      = data.channel_id
-                x_raw           = data.carrier_values.frequency
-                y_raw           = data.carrier_values.magnitude
-                snr_db_limit    = data.modulation_statistics.snr_db_min
-                mod_count:dict[str,int] = data.modulation_statistics.supported_modulation_counts
+                channel_id = data.channel_id
+                x_raw = data.carrier_values.frequency
+                y_raw = data.carrier_values.magnitude
+                snr_db_limit = data.modulation_statistics.snr_db_min
+                mod_count: dict[str, int] = (
+                    data.modulation_statistics.supported_modulation_counts
+                )
 
                 x = coerce_finite(x_raw, "raw_x")
                 y = coerce_finite(y_raw, "raw_y")
@@ -275,24 +317,30 @@ class RxMerAnalysisReport(AnalysisReport):
                 n = len(x)
                 if not (n and len(y) == n and len(sh) == n):
                     raise ValueError(
-                        f"length mismatch x/y/shannon: {len(x)}/{len(y)}/{len(sh)} (n must be equal & > 0)")
+                        f"length mismatch x/y/shannon: {len(x)}/{len(y)}/{len(sh)} (n must be equal & > 0)"
+                    )
 
                 model = RxMerAnalysisRptModel(
-                    channel_id  =   data.channel_id,
-                    raw_x       =   x,
-                    raw_y       =   y,
-                    parameters  =   RxMerParametersAnalysisRpt(
-                                        shannon_limit_db    =   sh,
-                                        regression_line     =   data.regression.slope,
-                                        modulation_count    =   mod_count
-                                    ))
+                    channel_id=data.channel_id,
+                    raw_x=x,
+                    raw_y=y,
+                    parameters=RxMerParametersAnalysisRpt(
+                        shannon_limit_db=sh,
+                        regression_line=data.regression.slope,
+                        modulation_count=mod_count,
+                    ),
+                )
 
                 # MUST register Model
                 self.register_common_analysis_model(channel_id, model)
 
                 # Add to Signal Capture Aggregator
-                self.logger.debug(f"Adding OFDM RxMER Channel: {channel_id} for aggregated signal capture")
-                self._sig_cap_agg.add_series(cast(ArrayLike, x_raw),cast(ArrayLike, y_raw))
+                self.logger.debug(
+                    f"Adding OFDM RxMER Channel: {channel_id} for aggregated signal capture"
+                )
+                self._sig_cap_agg.add_series(
+                    cast(ArrayLike, x_raw), cast(ArrayLike, y_raw)
+                )
 
                 return True, ""
             except Exception as exc:
@@ -301,12 +349,16 @@ class RxMerAnalysisReport(AnalysisReport):
         for idx, data in enumerate(analysis_models):
             success, error_msg = process_single_model(idx, data)
             if not success:
-                self.logger.exception("Failed to process RxMER item %d: %s", idx, error_msg)
+                self.logger.exception(
+                    "Failed to process RxMER item %d: %s", idx, error_msg
+                )
 
         # Finalize signal capture aggregation
         self._sig_cap_agg.reconstruct()
 
-    def __modulation_order_count_to_series(self, mod_count: Mapping[str, int]) -> tuple[IntSeries, IntSeries]:
+    def __modulation_order_count_to_series(
+        self, mod_count: Mapping[str, int]
+    ) -> tuple[IntSeries, IntSeries]:
         """
         Convert {"qam_<M>": count} → (bits_per_symbol_series, count_series),
         sorted by ascending QAM order M. Skips malformed entries with warnings.
@@ -340,12 +392,16 @@ class RxMerAnalysisReport(AnalysisReport):
                 self.logger.warning("Non-integer count for %s: %r", key, cnt)
                 continue
             if c_int < 0:
-                self.logger.warning("Negative count for %s (%d); clamping to 0", key, c_int)
+                self.logger.warning(
+                    "Negative count for %s (%d); clamping to 0", key, c_int
+                )
                 c_int = 0
 
             # compute bits/symbol via your Shannon helper
             try:
-                bps = int(Shannon.bits_from_symbol_count(m))  # ensure int for powers-of-two M
+                bps = int(
+                    Shannon.bits_from_symbol_count(m)
+                )  # ensure int for powers-of-two M
             except Exception as e:
                 self.logger.warning("Unable to compute bits/symbol for %s: %s", key, e)
                 continue

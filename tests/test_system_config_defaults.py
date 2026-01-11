@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -15,10 +14,16 @@ def test_config_files_exist() -> None:
     settings_cfg = Path("src/pypnm/settings/system.json")
     deploy_cfg = Path("deploy/docker/config/system.json")
 
-    assert settings_cfg.exists(), "src/pypnm/settings/system.json must exist (symlink to deploy config)"
-    assert deploy_cfg.exists(), "deploy/docker/config/system.json must exist for runtime config"
+    assert settings_cfg.exists(), (
+        "src/pypnm/settings/system.json must exist (symlink to deploy config)"
+    )
+    assert deploy_cfg.exists(), (
+        "deploy/docker/config/system.json must exist for runtime config"
+    )
     assert settings_cfg.is_symlink(), "src/pypnm/settings/system.json must be a symlink"
-    assert settings_cfg.resolve() == deploy_cfg.resolve(), "system.json symlink must target deploy/docker/config/system.json"
+    assert settings_cfg.resolve() == deploy_cfg.resolve(), (
+        "system.json symlink must target deploy/docker/config/system.json"
+    )
 
 
 def test_no_extra_system_json_files() -> None:
@@ -43,4 +48,6 @@ def test_no_extra_system_json_files() -> None:
 def test_default_config_path_resolves() -> None:
     from tools.system_config.common import DEFAULT_CONFIG_PATH
 
-    assert DEFAULT_CONFIG_PATH.exists(), f"DEFAULT_CONFIG_PATH must exist: {DEFAULT_CONFIG_PATH}"
+    assert DEFAULT_CONFIG_PATH.exists(), (
+        f"DEFAULT_CONFIG_PATH must exist: {DEFAULT_CONFIG_PATH}"
+    )

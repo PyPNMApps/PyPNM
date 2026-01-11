@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -32,13 +31,16 @@ class DocsIf31CmUsOfdmaChan(BaseModel):
     docsIf31CmStatusOfdmaUsIsMuted: bool | None = None
     docsIf31CmStatusOfdmaUsRangingStatus: str | None = None
 
+
 class DocsIf31CmUsOfdmaChanEntry(BaseModel):
     index: int
     channel_id: int
     entry: DocsIf31CmUsOfdmaChan
 
     @classmethod
-    async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsIf31CmUsOfdmaChanEntry | None:
+    async def from_snmp(
+        cls, index: int, snmp: Snmp_v2c
+    ) -> DocsIf31CmUsOfdmaChanEntry | None:
         logger = logging.getLogger(cls.__name__)
 
         def tenthdBmV_to_float(value: str) -> float | None:
@@ -53,7 +55,9 @@ class DocsIf31CmUsOfdmaChanEntry(BaseModel):
             except Exception:
                 return None
 
-        async def fetch(field: str, cast: Callable | None = None) -> None | int | float | str | bool:
+        async def fetch(
+            field: str, cast: Callable | None = None
+        ) -> None | int | float | str | bool:
             try:
                 raw = await snmp.get(f"{field}.{index}")
                 val = Snmp_v2c.get_result_value(raw)
@@ -75,38 +79,76 @@ class DocsIf31CmUsOfdmaChanEntry(BaseModel):
                 return None
 
         entry = DocsIf31CmUsOfdmaChan(
-            docsIf31CmUsOfdmaChanChannelId                  =   await fetch("docsIf31CmUsOfdmaChanChannelId", int),
-            docsIf31CmUsOfdmaChanConfigChangeCt             =   await fetch("docsIf31CmUsOfdmaChanConfigChangeCt", int),
-            docsIf31CmUsOfdmaChanSubcarrierZeroFreq         =   await fetch("docsIf31CmUsOfdmaChanSubcarrierZeroFreq", int),
-            docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum   =   await fetch("docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum", int),
-            docsIf31CmUsOfdmaChanLastActiveSubcarrierNum    =   await fetch("docsIf31CmUsOfdmaChanLastActiveSubcarrierNum", int),
-            docsIf31CmUsOfdmaChanNumActiveSubcarriers       =   await fetch("docsIf31CmUsOfdmaChanNumActiveSubcarriers", int),
-            docsIf31CmUsOfdmaChanSubcarrierSpacing          =   await fetch("docsIf31CmUsOfdmaChanSubcarrierSpacing", int),
-            docsIf31CmUsOfdmaChanCyclicPrefix               =   await fetch("docsIf31CmUsOfdmaChanCyclicPrefix", int),
-            docsIf31CmUsOfdmaChanRollOffPeriod              =   await fetch("docsIf31CmUsOfdmaChanRollOffPeriod", int),
-            docsIf31CmUsOfdmaChanNumSymbolsPerFrame         =   await fetch("docsIf31CmUsOfdmaChanNumSymbolsPerFrame", int),
-            docsIf31CmUsOfdmaChanTxPower                    =   await fetch("docsIf31CmUsOfdmaChanTxPower", tenthdBmV_to_float),
-            docsIf31CmUsOfdmaChanPreEqEnabled               =   await fetch("docsIf31CmUsOfdmaChanPreEqEnabled", Snmp_v2c.truth_value),
-            docsIf31CmStatusOfdmaUsT3Timeouts               =   await fetch("docsIf31CmStatusOfdmaUsT3Timeouts", int),
-            docsIf31CmStatusOfdmaUsT4Timeouts               =   await fetch("docsIf31CmStatusOfdmaUsT4Timeouts", int),
-            docsIf31CmStatusOfdmaUsRangingAborteds          =   await fetch("docsIf31CmStatusOfdmaUsRangingAborteds", int),
-            docsIf31CmStatusOfdmaUsT3Exceededs              =   await fetch("docsIf31CmStatusOfdmaUsT3Exceededs", int),
-            docsIf31CmStatusOfdmaUsIsMuted                  =   await fetch("docsIf31CmStatusOfdmaUsIsMuted", Snmp_v2c.truth_value),
-            docsIf31CmStatusOfdmaUsRangingStatus            =   await fetch("docsIf31CmStatusOfdmaUsRangingStatus", str)
+            docsIf31CmUsOfdmaChanChannelId=await fetch(
+                "docsIf31CmUsOfdmaChanChannelId", int
+            ),
+            docsIf31CmUsOfdmaChanConfigChangeCt=await fetch(
+                "docsIf31CmUsOfdmaChanConfigChangeCt", int
+            ),
+            docsIf31CmUsOfdmaChanSubcarrierZeroFreq=await fetch(
+                "docsIf31CmUsOfdmaChanSubcarrierZeroFreq", int
+            ),
+            docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum=await fetch(
+                "docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum", int
+            ),
+            docsIf31CmUsOfdmaChanLastActiveSubcarrierNum=await fetch(
+                "docsIf31CmUsOfdmaChanLastActiveSubcarrierNum", int
+            ),
+            docsIf31CmUsOfdmaChanNumActiveSubcarriers=await fetch(
+                "docsIf31CmUsOfdmaChanNumActiveSubcarriers", int
+            ),
+            docsIf31CmUsOfdmaChanSubcarrierSpacing=await fetch(
+                "docsIf31CmUsOfdmaChanSubcarrierSpacing", int
+            ),
+            docsIf31CmUsOfdmaChanCyclicPrefix=await fetch(
+                "docsIf31CmUsOfdmaChanCyclicPrefix", int
+            ),
+            docsIf31CmUsOfdmaChanRollOffPeriod=await fetch(
+                "docsIf31CmUsOfdmaChanRollOffPeriod", int
+            ),
+            docsIf31CmUsOfdmaChanNumSymbolsPerFrame=await fetch(
+                "docsIf31CmUsOfdmaChanNumSymbolsPerFrame", int
+            ),
+            docsIf31CmUsOfdmaChanTxPower=await fetch(
+                "docsIf31CmUsOfdmaChanTxPower", tenthdBmV_to_float
+            ),
+            docsIf31CmUsOfdmaChanPreEqEnabled=await fetch(
+                "docsIf31CmUsOfdmaChanPreEqEnabled", Snmp_v2c.truth_value
+            ),
+            docsIf31CmStatusOfdmaUsT3Timeouts=await fetch(
+                "docsIf31CmStatusOfdmaUsT3Timeouts", int
+            ),
+            docsIf31CmStatusOfdmaUsT4Timeouts=await fetch(
+                "docsIf31CmStatusOfdmaUsT4Timeouts", int
+            ),
+            docsIf31CmStatusOfdmaUsRangingAborteds=await fetch(
+                "docsIf31CmStatusOfdmaUsRangingAborteds", int
+            ),
+            docsIf31CmStatusOfdmaUsT3Exceededs=await fetch(
+                "docsIf31CmStatusOfdmaUsT3Exceededs", int
+            ),
+            docsIf31CmStatusOfdmaUsIsMuted=await fetch(
+                "docsIf31CmStatusOfdmaUsIsMuted", Snmp_v2c.truth_value
+            ),
+            docsIf31CmStatusOfdmaUsRangingStatus=await fetch(
+                "docsIf31CmStatusOfdmaUsRangingStatus", str
+            ),
         )
 
         try:
             return cls(
-                index           =   index,
-                channel_id      =   entry.docsIf31CmUsOfdmaChanChannelId or 0,
-                entry           =   entry
+                index=index,
+                channel_id=entry.docsIf31CmUsOfdmaChanChannelId or 0,
+                entry=entry,
             )
         except Exception as e:
             logger.warning(f"Failed to retrieve OFDMA channel {index}: {e}")
             return None
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsIf31CmUsOfdmaChanEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsIf31CmUsOfdmaChanEntry]:
         results: list[DocsIf31CmUsOfdmaChanEntry] = []
 
         for index in indices:

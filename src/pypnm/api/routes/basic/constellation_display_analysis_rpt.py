@@ -23,32 +23,44 @@ from pypnm.lib.types import ChannelId, ComplexArray
 
 
 class ConstDisplayAnalysisRptMatplotConfig(AnalysisRptMatplotConfig):
-    display_crosshair: bool = Field(default=True, description="Enable or disable crosshair on the constellation plot")
+    display_crosshair: bool = Field(
+        default=True,
+        description="Enable or disable crosshair on the constellation plot",
+    )
+
 
 class ConstellationDisplayParameters(BaseModel):
-    model_config                    = ConfigDict(populate_by_name=True, extra="ignore")
-    modulation:QamModulation        = Field(..., description="")
-    hard:ComplexArray               = Field(..., description="")
-    soft:ComplexArray               = Field(..., description="")
-    sample_count:int                = Field(..., description="")
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    modulation: QamModulation = Field(..., description="")
+    hard: ComplexArray = Field(..., description="")
+    soft: ComplexArray = Field(..., description="")
+    sample_count: int = Field(..., description="")
+
 
 class ConstellationDisplayAnalysisRptModel(CommonAnalysis):
-    parameters: ConstellationDisplayParameters = Field(..., description="Channel estimation analysis parameters and limits.")
+    parameters: ConstellationDisplayParameters = Field(
+        ..., description="Channel estimation analysis parameters and limits."
+    )
+
 
 class ConstellationDisplayReport(AnalysisReport):
+    FNAME_TAG: str = "constdisplay"
 
-    FNAME_TAG:str = 'constdisplay'
-
-    def __init__(self, analysis: Analysis,
-                 analysis_matplot_config: ConstDisplayAnalysisRptMatplotConfig | None = None,
-                 **kwargs: object) -> None:
+    def __init__(
+        self,
+        analysis: Analysis,
+        analysis_matplot_config: ConstDisplayAnalysisRptMatplotConfig | None = None,
+        **kwargs: object,
+    ) -> None:
         if analysis_matplot_config is None:
             analysis_matplot_config = ConstDisplayAnalysisRptMatplotConfig()
         super().__init__(analysis, analysis_matplot_config)
         self.logger = logging.getLogger("ConstellationDisplayReport")
         self._results: dict[int, ConstellationDisplayAnalysisRptModel] = {}
         self._sig_cap_agg: SignalCaptureAggregator = SignalCaptureAggregator()
-        self._matplot_config: ConstDisplayAnalysisRptMatplotConfig = analysis_matplot_config
+        self._matplot_config: ConstDisplayAnalysisRptMatplotConfig = (
+            analysis_matplot_config
+        )
 
     def create_csv(self, **kwargs: object) -> list[CSVManager]:
         """
@@ -60,36 +72,56 @@ class ConstellationDisplayReport(AnalysisReport):
         for common_model in self.get_common_analysis_model():
             any_models = True
             model = cast(ConstellationDisplayAnalysisRptModel, common_model)
-            channel_id                  = int(model.channel_id)
-            modulation:QamModulation    = model.parameters.modulation
-            hard:ComplexArray           = model.parameters.hard
-            soft:ComplexArray           = model.parameters.soft
+            channel_id = int(model.channel_id)
+            modulation: QamModulation = model.parameters.modulation
+            hard: ComplexArray = model.parameters.hard
+            soft: ComplexArray = model.parameters.soft
 
             """
             Single Channel Capture
             """
             try:
                 csv_mgr: CSVManager = self.csv_manager_factory()
-                csv_fname = self.create_csv_fname(tags=[str(channel_id), self.FNAME_TAG])
+                csv_fname = self.create_csv_fname(
+                    tags=[str(channel_id), self.FNAME_TAG]
+                )
                 csv_mgr.set_path_fname(csv_fname)
 
-                csv_mgr.set_header(["ChannelID",    "Modulation",
-                                    "Hard(I)",      "Hard(Q)",
-                                    "Soft(I)",      "Soft(Q)"])
+                csv_mgr.set_header(
+                    [
+                        "ChannelID",
+                        "Modulation",
+                        "Hard(I)",
+                        "Hard(Q)",
+                        "Soft(I)",
+                        "Soft(Q)",
+                    ]
+                )
 
                 for h, s in zip(hard, soft, strict=False):
                     hard_real, hard_img = h
                     soft_real, soft_img = s
-                    csv_mgr.insert_row([channel_id, modulation,
-                                        hard_real,  hard_img,
-                                        soft_real,  soft_img])
+                    csv_mgr.insert_row(
+                        [
+                            channel_id,
+                            modulation,
+                            hard_real,
+                            hard_img,
+                            soft_real,
+                            soft_img,
+                        ]
+                    )
 
-                self.logger.debug(f"CSV created for channel {channel_id}: {csv_fname} (rows={csv_mgr.get_row_count()})")
+                self.logger.debug(
+                    f"CSV created for channel {channel_id}: {csv_fname} (rows={csv_mgr.get_row_count()})"
+                )
 
                 csv_mgr_list.append(csv_mgr)
 
             except Exception as exc:
-                self.logger.exception(f"Failed to create CSV for channel {channel_id}: {exc}")
+                self.logger.exception(
+                    f"Failed to create CSV for channel {channel_id}: {exc}"
+                )
 
         if not any_models:
             self.logger.debug("No analysis data available; no CSVs created.")
@@ -101,39 +133,43 @@ class ConstellationDisplayReport(AnalysisReport):
         Generate per-channel line and multi-line plots from validated models.
         """
         matplot_mgr: list[MatplotManager] = []
-        any_models:bool = False
+        any_models: bool = False
 
         for common_model in self.get_common_analysis_model():
             any_models = True
             model = cast(ConstellationDisplayAnalysisRptModel, common_model)
-            channel_id                  = int(model.channel_id)
-            modulation:QamModulation    = model.parameters.modulation
-            hard:ComplexArray           = model.parameters.hard
-            soft:ComplexArray           = model.parameters.soft
-            sample_count:int            = model.parameters.sample_count
+            channel_id = int(model.channel_id)
+            modulation: QamModulation = model.parameters.modulation
+            hard: ComplexArray = model.parameters.hard
+            soft: ComplexArray = model.parameters.soft
+            sample_count: int = model.parameters.sample_count
 
-            '''
+            """
             Constellation Display - All OFDM DS Channels
-            '''
+            """
             try:
                 title = f"Constellation Display · OFDM Channel: {channel_id} · Modulation: {modulation.name} · SampleSize: {sample_count}"
                 cfg = PlotConfig(
-                    title           =   title,
-                    x               =   [0], # TODO: need to fix this, don't need to put in a dummy value
-                    xlabel          =   "In-phase (I)",
-                    ylabel          =   "Quadrature (Q)",
-                    qam             =   modulation,
-                    hard            =   hard,
-                    soft            =   soft,
-                    grid            =   False,
-                    legend          =   True,
-                    transparent     =   False,
-                    show_crosshair  =   self._matplot_config.display_crosshair,
-                    theme           =   self._matplot_config.theme,
+                    title=title,
+                    x=[0],  # TODO: need to fix this, don't need to put in a dummy value
+                    xlabel="In-phase (I)",
+                    ylabel="Quadrature (Q)",
+                    qam=modulation,
+                    hard=hard,
+                    soft=soft,
+                    grid=False,
+                    legend=True,
+                    transparent=False,
+                    show_crosshair=self._matplot_config.display_crosshair,
+                    theme=self._matplot_config.theme,
                 )
 
-                const_disp = self.create_png_fname(tags=[str(channel_id), self.FNAME_TAG])
-                self.logger.debug("Creating MatPlot: %s for channel: %s", const_disp, channel_id)
+                const_disp = self.create_png_fname(
+                    tags=[str(channel_id), self.FNAME_TAG]
+                )
+                self.logger.debug(
+                    "Creating MatPlot: %s for channel: %s", const_disp, channel_id
+                )
 
                 mgr = MatplotManager(default_cfg=cfg)
                 mgr.plot_constellation(filename=const_disp)
@@ -141,7 +177,9 @@ class ConstellationDisplayReport(AnalysisReport):
                 matplot_mgr.append(mgr)
 
             except Exception as exc:
-                self.logger.exception("Failed to create plot for channel %s: %s", channel_id, exc)
+                self.logger.exception(
+                    "Failed to create plot for channel %s: %s", channel_id, exc
+                )
 
         if not any_models:
             self.logger.warning("No analysis data available; no plots created.")
@@ -166,28 +204,30 @@ class ConstellationDisplayReport(AnalysisReport):
 
         try:
             for _idx, data in enumerate(data_list):
-                channel_id          = int(data.get("channel_id", INVALID_CHANNEL_ID))
-                modulation_order    = data.get("modulation_order", QamModulation.UNKNOWN)
-                hard                = data.get("hard", [])
-                soft                = data.get("soft", [])
-                sample_count        = data.get("num_sample_symbols", 0)
+                channel_id = int(data.get("channel_id", INVALID_CHANNEL_ID))
+                modulation_order = data.get("modulation_order", QamModulation.UNKNOWN)
+                hard = data.get("hard", [])
+                soft = data.get("soft", [])
+                sample_count = data.get("num_sample_symbols", 0)
 
                 params = ConstellationDisplayParameters(
-                        modulation      = modulation_order,
-                        hard            = hard,
-                        soft            = soft,
-                        sample_count    = sample_count,
+                    modulation=modulation_order,
+                    hard=hard,
+                    soft=soft,
+                    sample_count=sample_count,
                 )
 
                 model = ConstellationDisplayAnalysisRptModel(
-                        channel_id  =   ChannelId(channel_id),
-                        raw_x       =   [0],
-                        raw_y       =   [0],
-                        parameters  =   params
+                    channel_id=ChannelId(channel_id),
+                    raw_x=[0],
+                    raw_y=[0],
+                    parameters=params,
                 )
 
                 # Must register Model
                 self.register_common_analysis_model(channel_id, model)
 
         except Exception as exc:
-            self.logger.exception(f"Failed to process Channel Estimation data: Reason: {exc}")
+            self.logger.exception(
+                f"Failed to process Channel Estimation data: Reason: {exc}"
+            )

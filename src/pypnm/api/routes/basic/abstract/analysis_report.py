@@ -31,7 +31,8 @@ from pypnm.lib.types import (
 )
 from pypnm.lib.utils import Generate
 
-AnalysisData    = list[dict[str, Any]]
+AnalysisData = list[dict[str, Any]]
+
 
 class AnalysisOutputModel(BaseModel):
     """
@@ -45,11 +46,14 @@ class AnalysisOutputModel(BaseModel):
         report.build_report()
         payload = report.to_model()
     """
-    time: TimeStamp         = Field(..., description="Ephoc Time")
-    csv_files: PathArray    = Field(..., description="List of CSV file(s)")
-    plot_files: PathArray   = Field(..., description="List of PNG Matplot file(s)")
-    json_files: PathArray   = Field(..., description="List of JSON file(s)")
-    archive_file: PathLike  = Field(..., description="File name of archive file containging analysis files")
+
+    time: TimeStamp = Field(..., description="Ephoc Time")
+    csv_files: PathArray = Field(..., description="List of CSV file(s)")
+    plot_files: PathArray = Field(..., description="List of PNG Matplot file(s)")
+    json_files: PathArray = Field(..., description="List of JSON file(s)")
+    archive_file: PathLike = Field(
+        ..., description="File name of archive file containging analysis files"
+    )
 
 
 class AnalysisRptMatplotConfig(BaseModel):
@@ -58,10 +62,12 @@ class AnalysisRptMatplotConfig(BaseModel):
 
     Extend this model in subclasses to add specific plot configuration options.
     """
+
     theme: ThemeType = Field(default="dark", description="")
 
+
 class AnalysisReport(ABC):
-    '''
+    """
     Abstract base class for converting an `Analysis` into persisted artifacts
     (CSV files, plots, and a ZIP archive), plus a lightweight model for API use.
 
@@ -69,8 +75,11 @@ class AnalysisReport(ABC):
         - Subclass and implement `_process()`, `create_csv()`, and `create_matplot()`.
         - Construct with an `Analysis` instance.
         - Call `build_report()` to emit files, then `to_model()` for response data.
-    '''
-    def __init__(self, analysis: Analysis, armc: AnalysisRptMatplotConfig | None = None) -> None:
+    """
+
+    def __init__(
+        self, analysis: Analysis, armc: AnalysisRptMatplotConfig | None = None
+    ) -> None:
         """Set up logging, store the `Analysis`, and initialize runtime context."""
         self.logger = logging.getLogger("AnalysisReport")
         self._analysis = analysis
@@ -79,7 +88,7 @@ class AnalysisReport(ABC):
         self._armc = armc
         self.__init()
 
-        self.csv_files: list[PathLike]  = []
+        self.csv_files: list[PathLike] = []
         self.plot_files: list[PathLike] = []
         self.json_files: list[PathLike] = []
 
@@ -113,57 +122,57 @@ class AnalysisReport(ABC):
         Call this after `build_report()` to pass paths and metadata to API callers.
         """
         return AnalysisOutputModel(
-            time         =   self._group_time,
-            csv_files    =   self.csv_files,
-            plot_files   =   self.plot_files,
-            json_files   =   self.json_files,
-            archive_file =   self.archive_file,
+            time=self._group_time,
+            csv_files=self.csv_files,
+            plot_files=self.plot_files,
+            json_files=self.json_files,
+            archive_file=self.archive_file,
         )
 
     def create_csv_fname(self, tags: list[str] = None) -> PathLike:
-        '''
+        """
         Build a CSV filename of the form:
             <csv_dir>/<mac>_<model>_<timestamp>[_TAGS].csv
 
         Example:
             fname = self.create_csv_fname(tags=["ch1", "rpt"])
-        '''
+        """
         if tags is None:
             tags = []
         return f"{self._csv_dir}/{self.create_generic_fname(tags=tags, ext='csv')}"
 
     def create_png_fname(self, tags: list[str] = None) -> PathLike:
-        '''
+        """
         Build a PNG filename of the form:
             <png_dir>/<mac>_<model>_<timestamp>[_TAGS].png
 
         Example:
             fname = self.create_png_fname(tags=["spectrum"])
-        '''
+        """
         if tags is None:
             tags = []
         return f"{self._png_dir}/{self.create_generic_fname(tags=tags, ext='png')}"
 
     def create_json_fname(self, tags: list[str] = None) -> PathLike:
-        '''
+        """
         Build a PNG filename of the form:
             <json_dir>/<mac>_<model>_<timestamp>[_TAGS].png
 
         Example:
             fname = self.create_png_fname(tags=["spectrum"])
-        '''
+        """
         if tags is None:
             tags = []
         return f"{self._json_dir}/{self.create_generic_fname(tags=tags, ext='json')}"
 
     def create_archive_fname(self, tags: list[str] = None) -> PathLike:
-        '''
+        """
         Build a ZIP archive filename of the form:
             <archive_dir>/<mac>_<model>_<timestamp>[_TAGS].zip
 
         Example:
             fname = self.create_archive_fname(tags=["bundle"])
-        '''
+        """
         if tags is None:
             tags = []
         return f"{self._archive_dir}/{self.create_generic_fname(tags=tags, ext='zip')}"
@@ -196,7 +205,9 @@ class AnalysisReport(ABC):
         """
         return self._generate_fname()
 
-    def register_common_analysis_model(self, channel_id: ChannelId, model: CommonAnalysis, *, strict: bool = True) -> None:
+    def register_common_analysis_model(
+        self, channel_id: ChannelId, model: CommonAnalysis, *, strict: bool = True
+    ) -> None:
         """
         Register (or append) a `CommonAnalysis` model under a channel ID.
 
@@ -237,7 +248,9 @@ class AnalysisReport(ABC):
 
         bucket.append(model)
 
-    def get_common_analysis_model(self, channel_id: ChannelId = INVALID_CHANNEL_ID) -> list[CommonAnalysis]:
+    def get_common_analysis_model(
+        self, channel_id: ChannelId = INVALID_CHANNEL_ID
+    ) -> list[CommonAnalysis]:
         """
         Retrieve one or more `CommonAnalysis` models.
 
@@ -289,21 +302,20 @@ class AnalysisReport(ABC):
         """
         self._process()
 
-        f:PathArray = [Path('')]
+        f: PathArray = [Path("")]
 
         for csv_mgr in self.create_csv():
-
             if not csv_mgr.write():
                 self.logger.error(f"Failed to write CSV: {csv_mgr.get_path_fname()}")
                 continue
 
-            self.logger.debug(f'Wrote CSV File: {csv_mgr.get_path_fname()}')
+            self.logger.debug(f"Wrote CSV File: {csv_mgr.get_path_fname()}")
             self.csv_files.append(csv_mgr.get_path_fname())
             f.append(csv_mgr.get_path_fname())
 
         for matplot_mgr in self.create_matplot():
             for fn in matplot_mgr.get_png_files():
-                self.logger.debug(f'Wrote Matplotlib Figure: {fn}')
+                self.logger.debug(f"Wrote Matplotlib Figure: {fn}")
                 self.plot_files.append(fn)
                 f.append(fn)
 
@@ -311,14 +323,16 @@ class AnalysisReport(ABC):
         f.extend(self.json_files)
 
         try:
-            self.archive_file = ArchiveManager().zip_files(files=f, archive_path=self.create_archive_fname())
+            self.archive_file = ArchiveManager().zip_files(
+                files=f, archive_path=self.create_archive_fname()
+            )
 
         except Exception as e:
             self.logger.error(f"Failed to create archive: {e}")
 
         return self.archive_file
 
-    def get_all_generated_files(self, include_archive:bool=False) -> list[PathLike]:
+    def get_all_generated_files(self, include_archive: bool = False) -> list[PathLike]:
         """
         Return a flat list of generated file paths (CSVs, plots, and JSON files).
 
@@ -326,23 +340,28 @@ class AnalysisReport(ABC):
             `include_archive` is accepted for API symmetry but ignored; the
             archive path is available via `to_model().archive_file`.
         """
-        _:list[PathLike] = []
+        _: list[PathLike] = []
         _.extend(self.csv_files)
         _.extend(self.plot_files)
         _.extend(self.json_files)
         return _
 
-    def _build_common_analysis_json(self, channel_id: ChannelId, common_analysis:CommonAnalysis) -> None:
+    def _build_common_analysis_json(
+        self, channel_id: ChannelId, common_analysis: CommonAnalysis
+    ) -> None:
         """
         Build a JSON-serializable payload from the analysis results.
 
         Implement in subclasses as needed.
         """
 
-        full_path_fname = self.create_json_fname(tags=[str(channel_id), "analysis", str(Generate.time_stamp())])
+        full_path_fname = self.create_json_fname(
+            tags=[str(channel_id), "analysis", str(Generate.time_stamp())]
+        )
         self.json_files.append(full_path_fname)
-        JsonTransactionDb().write_json(data  = common_analysis.model_dump(),
-                                       fname = Path(full_path_fname).parts[-1])
+        JsonTransactionDb().write_json(
+            data=common_analysis.model_dump(), fname=Path(full_path_fname).parts[-1]
+        )
 
     @abstractmethod
     def _process(self) -> None:
@@ -381,21 +400,25 @@ class AnalysisReport(ABC):
     def __init(self) -> None:
         """Initialize runtime context: data cache, output dirs, timestamps, and descriptors."""
         # Acquire analysis data
-        self._data_list: AnalysisData = list(self._analysis.get_results().get("analysis", []))
+        self._data_list: AnalysisData = list(
+            self._analysis.get_results().get("analysis", [])
+        )
         self.logger.debug("Analysis items received: %d", len(self._data_list))
 
         if not self._data_list:
-            self.logger.error("Unable to acquire analysis data (empty 'analysis' list).")
+            self.logger.error(
+                "Unable to acquire analysis data (empty 'analysis' list)."
+            )
             raise ValueError("No analysis data available")
 
         # Directories / session metadata
-        self._png_dir: PathLike       = SystemConfigSettings.png_dir()
-        self._csv_dir: PathLike       = SystemConfigSettings.csv_dir()
-        self._json_dir: PathLike      = SystemConfigSettings.json_dir()
-        self._archive_dir: PathLike   = SystemConfigSettings.archive_dir()
+        self._png_dir: PathLike = SystemConfigSettings.png_dir()
+        self._csv_dir: PathLike = SystemConfigSettings.csv_dir()
+        self._json_dir: PathLike = SystemConfigSettings.json_dir()
+        self._archive_dir: PathLike = SystemConfigSettings.archive_dir()
 
-        self._group_time: TimeStamp         = TimeStamp(Generate.time_stamp())
-        self._base_filename: FileNameStr    = FileNameStr("")
+        self._group_time: TimeStamp = TimeStamp(Generate.time_stamp())
+        self._base_filename: FileNameStr = FileNameStr("")
         self._common_analysis_model: dict[ChannelId, list[CommonAnalysis]] = {}
 
         # Normalize first item to a dict (supports both dict and BaseModel)
@@ -410,16 +433,24 @@ class AnalysisReport(ABC):
             or first_dict.get("cm_mac_address")
             or MacAddress.null()
         )
-        cmts_mac_str: MacAddressStr  = first_dict.get("cmts_mac_address", MacAddress.null())
+        cmts_mac_str: MacAddressStr = first_dict.get(
+            "cmts_mac_address", MacAddress.null()
+        )
 
-        self._mac_address: MacAddress      = MacAddress(mac_str)
+        self._mac_address: MacAddress = MacAddress(mac_str)
         self._cmts_mac_address: MacAddress = MacAddress(cmts_mac_str)
 
         # System descriptor (robust to missing keys)
-        dev_details: dict[str, Any]                     = cast(dict[str, Any], first_dict.get("device_details", {}))
-        system_description_dict: dict[str, Any]         = cast(dict[str, Any], dev_details.get("system_description",
-                                                                                               SystemDescriptor.empty().to_dict()))
-        self._system_description: SystemDescriptor      = SystemDescriptor.load_from_dict(system_description_dict)
+        dev_details: dict[str, Any] = cast(
+            dict[str, Any], first_dict.get("device_details", {})
+        )
+        system_description_dict: dict[str, Any] = cast(
+            dict[str, Any],
+            dev_details.get("system_description", SystemDescriptor.empty().to_dict()),
+        )
+        self._system_description: SystemDescriptor = SystemDescriptor.load_from_dict(
+            system_description_dict
+        )
 
     def _generate_fname(self, tags: list[str] = None, ext: str = "") -> FileNameStr:
         """

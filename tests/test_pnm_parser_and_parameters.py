@@ -21,13 +21,13 @@ DATA_DIR = Path(__file__).parent / "files"
 
 # fname, supported, expected parser class (or None when unsupported)
 CASES = [
-    ("channel_estimation.bin", True,  CmDsOfdmChanEstimateCoef),
-    ("const_display.bin",      True,  CmDsConstDispMeas),
-    ("fec_summary.bin",        True,  CmDsOfdmFecSummary),
-    ("modulation_profile.bin", True,  CmDsOfdmModulationProfile),
-    ("rxmer.bin",              True,  CmDsOfdmRxMer),
-    ("histogram.bin",          True,  CmDsHist),
-    ("spectrum_analyzer.bin",  False, None),
+    ("channel_estimation.bin", True, CmDsOfdmChanEstimateCoef),
+    ("const_display.bin", True, CmDsConstDispMeas),
+    ("fec_summary.bin", True, CmDsOfdmFecSummary),
+    ("modulation_profile.bin", True, CmDsOfdmModulationProfile),
+    ("rxmer.bin", True, CmDsOfdmRxMer),
+    ("histogram.bin", True, CmDsHist),
+    ("spectrum_analyzer.bin", False, None),
 ]
 
 

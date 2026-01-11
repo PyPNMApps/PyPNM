@@ -49,10 +49,11 @@ class RxMerMarginRouter:
         self._add_routes()
 
     def _add_routes(self) -> None:
-
-        @self.router.post(f"/{self.base_endpoint}/getMeasurementTemplate",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            f"/{self.base_endpoint}/getMeasurementTemplate",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_measurement_template(request: PnmRequest) -> SnmpResponse:
             """
             📘 [API Guide - MER Margin Measurement Template](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/single/ds/ofdm/mer-margin.md#get-measurement-template)
@@ -61,30 +62,37 @@ class RxMerMarginRouter:
             ip: InetAddressStr = request.cable_modem.ip_address
             community: str = request.cable_modem.snmp.snmp_v2c.community
 
-            self.logger.info(f"Retrieving MER Margin measurement template for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Retrieving MER Margin measurement template for MAC: {mac}, IP: {ip}"
+            )
 
-            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+            cm = CableModem(
+                mac_address=MacAddress(mac), inet=Inet(ip), write_community=community
+            )
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm,validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm, validate_ofdm_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(
-                    mac_address=mac,
-                    status=status, message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             service = CmDsOfdmMerMarginService(cm)
-            template:dict[str, list[dict]] = await service.getMeasurementTemplate()
+            template: dict[str, list[dict]] = await service.getMeasurementTemplate()
 
             return SnmpResponse(
                 mac_address=mac,
                 status=ServiceStatusCode.SUCCESS,
                 message="MER Margin test triggered successfully",
-                results=template)
+                results=template,
+            )
 
-        @self.router.post(f"/{self.base_endpoint}/getMeasurement",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            f"/{self.base_endpoint}/getMeasurement",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_measurement(request: PnmMerMarginRequest) -> SnmpResponse:
             """
             Initiates a MER Margin test on a specified OFDM channel/profile.
@@ -96,17 +104,19 @@ class RxMerMarginRouter:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            self.logger.info(f"Initiating MER Margin measurement for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}")
+            self.logger.info(
+                f"Initiating MER Margin measurement for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}"
+            )
 
             cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip))
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm, validate_ofdm_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(
-                    mac_address=mac,
-                    status=status, message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             service = CmDsOfdmMerMarginService(cm)
             await service.set(request.mer_margin)
@@ -114,12 +124,17 @@ class RxMerMarginRouter:
             return SnmpResponse(
                 mac_address=request.cable_modem.mac_address,
                 status=ServiceStatusCode.SUCCESS,
-                message="MER Margin test triggered successfully")
+                message="MER Margin test triggered successfully",
+            )
 
-        @self.router.post(f"/{self.base_endpoint}/getAnalysis",
-                          response_model=None,
-                          responses=FAST_API_RESPONSE,)
-        async def get_analysis(request: PnmMerMarginRequest) -> SnmpResponse | PnmAnalysisResponse:
+        @self.router.post(
+            f"/{self.base_endpoint}/getAnalysis",
+            response_model=None,
+            responses=FAST_API_RESPONSE,
+        )
+        async def get_analysis(
+            request: PnmMerMarginRequest,
+        ) -> SnmpResponse | PnmAnalysisResponse:
             """
             Retrieves the MER Margin analysis results from the cable modem.
 
@@ -133,21 +148,27 @@ class RxMerMarginRouter:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            self.logger.info(f"Retrieving MER Margin analysis for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}")
+            self.logger.info(
+                f"Retrieving MER Margin analysis for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}"
+            )
 
             cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip))
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm, validate_ofdm_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac,status=status, message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             service = CmDsOfdmMerMarginService(cm)
             return await service.get_analysis()
 
-        @self.router.post(f"/{self.base_endpoint}/getMeasurementStatistics",
-                          response_model=SnmpResponse)
+        @self.router.post(
+            f"/{self.base_endpoint}/getMeasurementStatistics",
+            response_model=SnmpResponse,
+        )
         async def get_measurement_statistics(request: PnmRequest) -> SnmpResponse:
             """
             Returns current MER Margin measurement configuration and status.
@@ -163,17 +184,21 @@ class RxMerMarginRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             community: str = request.cable_modem.snmp.snmp_v2c.community
-            self.logger.info(f"Fetching MER Margin measurement statistics for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Fetching MER Margin measurement statistics for MAC: {mac}, IP: {ip}"
+            )
 
-            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+            cm = CableModem(
+                mac_address=MacAddress(mac), inet=Inet(ip), write_community=community
+            )
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm, validate_ofdm_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(
-                    mac_address=mac,
-                    status=status, message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             service = CmDsOfdmMerMarginService(cm)
             results = await service.getMeasurementStatus()
@@ -182,7 +207,9 @@ class RxMerMarginRouter:
                 mac_address=mac,
                 status=ServiceStatusCode.SUCCESS,
                 message="Measurement Statistics for MER Margin",
-                results=results)
+                results=results,
+            )
+
 
 # Required for dynamic auto-registration
 router = RxMerMarginRouter().router

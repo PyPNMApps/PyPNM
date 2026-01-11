@@ -12,52 +12,98 @@ from scipy.signal import butter, filtfilt
 
 from pypnm.lib.types import FrequencyHz, NDArrayC128, NDArrayF64
 
-DEFAULT_BUTTERWORTH_ORDER: int       = 4
-NYQUIST_DENOMINATOR: float           = 2.0
-MIN_NORMALIZED_CUTOFF: float         = 0.0
-MAX_NORMALIZED_CUTOFF: float         = 1.0
+DEFAULT_BUTTERWORTH_ORDER: int = 4
+NYQUIST_DENOMINATOR: float = 2.0
+MIN_NORMALIZED_CUTOFF: float = 0.0
+MAX_NORMALIZED_CUTOFF: float = 1.0
 
 
 class PreEqButterworthConfig(BaseModel):
-    sample_rate_hz: FrequencyHz = Field(..., description="Effective sample rate in Hertz along the complex coefficient index (e.g. OFDM subcarrier spacing).")
-    cutoff_hz:      FrequencyHz = Field(..., description="Low-pass Butterworth cutoff frequency in Hertz applied across coefficient index.")
-    order:          int         = Field(DEFAULT_BUTTERWORTH_ORDER, description="Butterworth filter order controlling roll-off steepness.")
-    zero_phase:     bool        = Field(True, description="Apply zero-phase filtering (filtfilt) when True; causal filtering when False.")
+    sample_rate_hz: FrequencyHz = Field(
+        ...,
+        description="Effective sample rate in Hertz along the complex coefficient index (e.g. OFDM subcarrier spacing).",
+    )
+    cutoff_hz: FrequencyHz = Field(
+        ...,
+        description="Low-pass Butterworth cutoff frequency in Hertz applied across coefficient index.",
+    )
+    order: int = Field(
+        DEFAULT_BUTTERWORTH_ORDER,
+        description="Butterworth filter order controlling roll-off steepness.",
+    )
+    zero_phase: bool = Field(
+        True,
+        description="Apply zero-phase filtering (filtfilt) when True; causal filtering when False.",
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
-        validate_assignment     = True,
-        extra                   = "forbid",
-        arbitrary_types_allowed = True,
+        validate_assignment=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
     )
 
 
 class PreEqButterworthResult(BaseModel):
-    sample_rate_hz:        FrequencyHz = Field(..., description="Effective sample rate in Hertz along the complex coefficient index.")
-    cutoff_hz:             FrequencyHz = Field(..., description="Low-pass Butterworth cutoff frequency in Hertz used during filtering.")
-    order:                 int         = Field(..., description="Butterworth filter order used during processing.")
-    zero_phase:            bool        = Field(..., description="Indicates whether zero-phase (filtfilt) filtering was applied.")
-    original_coefficients: NDArrayC128 = Field(..., description="Original complex coefficients (e.g. pre-equalization taps or channel-estimation values).")
-    filtered_coefficients: NDArrayC128 = Field(..., description="Filtered complex coefficients after Butterworth low-pass smoothing.")
+    sample_rate_hz: FrequencyHz = Field(
+        ...,
+        description="Effective sample rate in Hertz along the complex coefficient index.",
+    )
+    cutoff_hz: FrequencyHz = Field(
+        ...,
+        description="Low-pass Butterworth cutoff frequency in Hertz used during filtering.",
+    )
+    order: int = Field(
+        ..., description="Butterworth filter order used during processing."
+    )
+    zero_phase: bool = Field(
+        ...,
+        description="Indicates whether zero-phase (filtfilt) filtering was applied.",
+    )
+    original_coefficients: NDArrayC128 = Field(
+        ...,
+        description="Original complex coefficients (e.g. pre-equalization taps or channel-estimation values).",
+    )
+    filtered_coefficients: NDArrayC128 = Field(
+        ...,
+        description="Filtered complex coefficients after Butterworth low-pass smoothing.",
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
-        validate_assignment     = True,
-        extra                   = "forbid",
-        arbitrary_types_allowed = True,
+        validate_assignment=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
     )
 
 
 class MagnitudeButterworthResult(BaseModel):
-    sample_rate_hz:   FrequencyHz = Field(..., description="Effective sample rate in Hertz along the scalar series index (e.g. OFDM subcarrier spacing).")
-    cutoff_hz:        FrequencyHz = Field(..., description="Low-pass Butterworth cutoff frequency in Hertz used during filtering.")
-    order:            int         = Field(..., description="Butterworth filter order used during processing.")
-    zero_phase:       bool        = Field(..., description="Indicates whether zero-phase (filtfilt) filtering was applied.")
-    original_values:  NDArrayF64  = Field(..., description="Original real-valued samples (e.g. RxMER per subcarrier, magnitude, or SNR series).")
-    filtered_values:  NDArrayF64  = Field(..., description="Filtered real-valued samples after Butterworth low-pass smoothing.")
+    sample_rate_hz: FrequencyHz = Field(
+        ...,
+        description="Effective sample rate in Hertz along the scalar series index (e.g. OFDM subcarrier spacing).",
+    )
+    cutoff_hz: FrequencyHz = Field(
+        ...,
+        description="Low-pass Butterworth cutoff frequency in Hertz used during filtering.",
+    )
+    order: int = Field(
+        ..., description="Butterworth filter order used during processing."
+    )
+    zero_phase: bool = Field(
+        ...,
+        description="Indicates whether zero-phase (filtfilt) filtering was applied.",
+    )
+    original_values: NDArrayF64 = Field(
+        ...,
+        description="Original real-valued samples (e.g. RxMER per subcarrier, magnitude, or SNR series).",
+    )
+    filtered_values: NDArrayF64 = Field(
+        ...,
+        description="Filtered real-valued samples after Butterworth low-pass smoothing.",
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
-        validate_assignment     = True,
-        extra                   = "forbid",
-        arbitrary_types_allowed = True,
+        validate_assignment=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
     )
 
 
@@ -128,9 +174,9 @@ class PreEqButterworthFilter:
     def from_subcarrier_spacing(
         cls,
         subcarrier_spacing_hz: FrequencyHz,
-        cutoff_hz:            FrequencyHz,
-        order:                int  = DEFAULT_BUTTERWORTH_ORDER,
-        zero_phase:           bool = True,
+        cutoff_hz: FrequencyHz,
+        order: int = DEFAULT_BUTTERWORTH_ORDER,
+        zero_phase: bool = True,
     ) -> PreEqButterworthFilter:
         """
         Construct a Butterworth filter using OFDM subcarrier spacing as the sample rate.
@@ -159,10 +205,10 @@ class PreEqButterworthFilter:
             coefficient vectors indexed by subcarrier.
         """
         config = PreEqButterworthConfig(
-            sample_rate_hz = subcarrier_spacing_hz,
-            cutoff_hz      = cutoff_hz,
-            order          = order,
-            zero_phase     = zero_phase,
+            sample_rate_hz=subcarrier_spacing_hz,
+            cutoff_hz=cutoff_hz,
+            order=order,
+            zero_phase=zero_phase,
         )
         return cls(config=config)
 
@@ -191,10 +237,14 @@ class PreEqButterworthFilter:
         """
         coeffs_array = np.asarray(coefficients, dtype=np.complex128)
         if coeffs_array.size == 0:
-            raise ValueError("PreEqButterworthFilter.apply() received an empty coefficient array.")
+            raise ValueError(
+                "PreEqButterworthFilter.apply() received an empty coefficient array."
+            )
 
         if coeffs_array.ndim != 1:
-            raise ValueError("PreEqButterworthFilter.apply() expects a one-dimensional ComplexArray.")
+            raise ValueError(
+                "PreEqButterworthFilter.apply() expects a one-dimensional ComplexArray."
+            )
 
         b, a = cast(
             tuple[np.ndarray, np.ndarray],
@@ -210,25 +260,28 @@ class PreEqButterworthFilter:
             filtered = filtfilt(b, a, coeffs_array)
         else:
             from scipy.signal import lfilter
+
             filtered = lfilter(b, a, coeffs_array)
 
         return PreEqButterworthResult(
-            sample_rate_hz        = self.config.sample_rate_hz,
-            cutoff_hz             = self.config.cutoff_hz,
-            order                 = self.config.order,
-            zero_phase            = self.config.zero_phase,
-            original_coefficients = coeffs_array,
-            filtered_coefficients = np.asarray(filtered, dtype=np.complex128),
+            sample_rate_hz=self.config.sample_rate_hz,
+            cutoff_hz=self.config.cutoff_hz,
+            order=self.config.order,
+            zero_phase=self.config.zero_phase,
+            original_coefficients=coeffs_array,
+            filtered_coefficients=np.asarray(filtered, dtype=np.complex128),
         )
 
     def _compute_normalized_cutoff(self) -> float:
         """Compute normalized cutoff frequency relative to the Nyquist frequency."""
         sample_rate = float(self.config.sample_rate_hz)
-        cutoff      = float(self.config.cutoff_hz)
+        cutoff = float(self.config.cutoff_hz)
 
         nyquist = sample_rate / NYQUIST_DENOMINATOR
         if nyquist <= 0.0:
-            raise ValueError("Sample rate must be positive to compute a valid Nyquist frequency.")
+            raise ValueError(
+                "Sample rate must be positive to compute a valid Nyquist frequency."
+            )
 
         normalized = cutoff / nyquist
 
@@ -281,9 +334,9 @@ class MagnitudeButterworthFilter:
     def from_subcarrier_spacing(
         cls,
         subcarrier_spacing_hz: FrequencyHz,
-        cutoff_hz:            FrequencyHz,
-        order:                int  = DEFAULT_BUTTERWORTH_ORDER,
-        zero_phase:           bool = True,
+        cutoff_hz: FrequencyHz,
+        order: int = DEFAULT_BUTTERWORTH_ORDER,
+        zero_phase: bool = True,
     ) -> MagnitudeButterworthFilter:
         """
         Construct a Butterworth filter using OFDM subcarrier spacing as the sample rate.
@@ -312,10 +365,10 @@ class MagnitudeButterworthFilter:
             indexed by subcarrier.
         """
         config = PreEqButterworthConfig(
-            sample_rate_hz = subcarrier_spacing_hz,
-            cutoff_hz      = cutoff_hz,
-            order          = order,
-            zero_phase     = zero_phase,
+            sample_rate_hz=subcarrier_spacing_hz,
+            cutoff_hz=cutoff_hz,
+            order=order,
+            zero_phase=zero_phase,
         )
         return cls(config=config)
 
@@ -343,10 +396,14 @@ class MagnitudeButterworthFilter:
         """
         values_array = np.asarray(values, dtype=np.float64)
         if values_array.size == 0:
-            raise ValueError("MagnitudeButterworthFilter.apply() received an empty value array.")
+            raise ValueError(
+                "MagnitudeButterworthFilter.apply() received an empty value array."
+            )
 
         if values_array.ndim != 1:
-            raise ValueError("MagnitudeButterworthFilter.apply() expects a one-dimensional NDArrayF64.")
+            raise ValueError(
+                "MagnitudeButterworthFilter.apply() expects a one-dimensional NDArrayF64."
+            )
 
         b, a = cast(
             tuple[np.ndarray, np.ndarray],
@@ -362,25 +419,28 @@ class MagnitudeButterworthFilter:
             filtered = filtfilt(b, a, values_array)
         else:
             from scipy.signal import lfilter
+
             filtered = lfilter(b, a, values_array)
 
         return MagnitudeButterworthResult(
-            sample_rate_hz  = self.config.sample_rate_hz,
-            cutoff_hz       = self.config.cutoff_hz,
-            order           = self.config.order,
-            zero_phase      = self.config.zero_phase,
-            original_values = values_array,
-            filtered_values = np.asarray(filtered, dtype=np.float64),
+            sample_rate_hz=self.config.sample_rate_hz,
+            cutoff_hz=self.config.cutoff_hz,
+            order=self.config.order,
+            zero_phase=self.config.zero_phase,
+            original_values=values_array,
+            filtered_values=np.asarray(filtered, dtype=np.float64),
         )
 
     def _compute_normalized_cutoff(self) -> float:
         """Compute normalized cutoff frequency relative to the Nyquist frequency."""
         sample_rate = float(self.config.sample_rate_hz)
-        cutoff      = float(self.config.cutoff_hz)
+        cutoff = float(self.config.cutoff_hz)
 
         nyquist = sample_rate / NYQUIST_DENOMINATOR
         if nyquist <= 0.0:
-            raise ValueError("Sample rate must be positive to compute a valid Nyquist frequency.")
+            raise ValueError(
+                "Sample rate must be positive to compute a valid Nyquist frequency."
+            )
 
         normalized = cutoff / nyquist
 

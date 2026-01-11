@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -30,15 +29,17 @@ class FddDiplexerConfigResult:
 
     def __init__(self) -> None:
         self.router = APIRouter(
-            prefix="/docs/fdd/system",
-            tags=["DOCSIS 4.0 FDD System"])
+            prefix="/docs/fdd/system", tags=["DOCSIS 4.0 FDD System"]
+        )
         self.logger = logging.getLogger(self.__class__.__name__)
         self._register_routes()
 
     def _register_routes(self) -> None:
-        @self.router.post("/diplexer/configuration",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/diplexer/configuration",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def diplexer_config(request: SnmpRequest) -> SnmpResponse:
             """
             **DOCSIS 4.0 FDD Diplexer Configuration**
@@ -56,21 +57,28 @@ class FddDiplexerConfigResult:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          check_docsis_version=[ClabsDocsisVersion.DOCSIS_40]).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac,
+                ip_address=ip,
+                snmp_config=request.cable_modem.snmp,
+                check_docsis_version=[ClabsDocsisVersion.DOCSIS_40],
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            service = await FddDiplexerConfigService.fetch_fdd_diplexer_config(mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp)
+            service = await FddDiplexerConfigService.fetch_fdd_diplexer_config(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            )
             cfg = service.to_dict()
-            return SnmpResponse(mac_address     =   mac,
-                                status          =   ServiceStatusCode.SUCCESS,
-                                message         =   "Successfully retrieved FDD diplexer configuration",
-                                results         =   cfg)
+            return SnmpResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="Successfully retrieved FDD diplexer configuration",
+                results=cfg,
+            )
+
 
 # Required for dynamic FastAPI router registration
 router = FddDiplexerConfigResult().router

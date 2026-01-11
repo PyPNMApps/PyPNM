@@ -25,7 +25,7 @@ class FileProcessor:
         Args:
             filepath: Path to the primary file to manage (the file you read/write and can archive).
         """
-        self.logger   = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.filepath = Path(filepath)
         self.logger.debug(f"Initialized FileProcessor with path: {self.filepath}")
 
@@ -131,7 +131,7 @@ class FileProcessor:
             True on success (CSV + optional archive), False otherwise.
         """
         target = Path(filepath) if filepath else self.filepath
-        mode   = "a" if append else "w"
+        mode = "a" if append else "w"
 
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -144,7 +144,7 @@ class FileProcessor:
                 first = data[0]
                 if isinstance(first, dict):
                     fieldnames = list(first.keys())
-                    writer     = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     if not append:
                         writer.writeheader()
                     writer.writerows(data)  # type: ignore
@@ -202,12 +202,14 @@ class FileProcessor:
             raise FileNotFoundError(f"Cannot archive missing file: {src}")
 
         archive_path = Path(archive_path)
-        arcname      = arcname or src.name
+        arcname = arcname or src.name
 
         if archive_format == "zip":
             archive_path.parent.mkdir(parents=True, exist_ok=True)
             mode = "a" if archive_path.exists() else "w"
-            with zipfile.ZipFile(archive_path, mode=mode, compression=zipfile.ZIP_DEFLATED) as zf:
+            with zipfile.ZipFile(
+                archive_path, mode=mode, compression=zipfile.ZIP_DEFLATED
+            ) as zf:
                 zf.write(src, arcname=arcname)
             self.logger.debug(f"Added {src} as {arcname} to zip: {archive_path}")
             return archive_path
@@ -220,13 +222,15 @@ class FileProcessor:
                 "gztar": "w:gz",
                 "bztar": "w:bz2",
                 "xztar": "w:xz",
-                "tar":   "w",
+                "tar": "w",
             }
             mode = mode_map[archive_format]
             archive_path.parent.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(archive_path, mode) as tf:            # type: ignore
+            with tarfile.open(archive_path, mode) as tf:  # type: ignore
                 tf.add(src, arcname=arcname)
-            self.logger.debug(f"Created {archive_format} with {src} as {arcname}: {archive_path}")
+            self.logger.debug(
+                f"Created {archive_format} with {src} as {arcname}: {archive_path}"
+            )
             return archive_path
 
         raise ValueError(f"Unsupported archive_format: {archive_format}")
@@ -292,14 +296,14 @@ class FileProcessor:
             data = data[:limit_bytes]
 
         lines: list[str] = []
-        offset: int      = 0
-        total_len: int   = len(data)
+        offset: int = 0
+        total_len: int = len(data)
 
         while offset < total_len:
             chunk = data[offset : offset + bytes_per_line]
 
-            hex_bytes    = " ".join(f"{b:02x}" for b in chunk)
-            ascii_repr   = "".join(chr(b) if 32 <= b <= 126 else "." for b in chunk)
+            hex_bytes = " ".join(f"{b:02x}" for b in chunk)
+            ascii_repr = "".join(chr(b) if 32 <= b <= 126 else "." for b in chunk)
             padding_size = bytes_per_line - len(chunk)
 
             if padding_size > 0:
@@ -339,9 +343,12 @@ class FileProcessor:
     def __enter__(self) -> FileProcessor:
         return self
 
-    def __exit__(self, exc_type: type | None,
-                 exc_value: BaseException | None,
-                 traceback: TracebackType | None) -> Literal[False]:
+    def __exit__(
+        self,
+        exc_type: type | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> Literal[False]:
         self.close()
         if exc_type:
             self.logger.error(f"Exception in FileProcessor: {exc_value}")

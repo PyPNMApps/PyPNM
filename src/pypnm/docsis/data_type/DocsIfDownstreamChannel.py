@@ -55,6 +55,7 @@ class DocsIfDownstreamEntry(BaseModel):
     docsIf3SignalQualityExtRxMER : Optional[float]
         Extended RxMER (dB), from ``docsIf3SignalQualityExtRxMER``.
     """
+
     docsIfDownChannelId: ChannelId = INVALID_CHANNEL_ID
     docsIfDownChannelFrequency: FrequencyHz | None = None
     docsIfDownChannelWidth: FrequencyHz | None = None
@@ -100,12 +101,15 @@ class DocsIfDownstreamChannelEntry(BaseModel):
     >>> len(entries)
     4
     """
+
     index: int
     channel_id: int
     entry: DocsIfDownstreamEntry
 
     @classmethod
-    async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsIfDownstreamChannelEntry:
+    async def from_snmp(
+        cls, index: int, snmp: Snmp_v2c
+    ) -> DocsIfDownstreamChannelEntry:
         """
         Build an instance by querying SNMP for a single downstream SC-QAM index.
 
@@ -154,7 +158,9 @@ class DocsIfDownstreamChannelEntry(BaseModel):
             except Exception:
                 return None
 
-        async def fetch(field: str, cast: Callable | None = None) -> None | int | float | str | bool:
+        async def fetch(
+            field: str, cast: Callable | None = None
+        ) -> None | int | float | str | bool:
             try:
                 raw = await snmp.get(f"{field}.{index}")
                 val = Snmp_v2c.get_result_value(raw)
@@ -179,31 +185,32 @@ class DocsIfDownstreamChannelEntry(BaseModel):
                 return None
 
         entry = DocsIfDownstreamEntry(
-            docsIfDownChannelId         =   await fetch("docsIfDownChannelId", int),
-            docsIfDownChannelFrequency  =   await fetch("docsIfDownChannelFrequency", int),
-            docsIfDownChannelWidth      =   await fetch("docsIfDownChannelWidth", int),
-            docsIfDownChannelModulation =   await fetch("docsIfDownChannelModulation", int),
-            docsIfDownChannelInterleave =   await fetch("docsIfDownChannelInterleave", int),
-            docsIfDownChannelPower      =   await fetch("docsIfDownChannelPower", tenthdBmV_to_float),
-            docsIfSigQUnerroreds        =   await fetch("docsIfSigQUnerroreds", int),
-            docsIfSigQCorrecteds        =   await fetch("docsIfSigQCorrecteds", int),
-            docsIfSigQUncorrectables    =   await fetch("docsIfSigQUncorrectables", int),
-            docsIfSigQMicroreflections  =   await fetch("docsIfSigQMicroreflections", int),
-            docsIfSigQExtUnerroreds     =   await fetch("docsIfSigQExtUnerroreds", int),
-            docsIfSigQExtCorrecteds     =   await fetch("docsIfSigQExtCorrecteds", int),
-            docsIfSigQExtUncorrectables =   await fetch("docsIfSigQExtUncorrectables", int),
-            docsIf3SignalQualityExtRxMER =  await fetch("docsIf3SignalQualityExtRxMER", to_float)
+            docsIfDownChannelId=await fetch("docsIfDownChannelId", int),
+            docsIfDownChannelFrequency=await fetch("docsIfDownChannelFrequency", int),
+            docsIfDownChannelWidth=await fetch("docsIfDownChannelWidth", int),
+            docsIfDownChannelModulation=await fetch("docsIfDownChannelModulation", int),
+            docsIfDownChannelInterleave=await fetch("docsIfDownChannelInterleave", int),
+            docsIfDownChannelPower=await fetch(
+                "docsIfDownChannelPower", tenthdBmV_to_float
+            ),
+            docsIfSigQUnerroreds=await fetch("docsIfSigQUnerroreds", int),
+            docsIfSigQCorrecteds=await fetch("docsIfSigQCorrecteds", int),
+            docsIfSigQUncorrectables=await fetch("docsIfSigQUncorrectables", int),
+            docsIfSigQMicroreflections=await fetch("docsIfSigQMicroreflections", int),
+            docsIfSigQExtUnerroreds=await fetch("docsIfSigQExtUnerroreds", int),
+            docsIfSigQExtCorrecteds=await fetch("docsIfSigQExtCorrecteds", int),
+            docsIfSigQExtUncorrectables=await fetch("docsIfSigQExtUncorrectables", int),
+            docsIf3SignalQualityExtRxMER=await fetch(
+                "docsIf3SignalQualityExtRxMER", to_float
+            ),
         )
 
-
-        return cls(
-            index=index,
-            channel_id=entry.docsIfDownChannelId or 0,
-            entry=entry
-        )
+        return cls(index=index, channel_id=entry.docsIfDownChannelId or 0, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsIfDownstreamChannelEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsIfDownstreamChannelEntry]:
         """
         Fetch multiple downstream SC-QAM entries in a single call.
 

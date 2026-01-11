@@ -9,7 +9,6 @@ from pypnm.lib.types import FloatSeries
 
 
 class ChannelPower:
-
     @staticmethod
     def calculate_channel_power(dB_values: FloatSeries) -> float:
         """

@@ -84,13 +84,14 @@ from pypnm.snmp.snmp_v3 import Snmp_v3
 
 class DocsPnmBulkFileUploadStatus(Enum):
     """Represents the upload status of a DOCSIS PNM bulk data file."""
-    OTHER                   = 1
-    AVAILABLE_FOR_UPLOAD    = 2
-    UPLOAD_IN_PROGRESS      = 3
-    UPLOAD_COMPLETED        = 4
-    UPLOAD_PENDING          = 5
-    UPLOAD_CANCELLED        = 6
-    ERROR                   = 7
+
+    OTHER = 1
+    AVAILABLE_FOR_UPLOAD = 2
+    UPLOAD_IN_PROGRESS = 3
+    UPLOAD_COMPLETED = 4
+    UPLOAD_PENDING = 5
+    UPLOAD_CANCELLED = 6
+    ERROR = 7
 
     def describe(self) -> str:
         """Returns a human-readable description of the enum value."""
@@ -111,6 +112,7 @@ class DocsPnmBulkFileUploadStatus(Enum):
     def __str__(self) -> str:
         return super().__str__()
 
+
 class DocsPnmCmCtlStatus(Enum):
     """
     Enum representing the overall status of the PNM test platform.
@@ -119,25 +121,27 @@ class DocsPnmCmCtlStatus(Enum):
     test initiation constraints on the Cable Modem (CM).
     """
 
-    OTHER               = 1
-    READY               = 2
-    TEST_IN_PROGRESS    = 3
-    TEMP_REJECT         = 4
-    SNMP_ERROR          = 255
+    OTHER = 1
+    READY = 2
+    TEST_IN_PROGRESS = 3
+    TEMP_REJECT = 4
+    SNMP_ERROR = 255
 
     def __str__(self) -> str:
         return self.name.lower()
+
 
 class FecSummaryType(Enum):
     """
     Enum for FEC Summary Type used in DOCSIS PNM SNMP operations.
     """
-    TEN_MIN             = 2
-    TWENTY_FOUR_HOUR    = 3
+
+    TEN_MIN = 2
+    TWENTY_FOUR_HOUR = 3
 
     @classmethod
     def choices(cls) -> dict[str, int]:
-        ''' Returns a dictionary [key,value] of enum names and their corresponding values. '''
+        """Returns a dictionary [key,value] of enum names and their corresponding values."""
         return {e.name: e.value for e in cls}
 
     @classmethod
@@ -146,6 +150,7 @@ class FecSummaryType(Enum):
             return cls(value)
         except ValueError as err:
             raise ValueError(f"Invalid FEC Summary Type value: {value}") from err
+
 
 class CmSnmpOperation:
     """
@@ -164,9 +169,11 @@ class CmSnmpOperation:
 
     class SnmpVersion(IntEnum):
         _SNMPv2C = 0
-        _SNMPv3  = 1
+        _SNMPv3 = 1
 
-    def __init__(self, inet: Inet, write_community: str, port: int = Snmp_v2c.SNMP_PORT) -> None:
+    def __init__(
+        self, inet: Inet, write_community: str, port: int = Snmp_v2c.SNMP_PORT
+    ) -> None:
         """
         Initialize a CmSnmpOperation instance.
 
@@ -179,10 +186,12 @@ class CmSnmpOperation:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         if not isinstance(inet, Inet):
-            self.logger.error(f'CmSnmpOperation() inet is of an Invalid Type: {type(inet)} , expecting Inet')
+            self.logger.error(
+                f"CmSnmpOperation() inet is of an Invalid Type: {type(inet)} , expecting Inet"
+            )
             exit(1)
 
-        self._inet:Inet = inet
+        self._inet: Inet = inet
         self._community = write_community
         self._port = port
         self._snmp = self.__load_snmp_version()
@@ -198,7 +207,7 @@ class CmSnmpOperation:
         """
 
         if SystemConfigSettings.snmp_v3_enable():
-            '''
+            """
             self.logger.debug("SNMPv3 enabled in configuration; validating parameters...")
             try:
                 p = PnmConfigManager.get_snmp_v3_params()
@@ -224,12 +233,13 @@ class CmSnmpOperation:
                     "SNMPv3 is enabled but parameters are incomplete or invalid; "
                     "falling back to SNMPv2c."
                 )
-            '''
+            """
             # Keep the implementation stubbed for now.
             # Force an explicit failure instead of silently falling back.
             raise NotImplementedError(
                 "SNMPv3 is enabled in configuration, but the SNMPv3 client is not implemented yet. "
-                "Disable SNMPv3 to use SNMPv2c.")
+                "Disable SNMPv3 to use SNMPv2c."
+            )
 
         if SystemConfigSettings.snmp_enable():
             self.logger.debug("Using SNMPv2c")
@@ -240,7 +250,9 @@ class CmSnmpOperation:
         self.logger.error(msg)
         raise ValueError(msg)
 
-    async def _get_value(self, oid_suffix: str, value_type: type | str = str) -> str | bytes | int | None:
+    async def _get_value(
+        self, oid_suffix: str, value_type: type | str = str
+    ) -> str | bytes | int | None:
         """
         Retrieves a value from SNMP for the given OID suffix, processes the value based on the expected type,
         and handles any error cases that may arise during the process.
@@ -263,21 +275,26 @@ class CmSnmpOperation:
         logging.debug(f"get_value() -> Val:{val}")
 
         # Check if the result is an error message, and return None if it is
-        if isinstance(val, str) and "No Such Instance currently exists at this OID" in val:
+        if (
+            isinstance(val, str)
+            and "No Such Instance currently exists at this OID" in val
+        ):
             logging.warning(f"SNMP error for {oid_suffix}: {val}")
             return None
 
         # Handle string and bytes conversions explicitly
         if value_type is str:
             if isinstance(val, bytes):  # if val is bytes, decode it
-                return val.decode('utf-8', errors='ignore')  # or replace with appropriate encoding
+                return val.decode(
+                    "utf-8", errors="ignore"
+                )  # or replace with appropriate encoding
             return str(val)
 
         if value_type is bytes:
             if isinstance(val, str):  # if val is a string, convert to bytes
                 # Remove any '0x' prefix or spaces before converting
                 val = val.strip().lower()
-                if val.startswith('0x'):
+                if val.startswith("0x"):
                     val = val[2:]  # Remove '0x' prefix
 
                 # Ensure the string is a valid hex format
@@ -292,7 +309,9 @@ class CmSnmpOperation:
         try:
             return value_type(val)
         except ValueError as e:
-            logging.error(f"Failed to convert value for {oid_suffix}: {val}. Error: {e}")
+            logging.error(
+                f"Failed to convert value for {oid_suffix}: {val}. Error: {e}"
+            )
             return None
 
     ######################
@@ -331,7 +350,9 @@ class CmSnmpOperation:
             for result in results:
                 # Compare ifType value with the result value
                 if ifType_value == int(result[1]):
-                    self.logger.debug(f"ifType-Name: ({ifType_name}) -> ifType-Value: ({ifType_value}) -> Found: {result}")
+                    self.logger.debug(
+                        f"ifType-Name: ({ifType_name}) -> ifType-Value: ({ifType_value}) -> Found: {result}"
+                    )
 
                     # Extract index using a helper method (ensure it returns a valid index)
                     index = Snmp_v2c.get_oid_index(str(result[0]))
@@ -345,7 +366,9 @@ class CmSnmpOperation:
         # Return the list of found indexes
         return indexes
 
-    async def getSysDescr(self, timeout: int | None = None, retries: int | None = None) -> SystemDescriptor:
+    async def getSysDescr(
+        self, timeout: int | None = None, retries: int | None = None
+    ) -> SystemDescriptor:
         """
         Retrieves and parses the sysDescr SNMP value into a SysDescr dataclass.
 
@@ -355,10 +378,14 @@ class CmSnmpOperation:
         timeout = timeout if timeout is not None else self._snmp._timeout
         retries = retries if retries is not None else self._snmp._retries
 
-        self.logger.debug(f"Retrieving sysDescr for {self._inet}, timeout: {timeout}, retries: {retries}")
+        self.logger.debug(
+            f"Retrieving sysDescr for {self._inet}, timeout: {timeout}, retries: {retries}"
+        )
 
         try:
-            result = await self._snmp.get(f'{"sysDescr"}.0', timeout=timeout, retries=retries)
+            result = await self._snmp.get(
+                f"{'sysDescr'}.0", timeout=timeout, retries=retries
+            )
         except Exception as e:
             self.logger.error(f"Error occurred while retrieving sysDescr: {e}")
             return SystemDescriptor.empty()
@@ -404,13 +431,19 @@ class CmSnmpOperation:
         """
 
         return DocsPnmBulkDataGroup(
-            docsPnmBulkDestIpAddrType   =   await self._get_value("docsPnmBulkDestIpAddrType", int),
-            docsPnmBulkDestIpAddr       =   InetGenerate.binary_to_inet(await self._get_value("docsPnmBulkDestIpAddr", bytes)),
-            docsPnmBulkDestPath         =   await self._get_value("docsPnmBulkDestPath", str),
-            docsPnmBulkUploadControl    =   await self._get_value("docsPnmBulkUploadControl", int)
+            docsPnmBulkDestIpAddrType=await self._get_value(
+                "docsPnmBulkDestIpAddrType", int
+            ),
+            docsPnmBulkDestIpAddr=InetGenerate.binary_to_inet(
+                await self._get_value("docsPnmBulkDestIpAddr", bytes)
+            ),
+            docsPnmBulkDestPath=await self._get_value("docsPnmBulkDestPath", str),
+            docsPnmBulkUploadControl=await self._get_value(
+                "docsPnmBulkUploadControl", int
+            ),
         )
 
-    async def getDocsPnmCmCtlStatus(self, max_retry:int=1) -> DocsPnmCmCtlStatus:
+    async def getDocsPnmCmCtlStatus(self, max_retry: int = 1) -> DocsPnmCmCtlStatus:
         """
         Fetches the current Docs PNM CmCtlStatus.
 
@@ -435,12 +468,13 @@ class CmSnmpOperation:
         """
         count = 1
         while True:
-
-            result = await self._snmp.get(f'{"docsPnmCmCtlStatus"}.0')
+            result = await self._snmp.get(f"{'docsPnmCmCtlStatus'}.0")
 
             if result is None:
                 time.sleep(2)
-                self.logger.warning(f"Not getting a proper docsPnmCmCtlStatus response, retrying: ({count} of {max_retry})")
+                self.logger.warning(
+                    f"Not getting a proper docsPnmCmCtlStatus response, retrying: ({count} of {max_retry})"
+                )
 
                 if count >= max_retry:
                     self.logger.error(f"Reached max retries: ({max_retry})")
@@ -452,14 +486,18 @@ class CmSnmpOperation:
                 break
 
         if not result:
-            self.logger.error(f'No results found for docsPnmCmCtlStatus: {DocsPnmCmCtlStatus.SNMP_ERROR}')
+            self.logger.error(
+                f"No results found for docsPnmCmCtlStatus: {DocsPnmCmCtlStatus.SNMP_ERROR}"
+            )
             return DocsPnmCmCtlStatus.SNMP_ERROR
 
         status_value = int(Snmp_v2c.snmp_get_result_value(result)[0])
 
         return DocsPnmCmCtlStatus(status_value)
 
-    async def getIfPhysAddress(self, if_type: DocsisIfType = DocsisIfType.docsCableMaclayer) -> MacAddress:
+    async def getIfPhysAddress(
+        self, if_type: DocsisIfType = DocsisIfType.docsCableMaclayer
+    ) -> MacAddress:
         """
         Retrieve the physical (MAC) address of the specified interface type.
         Args:
@@ -508,7 +546,9 @@ class CmSnmpOperation:
             raise
 
         if len(mac_bytes) != 6:
-            raise ValueError(f"Invalid MAC length {len(mac_bytes)} from ifPhysAddress.{idx}")
+            raise ValueError(
+                f"Invalid MAC length {len(mac_bytes)} from ifPhysAddress.{idx}"
+            )
 
         mac_hex = mac_bytes.hex()
         return MacAddress(mac_hex)
@@ -536,7 +576,9 @@ class CmSnmpOperation:
         """
         return await self.getIfTypeIndex(DocsisIfType.docsOfdmDownstream)
 
-    async def getDocsIf31CmDsOfdmChanPlcFreq(self) -> list[tuple[InterfaceIndex, FrequencyHz]]:
+    async def getDocsIf31CmDsOfdmChanPlcFreq(
+        self,
+    ) -> list[tuple[InterfaceIndex, FrequencyHz]]:
         """
         Retrieve the PLC frequencies of DOCSIS 3.1 downstream OFDM channels.
 
@@ -550,7 +592,10 @@ class CmSnmpOperation:
 
         try:
             results = await self._snmp.walk(oid)
-            idx_plc_freqs = cast(list[tuple[InterfaceIndex, FrequencyHz]], Snmp_v2c.snmp_get_result_last_idx_value(results))
+            idx_plc_freqs = cast(
+                list[tuple[InterfaceIndex, FrequencyHz]],
+                Snmp_v2c.snmp_get_result_last_idx_value(results),
+            )
 
             self.logger.debug(f"Retrieved PLC Frequencies: {idx_plc_freqs}")
             return idx_plc_freqs
@@ -559,8 +604,10 @@ class CmSnmpOperation:
             self.logger.error(f"Failed to retrieve PLC frequencies from OID {oid}: {e}")
             return []
 
-    async def getDocsPnmCmOfdmChEstCoefMeasStatus(self, ofdm_idx: InterfaceIndex) -> int:
-        '''
+    async def getDocsPnmCmOfdmChEstCoefMeasStatus(
+        self, ofdm_idx: InterfaceIndex
+    ) -> int:
+        """
         Retrieves the measurement status of OFDM channel estimation coefficients.
 
         Parameters:
@@ -568,11 +615,15 @@ class CmSnmpOperation:
 
         Returns:
         int: The measurement status.
-        '''
-        result = await self._snmp.get(f'{"docsPnmCmOfdmChEstCoefMeasStatus"}.{ofdm_idx}')
+        """
+        result = await self._snmp.get(
+            f"{'docsPnmCmOfdmChEstCoefMeasStatus'}.{ofdm_idx}"
+        )
         return int(Snmp_v2c.snmp_get_result_value(result)[0])
 
-    async def getCmDsOfdmProfileStatsConfigChangeCt(self, ofdm_idx: InterfaceIndex) -> dict[int,dict[int,int]]:
+    async def getCmDsOfdmProfileStatsConfigChangeCt(
+        self, ofdm_idx: InterfaceIndex
+    ) -> dict[int, dict[int, int]]:
         """
         Retrieve the count of configuration change events for a specific OFDM profile.
 
@@ -585,7 +636,9 @@ class CmSnmpOperation:
         TODO: Need to get back, not really working
 
         """
-        result = self._snmp.walk(f'{"docsIf31CmDsOfdmProfileStatsConfigChangeCt"}.{ofdm_idx}')
+        result = self._snmp.walk(
+            f"{'docsIf31CmDsOfdmProfileStatsConfigChangeCt'}.{ofdm_idx}"
+        )
         profile_change_count = Snmp_v2c.snmp_get_result_value(result)[0]
         return profile_change_count
 
@@ -628,12 +681,16 @@ class CmSnmpOperation:
                 result = await self._snmp.get(oid)
 
                 if result is not None:
-                    self.logger.debug(f"Retrieved SNMP value for Member: {member_name} -> OID: {oid}")
+                    self.logger.debug(
+                        f"Retrieved SNMP value for Member: {member_name} -> OID: {oid}"
+                    )
                     try:
                         value = Snmp_v2c.snmp_get_result_value(result)
                         setattr(oce, member_name, value)
                     except (ValueError, TypeError) as e:
-                        self.logger.error(f"Failed to set '{member_name}' with value '{result}': {e}")
+                        self.logger.error(
+                            f"Failed to set '{member_name}' with value '{result}': {e}"
+                        )
                 else:
                     self.logger.warning(f"No SNMP response received for OID: {oid}")
 
@@ -683,16 +740,21 @@ class CmSnmpOperation:
                 self.logger.warning("No downstream SC-QAM channel indices found.")
                 return []
 
-            entries = await DocsIfDownstreamChannelEntry.get(snmp=self._snmp, indices=indices)
+            entries = await DocsIfDownstreamChannelEntry.get(
+                snmp=self._snmp, indices=indices
+            )
 
             return entries
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve downstream SC-QAM channel entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve downstream SC-QAM channel entries, error: %s", e
+            )
             return []
 
-    async def getDocsIfDownstreamChannelCwErrorRate(self, sample_time_elapsed: float = 5.0) -> \
-        list[DocsIfDownstreamCwErrorRateEntry] | dict[str, Any]:
+    async def getDocsIfDownstreamChannelCwErrorRate(
+        self, sample_time_elapsed: float = 5.0
+    ) -> list[DocsIfDownstreamCwErrorRateEntry] | dict[str, Any]:
         """
         Retrieves codeword error rate for all downstream SC-QAM channels.
 
@@ -703,37 +765,50 @@ class CmSnmpOperation:
         """
         try:
             # 1) Discover all downstream SC-QAM (index, channel_id) indices
-            idx_chanid_indices:list[tuple[int, int]] = await self.getDocsIfDownstreamChannelIdIndexStack()
+            idx_chanid_indices: list[
+                tuple[int, int]
+            ] = await self.getDocsIfDownstreamChannelIdIndexStack()
 
             if not idx_chanid_indices:
                 self.logger.warning("No downstream SC-QAM channel indices found.")
                 return {"entries": [], "aggregate_error_rate": 0.0}
 
-            self.logger.debug(f"Found {len(idx_chanid_indices)} downstream SC-QAM channel indices: {idx_chanid_indices}")
+            self.logger.debug(
+                f"Found {len(idx_chanid_indices)} downstream SC-QAM channel indices: {idx_chanid_indices}"
+            )
             # Extract only the first element of each tuple
-            idx_indices:list[int] = [index[0] for index in idx_chanid_indices]
+            idx_indices: list[int] = [index[0] for index in idx_chanid_indices]
 
             # 2) First snapshot
-            initial_entry = await DocsIfDownstreamChannelEntry.get(snmp=self._snmp, indices=idx_indices)
+            initial_entry = await DocsIfDownstreamChannelEntry.get(
+                snmp=self._snmp, indices=idx_indices
+            )
             self.logger.debug(f"Initial snapshot: {len(initial_entry)} channels")
 
             # 3) Wait the sample interval
             await asyncio.sleep(sample_time_elapsed)
 
             # 4) Second snapshot
-            later_entry = await DocsIfDownstreamChannelEntry.get(snmp=self._snmp, indices=idx_indices)
-            self.logger.debug(f"Second snapshot after {sample_time_elapsed}s: {len(later_entry)} channels")
+            later_entry = await DocsIfDownstreamChannelEntry.get(
+                snmp=self._snmp, indices=idx_indices
+            )
+            self.logger.debug(
+                f"Second snapshot after {sample_time_elapsed}s: {len(later_entry)} channels"
+            )
 
             # 5) Calculate error rates
             calculator = DocsIfDownstreamChannelCwErrorRate(
-                            entries_1=initial_entry,
-                            entries_2=later_entry,
-                            channel_id_index_stack=idx_chanid_indices,
-                            time_elapsed=sample_time_elapsed)
+                entries_1=initial_entry,
+                entries_2=later_entry,
+                channel_id_index_stack=idx_chanid_indices,
+                time_elapsed=sample_time_elapsed,
+            )
             return calculator.get()
 
         except Exception:
-            self.logger.exception("Failed to retrieve downstream SC-QAM codeword error rates")
+            self.logger.exception(
+                "Failed to retrieve downstream SC-QAM codeword error rates"
+            )
             return {"entries": [], "aggregate_error_rate": 0.0}
 
     async def getEventEntryIndex(self) -> list[EntryIndex]:
@@ -753,7 +828,9 @@ class CmSnmpOperation:
 
         return cast(list[EntryIndex], Snmp_v2c.extract_last_oid_index(results))
 
-    async def getDocsDevEventEntry(self, to_dict: bool = False) -> list[DocsDevEventEntry] | list[dict]:
+    async def getDocsDevEventEntry(
+        self, to_dict: bool = False
+    ) -> list[DocsDevEventEntry] | list[dict]:
         """
         Retrieves all DocsDevEventEntry SNMP table entries.
 
@@ -778,11 +855,15 @@ class CmSnmpOperation:
                 event_entries.append(entry.to_dict() if to_dict else entry)
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsDevEventEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsDevEventEntry entries, error: %s", e
+            )
 
         return event_entries
 
-    async def getDocsIf31CmDsOfdmChanEntry(self) -> list[DocsIf31CmDsOfdmChanChannelEntry]:
+    async def getDocsIf31CmDsOfdmChanEntry(
+        self,
+    ) -> list[DocsIf31CmDsOfdmChanChannelEntry]:
         """
         Asynchronously retrieves and populates a list of `DocsIf31CmDsOfdmChanEntry` entries.
 
@@ -806,10 +887,14 @@ class CmSnmpOperation:
                 self.logger.warning("No DocsIf31CmDsOfdmChanChannelId indices found.")
                 return ofdm_chan_entry
 
-            ofdm_chan_entry.extend(await DocsIf31CmDsOfdmChanChannelEntry.get(self._snmp, indices))
+            ofdm_chan_entry.extend(
+                await DocsIf31CmDsOfdmChanChannelEntry.get(self._snmp, indices)
+            )
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsIf31CmDsOfdmChanEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsIf31CmDsOfdmChanEntry entries, error: %s", e
+            )
 
         return ofdm_chan_entry
 
@@ -828,7 +913,9 @@ class CmSnmpOperation:
 
         return obj
 
-    async def getDocsIf31CmDsOfdmProfileStatsEntry(self) -> list[DocsIf31CmDsOfdmProfileStatsEntry]:
+    async def getDocsIf31CmDsOfdmProfileStatsEntry(
+        self,
+    ) -> list[DocsIf31CmDsOfdmProfileStatsEntry]:
         """
         Asynchronously retrieves the DOCS-IF31-MIB system configuration state and populates the `DocsIf31CmSystemCfgState` object.
 
@@ -845,7 +932,9 @@ class CmSnmpOperation:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return ofdm_profile_entry
 
             for idx in indices:
@@ -854,11 +943,16 @@ class CmSnmpOperation:
                 ofdm_profile_entry.append(entry)
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsIf31CmDsOfdmProfileStatsEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsIf31CmDsOfdmProfileStatsEntry entries, error: %s",
+                e,
+            )
 
         return ofdm_profile_entry
 
-    async def getPnmMeasurementStatus(self, test_type: DocsPnmCmCtlTest, ofdm_ifindex: int = 0) -> MeasStatusType:
+    async def getPnmMeasurementStatus(
+        self, test_type: DocsPnmCmCtlTest, ofdm_ifindex: int = 0
+    ) -> MeasStatusType:
         """
         Retrieve the measurement status for a given PNM test type.
 
@@ -912,10 +1006,12 @@ class CmSnmpOperation:
 
         except Exception as e:
             self.logger.error(f"[{test_type.name}] SNMP fetch failed on OID {oid}: {e}")
-            self.logger.error(f'[{test_type.name}] {result}')
+            self.logger.error(f"[{test_type.name}] {result}")
             return MeasStatusType.ERROR
 
-    async def getDocsIfDownstreamChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIfDownstreamChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         """
         Retrieve SC-QAM channel index ↔ channelId tuples for DOCSIS 3.0 downstream channels,
         ensuring we only return true SC-QAM channels ( skips OFDM / zero entries ).
@@ -925,9 +1021,13 @@ class CmSnmpOperation:
         """
         # 1) fetch indices of all SC-QAM interfaces
         try:
-            scqam_if_indices = await self.getIfTypeIndex(DocsisIfType.docsCableDownstream)
+            scqam_if_indices = await self.getIfTypeIndex(
+                DocsisIfType.docsCableDownstream
+            )
         except Exception:
-            self.logger.error("Failed to retrieve SC-QAM interface indices", exc_info=True)
+            self.logger.error(
+                "Failed to retrieve SC-QAM interface indices", exc_info=True
+            )
             return []
         if not scqam_if_indices:
             self.logger.debug("No SC-QAM interface indices found")
@@ -945,8 +1045,11 @@ class CmSnmpOperation:
 
         # 3) parse into (idx, chanId), forcing chanId → int
         try:
-            raw_pairs: list[tuple[int, int]] = Snmp_v2c.snmp_get_result_last_idx_force_value_type(responses,
-                                                                                                  value_type=int)
+            raw_pairs: list[tuple[int, int]] = (
+                Snmp_v2c.snmp_get_result_last_idx_force_value_type(
+                    responses, value_type=int
+                )
+            )
 
         except Exception:
             self.logger.error("Failed to parse index/channel-ID pairs", exc_info=True)
@@ -961,13 +1064,17 @@ class CmSnmpOperation:
                 self.logger.debug("Skipping idx %s not in SC-QAM interface list", idx)
                 continue
             if chan_id == 0:
-                self.logger.debug("Skipping idx %s with channel_id=0 (likely OFDM)", idx)
+                self.logger.debug(
+                    "Skipping idx %s with channel_id=0 (likely OFDM)", idx
+                )
                 continue
             filtered.append((InterfaceIndex(idx), ChannelId(chan_id)))
 
         return filtered
 
-    async def getDocsIf31CmDsOfdmChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmDsOfdmChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         """
         Retrieve a list of tuples representing OFDM channel index and their associated channel IDs
         for DOCSIS 3.1 downstream OFDM channels.
@@ -975,14 +1082,16 @@ class CmSnmpOperation:
         Returns:
             List[Tuple[int, int]]: Each tuple contains (index, channelId). Returns an empty list if no data is found.
         """
-        result = await self._snmp.walk(f'{"docsIf31CmDsOfdmChanChannelId"}')
+        result = await self._snmp.walk(f"{'docsIf31CmDsOfdmChanChannelId'}")
 
         if not result:
             return []
 
-        raw_pairs: list[tuple[int, int]] = Snmp_v2c.snmp_get_result_last_idx_force_value_type(
-            result,
-            value_type=int,
+        raw_pairs: list[tuple[int, int]] = (
+            Snmp_v2c.snmp_get_result_last_idx_force_value_type(
+                result,
+                value_type=int,
+            )
         )
         idx_channel_id: list[tuple[InterfaceIndex, ChannelId]] = [
             (InterfaceIndex(idx), ChannelId(chan_id)) for idx, chan_id in raw_pairs
@@ -1006,7 +1115,7 @@ class CmSnmpOperation:
             - A warning if the SNMP GET fails or returns no result.
             - An error if the value cannot be converted to an integer.
         """
-        result = await self._snmp.get(f'{"sysUpTime"}.0')
+        result = await self._snmp.get(f"{'sysUpTime'}.0")
 
         if not result:
             self.logger.warning("SNMP get failed or returned empty for sysUpTime.")
@@ -1096,13 +1205,19 @@ class CmSnmpOperation:
         # Log total length for reference
         total_length = len(varbind_bytes)
         if total_length == 0:
-            self.logger.warning(f"OID {oid} returned an empty byte stream after concatenation.")
+            self.logger.warning(
+                f"OID {oid} returned an empty byte stream after concatenation."
+            )
         else:
-            self.logger.debug(f"Retrieved {total_length} bytes of amplitude data for OID {oid}.")
+            self.logger.debug(
+                f"Retrieved {total_length} bytes of amplitude data for OID {oid}."
+            )
 
         return varbind_bytes
 
-    async def getBulkFileUploadStatus(self, filename: str) -> DocsPnmBulkFileUploadStatus:
+    async def getBulkFileUploadStatus(
+        self, filename: str
+    ) -> DocsPnmBulkFileUploadStatus:
         """
         Retrieve the upload‐status enum of a bulk data file by its filename.
 
@@ -1159,7 +1274,9 @@ class CmSnmpOperation:
                 self.logger.error(f"Unexpected error parsing status: {e}")
                 return DocsPnmBulkFileUploadStatus.ERROR
 
-            self.logger.debug(f"Bulk file '{filename}' upload status: {status_enum.name}")
+            self.logger.debug(
+                f"Bulk file '{filename}' upload status: {status_enum.name}"
+            )
             return status_enum
 
         # not found
@@ -1188,23 +1305,29 @@ class CmSnmpOperation:
         self.logger.debug("Fetching docsIf31DocsisBaseCapability")
 
         try:
-            rsp = await self._snmp.get('docsIf31DocsisBaseCapability.0')
+            rsp = await self._snmp.get("docsIf31DocsisBaseCapability.0")
             docsis_version_raw = Snmp_v2c.get_result_value(rsp)
 
             if docsis_version_raw is None:
-                self.logger.error("Failed to retrieve DOCSIS version: SNMP result is None")
+                self.logger.error(
+                    "Failed to retrieve DOCSIS version: SNMP result is None"
+                )
                 return None
 
             try:
                 docsis_version = int(docsis_version_raw)
             except (ValueError, TypeError):
-                self.logger.error(f"Failed to cast DOCSIS version to int: {docsis_version_raw}")
+                self.logger.error(
+                    f"Failed to cast DOCSIS version to int: {docsis_version_raw}"
+                )
                 return None
 
             cdv = ClabsDocsisVersion.from_value(docsis_version)
 
             if cdv == ClabsDocsisVersion.OTHER:
-                self.logger.warning(f"Unknown DOCSIS version: {docsis_version} -> Enum: {cdv.name}")
+                self.logger.warning(
+                    f"Unknown DOCSIS version: {docsis_version} -> Enum: {cdv.name}"
+                )
             else:
                 self.logger.debug(f"DOCSIS version: {cdv.name}")
 
@@ -1214,7 +1337,9 @@ class CmSnmpOperation:
             self.logger.exception(f"Exception during DOCSIS version retrieval: {e}")
             return None
 
-    async def getInterfaceStatistics(self, interface_types: type[Enum] = DocsisIfType) -> dict[str, list[dict]]:
+    async def getInterfaceStatistics(
+        self, interface_types: type[Enum] = DocsisIfType
+    ) -> dict[str, list[dict]]:
         """
         Retrieves interface statistics grouped by provided Enum of interface types.
 
@@ -1273,17 +1398,20 @@ class CmSnmpOperation:
                 return []
 
             entries = await DocsIfUpstreamChannelEntry.get(
-                snmp=self._snmp,
-                indices=indices
+                snmp=self._snmp, indices=indices
             )
 
             return entries
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve ATDMA upstream channel entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve ATDMA upstream channel entries, error: %s", e
+            )
             return []
 
-    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         """
         Retrieve a list of tuples representing OFDMA channel index and their associated channel IDs
         for DOCSIS 3.1 upstream OFDMA channels.
@@ -1291,14 +1419,16 @@ class CmSnmpOperation:
         Returns:
             List[Tuple[InterfaceIndex, ChannelId]]: Each tuple contains (index, channelId). Returns an empty list if no data is found.
         """
-        result = await self._snmp.walk(f'{"docsIf31CmUsOfdmaChanChannelId"}')
+        result = await self._snmp.walk(f"{'docsIf31CmUsOfdmaChanChannelId'}")
 
         if not result:
             return []
 
-        raw_pairs: list[tuple[int, int]] = Snmp_v2c.snmp_get_result_last_idx_force_value_type(
-            result,
-            value_type=int,
+        raw_pairs: list[tuple[int, int]] = (
+            Snmp_v2c.snmp_get_result_last_idx_force_value_type(
+                result,
+                value_type=int,
+            )
         )
         idx_channel_id_list: list[tuple[InterfaceIndex, ChannelId]] = [
             (InterfaceIndex(idx), ChannelId(chan_id)) for idx, chan_id in raw_pairs
@@ -1327,11 +1457,12 @@ class CmSnmpOperation:
             oid_modulation = "docsIfUpChannelType"
 
             for idx in index_list:
-
-                result = await self._snmp.get(f'{oid_modulation}.{idx}')
+                result = await self._snmp.get(f"{oid_modulation}.{idx}")
 
                 if not result:
-                    self.logger.warning(f"SNMP get failed or returned empty docsIfUpChannelType for index {idx}.")
+                    self.logger.warning(
+                        f"SNMP get failed or returned empty docsIfUpChannelType for index {idx}."
+                    )
                     continue
 
                 val = Snmp_v2c.snmp_get_result_value(result)[0]
@@ -1340,10 +1471,12 @@ class CmSnmpOperation:
                     channel_type = int(val)
 
                 except ValueError:
-                    self.logger.warning(f"Failed to convert channel-type value '{val}' to int for index {idx}. Skipping.")
+                    self.logger.warning(
+                        f"Failed to convert channel-type value '{val}' to int for index {idx}. Skipping."
+                    )
                     continue
 
-                '''
+                """
                     DocsisUpstreamType ::= TEXTUAL-CONVENTION
                     STATUS          current
                     DESCRIPTION
@@ -1364,17 +1497,18 @@ class CmSnmpOperation:
                         tdmaAndAtdma(4)
                     }
 
-                '''
+                """
 
-                if channel_type != 0: # 0 means OFDMA in this case
+                if channel_type != 0:  # 0 means OFDMA in this case
                     idx_list.append(idx)
 
             return idx_list
 
         except Exception as e:
-            self.logger.error(f"Failed to retrieve SC-QAM channel indices from {oid_channel_id}: {e}")
+            self.logger.error(
+                f"Failed to retrieve SC-QAM channel indices from {oid_channel_id}: {e}"
+            )
             return []
-
 
     """
     Measurement Entries
@@ -1390,20 +1524,24 @@ class CmSnmpOperation:
             A list of Pydantic models with values already coerced to floats
             where appropriate (e.g., dB fields scaled by 1/100).
         """
-        self.logger.debug('Entering into -> getDocsPnmCmDsOfdmRxMerEntry()')
+        self.logger.debug("Entering into -> getDocsPnmCmDsOfdmRxMerEntry()")
         entries: list[DocsPnmCmDsOfdmRxMerEntry] = []
         try:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
             # De-dupe and sort for predictable iteration (optional but nice for logs)
             unique_indices = sorted(set(int(i) for i in indices))
             self.logger.debug(f"RxMER fetch: indices={unique_indices}")
 
-            entries = await DocsPnmCmDsOfdmRxMerEntry.get(snmp=self._snmp, indices=unique_indices)
+            entries = await DocsPnmCmDsOfdmRxMerEntry.get(
+                snmp=self._snmp, indices=unique_indices
+            )
 
             # Helpful summary log—count only; detailed per-field logs happen in the entry fetcher
             self.logger.debug("RxMER fetch complete: %d entries", len(entries))
@@ -1411,10 +1549,14 @@ class CmSnmpOperation:
 
         except Exception as e:
             # Keep the exception in logs for debugging (stacktrace included)
-            self.logger.exception("Failed to retrieve DocsPnmCmDsOfdmRxMerEntry entries: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsOfdmRxMerEntry entries: %s", e
+            )
             return entries
 
-    async def getDocsPnmCmOfdmChanEstCoefEntry(self) -> list[DocsPnmCmOfdmChanEstCoefEntry]:
+    async def getDocsPnmCmOfdmChanEstCoefEntry(
+        self,
+    ) -> list[DocsPnmCmOfdmChanEstCoefEntry]:
         """
         Retrieves downstream OFDM Channel Estimation Coefficient entries from the cable modem via SNMP.
 
@@ -1435,17 +1577,25 @@ class CmSnmpOperation:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
-            entries = await DocsPnmCmOfdmChanEstCoefEntry.get(snmp=self._snmp, indices=indices)
+            entries = await DocsPnmCmOfdmChanEstCoefEntry.get(
+                snmp=self._snmp, indices=indices
+            )
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmOfdmChanEstCoefEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmOfdmChanEstCoefEntry entries, error: %s", e
+            )
 
         return entries
 
-    async def getDocsPnmCmDsConstDispMeasEntry(self) -> list[DocsPnmCmDsConstDispMeasEntry]:
+    async def getDocsPnmCmDsConstDispMeasEntry(
+        self,
+    ) -> list[DocsPnmCmDsConstDispMeasEntry]:
         """
         Retrieves Constellation Display measurement entries for all downstream OFDM channels.
 
@@ -1464,13 +1614,19 @@ class CmSnmpOperation:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
-            entries = await DocsPnmCmDsConstDispMeasEntry.get(snmp=self._snmp, indices=indices)
+            entries = await DocsPnmCmDsConstDispMeasEntry.get(
+                snmp=self._snmp, indices=indices
+            )
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmDsConstDispMeasEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsConstDispMeasEntry entries, error: %s", e
+            )
 
         return entries
 
@@ -1495,7 +1651,9 @@ class CmSnmpOperation:
             entries = await DocsPnmCmUsPreEqEntry.get(snmp=self._snmp, indices=indices)
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmUsPreEqEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmUsPreEqEntry entries, error: %s", e
+            )
 
         return entries
 
@@ -1516,14 +1674,22 @@ class CmSnmpOperation:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
-            entries = await DocsPnmCmDsOfdmMerMarEntry.get(snmp=self._snmp, indices=indices)
-            self.logger.debug(f'Number of DocsPnmCmDsOfdmMerMarEntry Found: {len(entries)}')
+            entries = await DocsPnmCmDsOfdmMerMarEntry.get(
+                snmp=self._snmp, indices=indices
+            )
+            self.logger.debug(
+                f"Number of DocsPnmCmDsOfdmMerMarEntry Found: {len(entries)}"
+            )
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmDsOfdmMerMarEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsOfdmMerMarEntry entries, error: %s", e
+            )
 
         return entries
 
@@ -1545,13 +1711,15 @@ class CmSnmpOperation:
                 self.logger.error("No docsCableMaclayer indices found.")
                 return entries
 
-            self.logger.debug(f'Found docsCableDownstream Indices: {indices}')
+            self.logger.debug(f"Found docsCableDownstream Indices: {indices}")
 
             entries = await DocsPnmCmDsHistEntry.get(snmp=self._snmp, indices=indices)
-            self.logger.debug(f'Number of DocsPnmCmDsHistEntry Found: {len(entries)}')
+            self.logger.debug(f"Number of DocsPnmCmDsHistEntry Found: {len(entries)}")
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmDsHistEntry entries, error: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsHistEntry entries, error: %s", e
+            )
 
         return entries
 
@@ -1563,25 +1731,31 @@ class CmSnmpOperation:
         -------
         List[DocsPnmCmDsOfdmFecEntry].
         """
-        self.logger.debug('Entering into -> getDocsPnmCmDsOfdmFecEntry()')
+        self.logger.debug("Entering into -> getDocsPnmCmDsOfdmFecEntry()")
         entries: list[DocsPnmCmDsOfdmFecEntry] = []
         try:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
             unique_indices = sorted(set(int(i) for i in indices))
             self.logger.debug(f"`FEC Summary fetch: indices={unique_indices}")
 
-            entries = await DocsPnmCmDsOfdmFecEntry.get(snmp=self._snmp, indices=unique_indices)
+            entries = await DocsPnmCmDsOfdmFecEntry.get(
+                snmp=self._snmp, indices=unique_indices
+            )
 
             self.logger.debug("FEC Summary fetch complete: %d entries", len(entries))
             return entries
 
         except Exception as e:
-            self.logger.exception("Failed to retrieve DocsPnmCmDsOfdmFecEntry entries: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsOfdmFecEntry entries: %s", e
+            )
             return entries
 
     async def getDocsPnmCmDsOfdmModProfEntry(self) -> list[DocsPnmCmDsOfdmModProfEntry]:
@@ -1592,20 +1766,24 @@ class CmSnmpOperation:
         -------
         List[DocsPnmCmDsOfdmModProfEntry].
         """
-        self.logger.debug('Entering into -> getDocsPnmCmDsOfdmModProfEntry()')
+        self.logger.debug("Entering into -> getDocsPnmCmDsOfdmModProfEntry()")
         entries: list[DocsPnmCmDsOfdmModProfEntry] = []
         try:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
             # De-dupe and sort for predictable iteration (optional but nice for logs)
             unique_indices = sorted(set(int(i) for i in indices))
             self.logger.debug(f"ModProf fetch: indices={unique_indices}")
 
-            entries = await DocsPnmCmDsOfdmModProfEntry.get(snmp=self._snmp, indices=unique_indices)
+            entries = await DocsPnmCmDsOfdmModProfEntry.get(
+                snmp=self._snmp, indices=unique_indices
+            )
 
             # Helpful summary log—count only; detailed per-field logs happen in the entry fetcher
             self.logger.debug("ModProf fetch complete: %d entries", len(entries))
@@ -1613,10 +1791,14 @@ class CmSnmpOperation:
 
         except Exception as e:
             # Keep the exception in logs for debugging (stacktrace included)
-            self.logger.exception("Failed to retrieve DocsPnmCmDsOfdmModProfEntry entries: %s", e)
+            self.logger.exception(
+                "Failed to retrieve DocsPnmCmDsOfdmModProfEntry entries: %s", e
+            )
             return entries
 
-    async def getDocsIf3CmSpectrumAnalysisEntry(self, indices: list[int] = DEFAULT_SPECTRUM_ANALYZER_INDICES) -> list[DocsIf3CmSpectrumAnalysisEntry]:
+    async def getDocsIf3CmSpectrumAnalysisEntry(
+        self, indices: list[int] = DEFAULT_SPECTRUM_ANALYZER_INDICES
+    ) -> list[DocsIf3CmSpectrumAnalysisEntry]:
         """
         Retrieves DOCSIS 3.0 Spectrum Analysis entries
         Args:
@@ -1634,13 +1816,19 @@ class CmSnmpOperation:
                 self.logger.error("No docsCableMaclayer indices found.")
                 return entries
 
-            self.logger.debug(f'Found docsCableDownstream Indices: {indices}')
+            self.logger.debug(f"Found docsCableDownstream Indices: {indices}")
 
-            entries = await DocsIf3CmSpectrumAnalysisEntry.get(snmp=self._snmp, indices=indices)
-            self.logger.debug(f'Number of DocsIf3CmSpectrumAnalysisEntry Found: {len(entries)}')
+            entries = await DocsIf3CmSpectrumAnalysisEntry.get(
+                snmp=self._snmp, indices=indices
+            )
+            self.logger.debug(
+                f"Number of DocsIf3CmSpectrumAnalysisEntry Found: {len(entries)}"
+            )
 
         except Exception as e:
-            self.logger.exception(f"Failed to retrieve DocsIf3CmSpectrumAnalysisEntry entries: {e}")
+            self.logger.exception(
+                f"Failed to retrieve DocsIf3CmSpectrumAnalysisEntry entries: {e}"
+            )
 
         return entries
 
@@ -1653,7 +1841,7 @@ class CmSnmpOperation:
                 - SNMP index (int)
                 - Corresponding OfdmProfiles bitmask (OfdmProfiles enum)
         """
-        BITS_16:int = 16
+        BITS_16: int = 16
 
         entries: list[tuple[int, OfdmProfiles]] = []
 
@@ -1661,15 +1849,19 @@ class CmSnmpOperation:
             indices = await self.getDocsIf31CmDsOfdmChannelIdIndex()
 
             if not indices:
-                self.logger.warning("No DocsIf31CmDsOfdmChanChannelIdIndex indices found.")
+                self.logger.warning(
+                    "No DocsIf31CmDsOfdmChanChannelIdIndex indices found."
+                )
                 return entries
 
             for index in indices:
-                results = await self._snmp.get(f'docsIf31RxChStatusOfdmProfiles.{index}')
+                results = await self._snmp.get(
+                    f"docsIf31RxChStatusOfdmProfiles.{index}"
+                )
                 raw = Snmp_v2c.get_result_value(results)
 
                 if isinstance(raw, bytes):
-                    value = int.from_bytes(raw, byteorder='little')
+                    value = int.from_bytes(raw, byteorder="little")
                 else:
                     value = int(raw, BITS_16)
 
@@ -1685,7 +1877,9 @@ class CmSnmpOperation:
     # DOCSIS 4.0 - FDD #
     ####################
 
-    async def getDocsFddCmFddSystemCfgState(self, index: int = 0) -> DocsFddCmFddSystemCfgState | None | None:
+    async def getDocsFddCmFddSystemCfgState(
+        self, index: int = 0
+    ) -> DocsFddCmFddSystemCfgState | None | None:
         """
         Retrieves the FDD band edge configuration state for a specific cable modem index.
 
@@ -1700,21 +1894,27 @@ class CmSnmpOperation:
         Returns:
             DocsFddCmFddSystemCfgState | None: Populated object if successful, or None on failure.
         """
-        results = await self._snmp.walk('docsFddCmFddSystemCfgState')
+        results = await self._snmp.walk("docsFddCmFddSystemCfgState")
         if not results:
-            self.logger.warning(f"No results found during SNMP walk for OID {'docsFddCmFddSystemCfgState'}")
+            self.logger.warning(
+                f"No results found during SNMP walk for OID {'docsFddCmFddSystemCfgState'}"
+            )
             return None
 
         obj = DocsFddCmFddSystemCfgState(index, self._snmp)
         success = await obj.start()
 
         if not success:
-            self.logger.warning(f"SNMP population failed for DocsFddCmFddSystemCfgState (index={index})")
+            self.logger.warning(
+                f"SNMP population failed for DocsFddCmFddSystemCfgState (index={index})"
+            )
             return None
 
         return obj
 
-    async def getDocsFddCmFddBandEdgeCapabilities(self, create_and_start: bool = True) -> list[DocsFddCmFddBandEdgeCapabilities] | None:
+    async def getDocsFddCmFddBandEdgeCapabilities(
+        self, create_and_start: bool = True
+    ) -> list[DocsFddCmFddBandEdgeCapabilities] | None:
         """
         Retrieve a list of FDD band edge capability entries for a DOCSIS 4.0 modem.
 
@@ -1727,9 +1927,11 @@ class CmSnmpOperation:
         Returns:
             A list of DocsFddCmFddBandEdgeCapabilities objects, or None if none found.
         """
-        results = await self._snmp.walk('docsFddDiplexerUsUpperBandEdgeCapability')
+        results = await self._snmp.walk("docsFddDiplexerUsUpperBandEdgeCapability")
         if not results:
-            self.logger.warning("No results found during SNMP walk for OID 'docsFddDiplexerUsUpperBandEdgeCapability'")
+            self.logger.warning(
+                "No results found during SNMP walk for OID 'docsFddDiplexerUsUpperBandEdgeCapability'"
+            )
             return None
 
         entries = []
@@ -1737,7 +1939,9 @@ class CmSnmpOperation:
             obj = DocsFddCmFddBandEdgeCapabilities(idx, self._snmp)
 
             if create_and_start and not await obj.start():
-                self.logger.warning(f"SNMP population failed for DocsFddCmFddBandEdgeCapabilities (index={idx})")
+                self.logger.warning(
+                    f"SNMP population failed for DocsFddCmFddBandEdgeCapabilities (index={idx})"
+                )
                 continue
 
             entries.append(obj)
@@ -1756,22 +1960,22 @@ class CmSnmpOperation:
         - bool: True if the SNMP set operation is successful, False otherwise.
         """
         try:
-            oid = f'{"docsDevResetNow"}.0'
-            self.logger.debug(f'Sending device reset via SNMP SET: {oid} = 1')
+            oid = f"{'docsDevResetNow'}.0"
+            self.logger.debug(f"Sending device reset via SNMP SET: {oid} = 1")
 
             response = await self._snmp.set(oid, Snmp_v2c.TRUE, Integer32)
 
             if response is None:
-                self.logger.error('Device reset command returned None')
+                self.logger.error("Device reset command returned None")
                 return False
 
             result = Snmp_v2c.snmp_set_result_value(response)
 
-            self.logger.debug(f'Device reset command issued. SNMP response: {result}')
+            self.logger.debug(f"Device reset command issued. SNMP response: {result}")
             return True
 
         except Exception as e:
-            self.logger.exception(f'Failed to send device reset command: {e}')
+            self.logger.exception(f"Failed to send device reset command: {e}")
             return False
 
     async def setDocsPnmBulk(self, tftp_server: str, tftp_path: str = "") -> bool:
@@ -1787,23 +1991,34 @@ class CmSnmpOperation:
         """
         try:
             ip_type = Snmp_v2c.get_inet_address_type(tftp_server).value
-            set_response = await self._snmp.set(f'{"docsPnmBulkDestIpAddrType"}.0', ip_type, Integer32)
-            self.logger.debug(f'docsPnmBulkDestIpAddrType set: {set_response}')
+            set_response = await self._snmp.set(
+                f"{'docsPnmBulkDestIpAddrType'}.0", ip_type, Integer32
+            )
+            self.logger.debug(f"docsPnmBulkDestIpAddrType set: {set_response}")
 
-            set_response = await self._snmp.set(f'{"docsPnmBulkUploadControl"}.0',
-                                          DocsPnmBulkUploadControl.AUTO_UPLOAD.value, Integer32)
-            self.logger.debug(f'docsPnmBulkUploadControl set: {set_response}')
+            set_response = await self._snmp.set(
+                f"{'docsPnmBulkUploadControl'}.0",
+                DocsPnmBulkUploadControl.AUTO_UPLOAD.value,
+                Integer32,
+            )
+            self.logger.debug(f"docsPnmBulkUploadControl set: {set_response}")
 
             ip_binary = InetGenerate.inet_to_binary(tftp_server)
             if ip_binary is None:
-                self.logger.error(f"Failed to convert IP address to binary: {tftp_server}")
+                self.logger.error(
+                    f"Failed to convert IP address to binary: {tftp_server}"
+                )
                 return False
-            set_response = await self._snmp.set('docsPnmBulkDestIpAddr.0', ip_binary, OctetString)
-            self.logger.debug(f'docsPnmBulkDestIpAddr set: {set_response}')
+            set_response = await self._snmp.set(
+                "docsPnmBulkDestIpAddr.0", ip_binary, OctetString
+            )
+            self.logger.debug(f"docsPnmBulkDestIpAddr set: {set_response}")
 
             tftp_path = tftp_path or ""
-            set_response = await self._snmp.set(f'{"docsPnmBulkDestPath"}.0', tftp_path, OctetString)
-            self.logger.debug(f'docsPnmBulkDestPath set: {set_response}')
+            set_response = await self._snmp.set(
+                f"{'docsPnmBulkDestPath'}.0", tftp_path, OctetString
+            )
+            self.logger.debug(f"docsPnmBulkDestPath set: {set_response}")
 
             return True
 
@@ -1811,10 +2026,12 @@ class CmSnmpOperation:
             self.logger.error(f"Failed to set DocsPnmBulk parameters: {e}")
             return False
 
-    async def setDocsIf3CmSpectrumAnalysisCtrlCmd(self,
-                        spec_ana_cmd: DocsIf3CmSpectrumAnalysisCtrlCmd,
-                        spectrum_retrieval_type: SpectrumRetrievalType = SpectrumRetrievalType.FILE,
-                        set_and_go: bool = True) -> bool:
+    async def setDocsIf3CmSpectrumAnalysisCtrlCmd(
+        self,
+        spec_ana_cmd: DocsIf3CmSpectrumAnalysisCtrlCmd,
+        spectrum_retrieval_type: SpectrumRetrievalType = SpectrumRetrievalType.FILE,
+        set_and_go: bool = True,
+    ) -> bool:
         """
         Sets all DocsIf3CmSpectrumAnalysisCtrlCmd parameters via SNMP using index 0.
 
@@ -1834,46 +2051,61 @@ class CmSnmpOperation:
         - Exception: If any error occurs during the SNMP set operations.
         """
 
-        self.logger.debug(f'SpectrumAnalyzerPara: {spec_ana_cmd.to_dict()}')
+        self.logger.debug(f"SpectrumAnalyzerPara: {spec_ana_cmd.to_dict()}")
 
         if spec_ana_cmd.precheck_spectrum_analyzer_settings():
-            self.logger.debug(f'SpectrumAnalyzerPara-PreCheck-Changed: {spec_ana_cmd.to_dict()}')
+            self.logger.debug(
+                f"SpectrumAnalyzerPara-PreCheck-Changed: {spec_ana_cmd.to_dict()}"
+            )
 
-        '''
+        """
             Custom SNMP SET for Spectrum Analyzer
-        '''
-        async def __snmp_set(field_name:str, obj_value:str | int, snmp_type:type) -> bool:
-            """ Helper function to perform SNMP set and verify the result."""
+        """
+
+        async def __snmp_set(
+            field_name: str, obj_value: str | int, snmp_type: type
+        ) -> bool:
+            """Helper function to perform SNMP set and verify the result."""
             base_oid = COMPILED_OIDS.get(field_name)
             if not base_oid:
-                self.logger.warning(f'OID not found for field "{field_name}", skipping.')
+                self.logger.warning(
+                    f'OID not found for field "{field_name}", skipping.'
+                )
                 return False
 
             oid = f"{base_oid}.0"
-            logging.debug(f'Field-OID: {field_name} -> OID: {oid} -> {obj_value} -> Type: {snmp_type}')
+            logging.debug(
+                f"Field-OID: {field_name} -> OID: {oid} -> {obj_value} -> Type: {snmp_type}"
+            )
 
             set_response = await self._snmp.set(oid, obj_value, snmp_type)
-            logging.debug(f'Set {field_name} [{oid}] = {obj_value}: {set_response}')
+            logging.debug(f"Set {field_name} [{oid}] = {obj_value}: {set_response}")
 
             if not set_response:
-                logging.error(f'Failed to set {field_name} to ({obj_value})')
+                logging.error(f"Failed to set {field_name} to ({obj_value})")
                 return False
 
             result = Snmp_v2c.snmp_set_result_value(set_response)[0]
 
             if not result:
-                logging.error(f'Failed to set {field_name} to ({obj_value})')
+                logging.error(f"Failed to set {field_name} to ({obj_value})")
                 return False
 
-            logging.debug(f"Result({result}): {type(result)} -> Value({obj_value}): {type(obj_value)}")
+            logging.debug(
+                f"Result({result}): {type(result)} -> Value({obj_value}): {type(obj_value)}"
+            )
 
             if str(result) != str(obj_value):
-                logging.error(f'Failed to set {field_name}. Expected ({obj_value}), got ({result})')
+                logging.error(
+                    f"Failed to set {field_name}. Expected ({obj_value}), got ({result})"
+                )
                 return False
             return True
 
         # Need to get Diplex Setting to make sure that the Spec Analyzer setting are within the band
-        cscs:DocsIf31CmSystemCfgDiplexState = await self.getDocsIf31CmSystemCfgDiplexState()
+        cscs: DocsIf31CmSystemCfgDiplexState = (
+            await self.getDocsIf31CmSystemCfgDiplexState()
+        )
         cscs.to_dict()[0]
 
         """ TODO: Will need to validate the Spec Analyzer Settings against the Diplex Settings
@@ -1895,17 +2127,17 @@ class CmSnmpOperation:
                 "docsIf3CmSpectrumAnalysisCtrlCmdFileEnable": Integer32,
             }
 
-            '''
+            """
                 Note: MUST BE THE LAST 2 AND IN THIS ORDER:
                     docsIf3CmSpectrumAnalysisCtrlCmdEnable      <- Triggers SNMP AMPLITUDE DATA RETURN
                     docsIf3CmSpectrumAnalysisCtrlCmdFileEnable  <- Trigger PNM FILE RETURN, OVERRIDES SNMP AMPLITUDE DATA RETURN
-            '''
+            """
 
             # Iterating through the fields and setting their values via SNMP
             for field_name, snmp_type in field_type_map.items():
                 obj_value = getattr(spec_ana_cmd, field_name)
 
-                self.logger.debug(f'Field-Name: {field_name} -> SNMP-Type: {snmp_type}')
+                self.logger.debug(f"Field-Name: {field_name} -> SNMP-Type: {snmp_type}")
 
                 ##############################################################
                 # OVERRIDE SECTION TO MAKE SURE WE FOLLOW THE SPEC-ANA RULES #
@@ -1915,9 +2147,15 @@ class CmSnmpOperation:
                     file_name = getattr(spec_ana_cmd, field_name)
 
                     if not file_name:
-                        setattr(spec_ana_cmd, field_name,f'snmp-amplitude-get-flag-{Generate.time_stamp()}')
+                        setattr(
+                            spec_ana_cmd,
+                            field_name,
+                            f"snmp-amplitude-get-flag-{Generate.time_stamp()}",
+                        )
 
-                    await __snmp_set(field_name, getattr(spec_ana_cmd, field_name) , snmp_type)
+                    await __snmp_set(
+                        field_name, getattr(spec_ana_cmd, field_name), snmp_type
+                    )
 
                     continue
 
@@ -1928,19 +2166,24 @@ class CmSnmpOperation:
                 # This OID Triggers the start of the Spectrum Analysis for SNMP-AMPLITUDE-DATA RETURN #
                 #######################################################################################
                 elif field_name == "docsIf3CmSpectrumAnalysisCtrlCmdEnable":
-
                     obj_value = Snmp_v2c.TRUE
-                    self.logger.debug(f'Field-Name: {field_name} -> SNMP-Type: {snmp_type}')
+                    self.logger.debug(
+                        f"Field-Name: {field_name} -> SNMP-Type: {snmp_type}"
+                    )
 
                     # Need to toggle ? -> FALSE -> TRUE
                     if not await __snmp_set(field_name, Snmp_v2c.FALSE, snmp_type):
-                        self.logger.error(f'Fail to set {field_name} to {Snmp_v2c.FALSE}')
+                        self.logger.error(
+                            f"Fail to set {field_name} to {Snmp_v2c.FALSE}"
+                        )
                         return False
 
                     time.sleep(1)
 
                     if not await __snmp_set(field_name, Snmp_v2c.TRUE, snmp_type):
-                        self.logger.error(f'Fail to set {field_name} to {Snmp_v2c.TRUE}')
+                        self.logger.error(
+                            f"Fail to set {field_name} to {Snmp_v2c.TRUE}"
+                        )
                         return False
 
                     continue
@@ -1954,31 +2197,49 @@ class CmSnmpOperation:
                 # Override SNMP-AMPLITUDE-DATA RETURN
                 ######################################################################################
                 elif field_name == "docsIf3CmSpectrumAnalysisCtrlCmdFileEnable":
-                    obj_value = Snmp_v2c.TRUE if spectrum_retrieval_type == SpectrumRetrievalType.FILE else Snmp_v2c.FALSE
-                    self.logger.debug(f'Setting File Retrival, Set-And-Go({set_and_go}) -> Value: {obj_value}')
+                    obj_value = (
+                        Snmp_v2c.TRUE
+                        if spectrum_retrieval_type == SpectrumRetrievalType.FILE
+                        else Snmp_v2c.FALSE
+                    )
+                    self.logger.debug(
+                        f"Setting File Retrival, Set-And-Go({set_and_go}) -> Value: {obj_value}"
+                    )
 
                 ###############################################
                 # Set Field setting not change by above rules #
                 ###############################################
                 if isinstance(obj_value, Enum):
                     obj_value = str(obj_value.value)
-                    self.logger.debug(f'ENUM Found: Set Value Type: {obj_value} -> {type(obj_value)}')
+                    self.logger.debug(
+                        f"ENUM Found: Set Value Type: {obj_value} -> {type(obj_value)}"
+                    )
                 else:
                     obj_value = str(obj_value)
 
-                self.logger.debug(f'{field_name} -> Set Value Type: {obj_value} -> {type(obj_value)}')
+                self.logger.debug(
+                    f"{field_name} -> Set Value Type: {obj_value} -> {type(obj_value)}"
+                )
 
                 if not await __snmp_set(field_name, obj_value, snmp_type):
-                    self.logger.error(f'Fail to set {field_name} to {obj_value}')
+                    self.logger.error(f"Fail to set {field_name} to {obj_value}")
                     return False
 
             return True
 
         except Exception:
-            logging.exception("Exception while setting DocsIf3CmSpectrumAnalysisCtrlCmd")
+            logging.exception(
+                "Exception while setting DocsIf3CmSpectrumAnalysisCtrlCmd"
+            )
             return False
 
-    async def setDocsPnmCmUsPreEq(self, ofdma_idx: int, filename:str, last_pre_eq_filename:str, set_and_go:bool=True) -> bool:
+    async def setDocsPnmCmUsPreEq(
+        self,
+        ofdma_idx: int,
+        filename: str,
+        last_pre_eq_filename: str,
+        set_and_go: bool = True,
+    ) -> bool:
         """
         Set the upstream Pre-EQ file name and enable Pre-EQ capture for a specified OFDMA channel index.
 
@@ -1990,42 +2251,56 @@ class CmSnmpOperation:
             bool: True if both SNMP set operations succeed and verify expected values; False otherwise.
         """
         try:
-            oid = f'{"docsPnmCmUsPreEqFileName"}.{ofdma_idx}'
+            oid = f"{'docsPnmCmUsPreEqFileName'}.{ofdma_idx}"
             self.logger.debug(f'Setting Pre-EQ filename: [{oid}] = "{filename}"')
             response = await self._snmp.set(oid, filename, OctetString)
             result = Snmp_v2c.snmp_set_result_value(response)
 
             if not result or str(result[0]) != filename:
-                self.logger.error(f'Filename mismatch. Expected "{filename}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Filename mismatch. Expected "{filename}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
-            oid = f'{"docsPnmCmUsPreEqLastUpdateFileName"}.{ofdma_idx}'
-            self.logger.debug(f'Setting Last-Pre-EQ filename: [{oid}] = "{last_pre_eq_filename}"')
+            oid = f"{'docsPnmCmUsPreEqLastUpdateFileName'}.{ofdma_idx}"
+            self.logger.debug(
+                f'Setting Last-Pre-EQ filename: [{oid}] = "{last_pre_eq_filename}"'
+            )
             response = await self._snmp.set(oid, last_pre_eq_filename, OctetString)
             result = Snmp_v2c.snmp_set_result_value(response)
 
             if not result or str(result[0]) != last_pre_eq_filename:
-                self.logger.error(f'Filename mismatch. Expected "{last_pre_eq_filename}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Filename mismatch. Expected "{last_pre_eq_filename}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
                 time.sleep(1)
-                enable_oid = f'{"docsPnmCmUsPreEqFileEnable"}.{ofdma_idx}'
-                self.logger.debug(f'Enabling Pre-EQ capture [{enable_oid}] = {Snmp_v2c.TRUE}')
+                enable_oid = f"{'docsPnmCmUsPreEqFileEnable'}.{ofdma_idx}"
+                self.logger.debug(
+                    f"Enabling Pre-EQ capture [{enable_oid}] = {Snmp_v2c.TRUE}"
+                )
                 response = await self._snmp.set(enable_oid, Snmp_v2c.TRUE, Integer32)
                 result = Snmp_v2c.snmp_set_result_value(response)
 
                 if not result or int(result[0]) != Snmp_v2c.TRUE:
-                    self.logger.error(f'Failed to enable Pre-EQ capture. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable Pre-EQ capture. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
             return True
 
         except Exception as e:
-            self.logger.exception(f'Exception during setDocsPnmCmUsPreEq for index {ofdma_idx}: {e}')
+            self.logger.exception(
+                f"Exception during setDocsPnmCmUsPreEq for index {ofdma_idx}: {e}"
+            )
             return False
 
-    async def setDocsPnmCmDsOfdmModProf(self, ofdm_idx: int, mod_prof_file_name: str, set_and_go:bool=True) -> bool:
+    async def setDocsPnmCmDsOfdmModProf(
+        self, ofdm_idx: int, mod_prof_file_name: str, set_and_go: bool = True
+    ) -> bool:
         """
         Set the DocsPnmCmDsOfdmModProf parameters for a given OFDM index.
 
@@ -2037,23 +2312,33 @@ class CmSnmpOperation:
         - bool: True if both SNMP sets were successful, False otherwise.
         """
         try:
-            file_oid = f'{"docsPnmCmDsOfdmModProfFileName"}.{ofdm_idx}'
-            enable_oid = f'{"docsPnmCmDsOfdmModProfFileEnable"}.{ofdm_idx}'
+            file_oid = f"{'docsPnmCmDsOfdmModProfFileName'}.{ofdm_idx}"
+            enable_oid = f"{'docsPnmCmDsOfdmModProfFileEnable'}.{ofdm_idx}"
 
-            file_response = await self._snmp.set(file_oid, mod_prof_file_name, OctetString)
-            self.logger.debug(f'Set {file_oid} to {mod_prof_file_name}: {file_response}')
+            file_response = await self._snmp.set(
+                file_oid, mod_prof_file_name, OctetString
+            )
+            self.logger.debug(
+                f"Set {file_oid} to {mod_prof_file_name}: {file_response}"
+            )
 
             if set_and_go:
-                enable_response = await self._snmp.set(enable_oid, Snmp_v2c.TRUE, Integer32)
-                self.logger.debug(f'Set {enable_oid} to 1 (enable): {enable_response}')
+                enable_response = await self._snmp.set(
+                    enable_oid, Snmp_v2c.TRUE, Integer32
+                )
+                self.logger.debug(f"Set {enable_oid} to 1 (enable): {enable_response}")
 
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to set DocsPnmCmDsOfdmModProf for index {ofdm_idx}: {e}")
+            self.logger.error(
+                f"Failed to set DocsPnmCmDsOfdmModProf for index {ofdm_idx}: {e}"
+            )
             return False
 
-    async def setDocsPnmCmDsOfdmRxMer(self, ofdm_idx: int, rxmer_file_name: str, set_and_go:bool=True) -> bool:
+    async def setDocsPnmCmDsOfdmRxMer(
+        self, ofdm_idx: int, rxmer_file_name: str, set_and_go: bool = True
+    ) -> bool:
         """
         Sets the RxMER file name and enables file capture for a specified OFDM channel index.
 
@@ -2065,35 +2350,48 @@ class CmSnmpOperation:
         - bool: True if both SNMP set operations succeed and return expected values, False otherwise.
         """
         try:
-            oid_file_name = f'{"docsPnmCmDsOfdmRxMerFileName"}.{ofdm_idx}'
-            set_response = await self._snmp.set(oid_file_name, rxmer_file_name, OctetString)
-            self.logger.debug(f'Setting RxMER file name [{oid_file_name}] = "{rxmer_file_name}"')
+            oid_file_name = f"{'docsPnmCmDsOfdmRxMerFileName'}.{ofdm_idx}"
+            set_response = await self._snmp.set(
+                oid_file_name, rxmer_file_name, OctetString
+            )
+            self.logger.debug(
+                f'Setting RxMER file name [{oid_file_name}] = "{rxmer_file_name}"'
+            )
 
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != rxmer_file_name:
-                self.logger.error(f'File name mismatch. Expected "{rxmer_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'File name mismatch. Expected "{rxmer_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
-                oid_file_enable = f'{"docsPnmCmDsOfdmRxMerFileEnable"}.{ofdm_idx}'
+                oid_file_enable = f"{'docsPnmCmDsOfdmRxMerFileEnable'}.{ofdm_idx}"
                 set_response = await self._snmp.set(oid_file_enable, 1, Integer32)
-                self.logger.debug(f'Enabling RxMER capture [{oid_file_enable}] = 1')
+                self.logger.debug(f"Enabling RxMER capture [{oid_file_enable}] = 1")
 
                 result = Snmp_v2c.snmp_set_result_value(set_response)
                 if not result or int(result[0]) != 1:
-                    self.logger.error(f'Failed to enable RxMER capture. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable RxMER capture. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
             return True
 
         except Exception as e:
-            self.logger.exception(f'Exception during setDocsPnmCmDsOfdmRxMer for index {ofdm_idx}: {e}')
+            self.logger.exception(
+                f"Exception during setDocsPnmCmDsOfdmRxMer for index {ofdm_idx}: {e}"
+            )
             return False
 
-    async def setDocsPnmCmDsOfdmFecSum(self, ofdm_idx: int,
-                                       fec_sum_file_name: str,
-                                       fec_sum_type: FecSummaryType = FecSummaryType.TEN_MIN,
-                                       set_and_go:bool=True) -> bool:
+    async def setDocsPnmCmDsOfdmFecSum(
+        self,
+        ofdm_idx: int,
+        fec_sum_file_name: str,
+        fec_sum_type: FecSummaryType = FecSummaryType.TEN_MIN,
+        set_and_go: bool = True,
+    ) -> bool:
         """
         Sets SNMP parameters for FEC summary of an OFDM channel.
 
@@ -2106,39 +2404,59 @@ class CmSnmpOperation:
         - bool: True if successful, False if any error occurs during SNMP operations.
         """
         try:
-            oid_file_name = f'{"docsPnmCmDsOfdmFecFileName"}.{ofdm_idx}'
-            self.logger.debug(f'Setting FEC file name [{oid_file_name}] = "{fec_sum_file_name}"')
-            set_response = await self._snmp.set(oid_file_name, fec_sum_file_name, OctetString)
+            oid_file_name = f"{'docsPnmCmDsOfdmFecFileName'}.{ofdm_idx}"
+            self.logger.debug(
+                f'Setting FEC file name [{oid_file_name}] = "{fec_sum_file_name}"'
+            )
+            set_response = await self._snmp.set(
+                oid_file_name, fec_sum_file_name, OctetString
+            )
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != fec_sum_file_name:
-                self.logger.error(f'File name mismatch. Expected "{fec_sum_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'File name mismatch. Expected "{fec_sum_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
-            oid_sum_type = f'{"docsPnmCmDsOfdmFecSumType"}.{ofdm_idx}'
-            self.logger.debug(f'Setting FEC sum type [{oid_sum_type}] = {fec_sum_type.name} -> {type(fec_sum_type.value)}')
-            set_response = await self._snmp.set(oid_sum_type, fec_sum_type.value, Integer32)
+            oid_sum_type = f"{'docsPnmCmDsOfdmFecSumType'}.{ofdm_idx}"
+            self.logger.debug(
+                f"Setting FEC sum type [{oid_sum_type}] = {fec_sum_type.name} -> {type(fec_sum_type.value)}"
+            )
+            set_response = await self._snmp.set(
+                oid_sum_type, fec_sum_type.value, Integer32
+            )
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or int(result[0]) != fec_sum_type.value:
-                self.logger.error(f'FEC sum type mismatch. Expected {fec_sum_type.value}, got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'FEC sum type mismatch. Expected {fec_sum_type.value}, got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
-                oid_file_enable = f'{"docsPnmCmDsOfdmFecFileEnable"}.{ofdm_idx}'
-                self.logger.debug(f'Enabling FEC file capture [{oid_file_enable}] = 1')
+                oid_file_enable = f"{'docsPnmCmDsOfdmFecFileEnable'}.{ofdm_idx}"
+                self.logger.debug(f"Enabling FEC file capture [{oid_file_enable}] = 1")
                 set_response = await self._snmp.set(oid_file_enable, 1, Integer32)
                 result = Snmp_v2c.snmp_set_result_value(set_response)
                 if not result or int(result[0]) != 1:
-                    self.logger.error(f'Failed to enable FEC capture. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable FEC capture. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
-            self.logger.debug(f'Successfully configured FEC summary capture for OFDM index {ofdm_idx}')
+            self.logger.debug(
+                f"Successfully configured FEC summary capture for OFDM index {ofdm_idx}"
+            )
             return True
 
         except Exception as e:
-            self.logger.exception(f'Exception during setDocsPnmCmDsOfdmFecSum for index {ofdm_idx}: {e}')
+            self.logger.exception(
+                f"Exception during setDocsPnmCmDsOfdmFecSum for index {ofdm_idx}: {e}"
+            )
             return False
 
-    async def setDocsPnmCmOfdmChEstCoef(self, ofdm_idx: int, chan_est_file_name: str, set_and_go:bool=True) -> bool:
+    async def setDocsPnmCmOfdmChEstCoef(
+        self, ofdm_idx: int, chan_est_file_name: str, set_and_go: bool = True
+    ) -> bool:
         """
         Sets SNMP parameters for OFDM channel estimation coefficients.
 
@@ -2150,29 +2468,45 @@ class CmSnmpOperation:
         - bool: True if the SNMP set operations were successful, False otherwise.
         """
         try:
-            oid_file_name = f'{"docsPnmCmOfdmChEstCoefFileName"}.{ofdm_idx}'
-            self.logger.debug(f'Setting OFDM Channel Estimation File Name [{oid_file_name}] = "{chan_est_file_name}"')
-            set_response = await self._snmp.set(oid_file_name, chan_est_file_name, OctetString)
+            oid_file_name = f"{'docsPnmCmOfdmChEstCoefFileName'}.{ofdm_idx}"
+            self.logger.debug(
+                f'Setting OFDM Channel Estimation File Name [{oid_file_name}] = "{chan_est_file_name}"'
+            )
+            set_response = await self._snmp.set(
+                oid_file_name, chan_est_file_name, OctetString
+            )
 
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != chan_est_file_name:
-                self.logger.error(f'Failed to set channel estimation file name. Expected "{chan_est_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to set channel estimation file name. Expected "{chan_est_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
-                oid_trigger_enable = f'{"docsPnmCmOfdmChEstCoefTrigEnable"}.{ofdm_idx}'
-                self.logger.debug(f'Setting Channel Estimation Trigger Enable [{oid_trigger_enable}] = 1')
-                set_response = await self._snmp.set(oid_trigger_enable, Snmp_v2c.TRUE, Integer32)
+                oid_trigger_enable = f"{'docsPnmCmOfdmChEstCoefTrigEnable'}.{ofdm_idx}"
+                self.logger.debug(
+                    f"Setting Channel Estimation Trigger Enable [{oid_trigger_enable}] = 1"
+                )
+                set_response = await self._snmp.set(
+                    oid_trigger_enable, Snmp_v2c.TRUE, Integer32
+                )
 
                 result = Snmp_v2c.snmp_set_result_value(set_response)
                 if not result or int(result[0]) != 1:
-                    self.logger.error(f'Failed to enable channel estimation trigger. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable channel estimation trigger. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
-            self.logger.debug(f'Successfully configured OFDM channel estimation for index {ofdm_idx} with file name "{chan_est_file_name}"')
+            self.logger.debug(
+                f'Successfully configured OFDM channel estimation for index {ofdm_idx} with file name "{chan_est_file_name}"'
+            )
 
         except Exception as e:
-            self.logger.exception(f'Exception occurred while setting OFDM Channel Estimation coefficients for index {ofdm_idx}: {e}')
+            self.logger.exception(
+                f"Exception occurred while setting OFDM Channel Estimation coefficients for index {ofdm_idx}: {e}"
+            )
             return False
 
         return True
@@ -2183,7 +2517,8 @@ class CmSnmpOperation:
         const_disp_name: str,
         modulation_order_offset: int = CmDsConstellationDisplayConst.MODULATION_OFFSET.value,
         number_sample_symbol: int = CmDsConstellationDisplayConst.NUM_SAMPLE_SYMBOL.value,
-        set_and_go: bool = True ) -> bool:
+        set_and_go: bool = True,
+    ) -> bool:
         """
         Configures SNMP parameters for the OFDM Downstream Constellation Display.
 
@@ -2199,40 +2534,50 @@ class CmSnmpOperation:
         """
         try:
             # Set file name
-            oid = f'{"docsPnmCmDsConstDispFileName"}.{ofdm_idx}'
+            oid = f"{'docsPnmCmDsConstDispFileName'}.{ofdm_idx}"
             self.logger.debug(f'Setting FileName [{oid}] = "{const_disp_name}"')
             set_response = await self._snmp.set(oid, const_disp_name, OctetString)
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != const_disp_name:
-                self.logger.error(f'Failed to set FileName. Expected "{const_disp_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to set FileName. Expected "{const_disp_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             # Set modulation order offset
-            oid = f'{"docsPnmCmDsConstDispModOrderOffset"}.{ofdm_idx}'
-            self.logger.debug(f'Setting ModOrderOffset [{oid}] = {modulation_order_offset}')
+            oid = f"{'docsPnmCmDsConstDispModOrderOffset'}.{ofdm_idx}"
+            self.logger.debug(
+                f"Setting ModOrderOffset [{oid}] = {modulation_order_offset}"
+            )
             set_response = await self._snmp.set(oid, modulation_order_offset, Gauge32)
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or int(result[0]) != modulation_order_offset:
-                self.logger.error(f'Failed to set ModOrderOffset. Expected {modulation_order_offset}, got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to set ModOrderOffset. Expected {modulation_order_offset}, got "{result[0] if result else "None"}"'
+                )
                 return False
 
             # Set number of sample symbols
-            oid = f'{"docsPnmCmDsConstDispNumSampleSymb"}.{ofdm_idx}'
-            self.logger.debug(f'Setting NumSampleSymb [{oid}] = {number_sample_symbol}')
+            oid = f"{'docsPnmCmDsConstDispNumSampleSymb'}.{ofdm_idx}"
+            self.logger.debug(f"Setting NumSampleSymb [{oid}] = {number_sample_symbol}")
             set_response = await self._snmp.set(oid, number_sample_symbol, Gauge32)
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or int(result[0]) != number_sample_symbol:
-                self.logger.error(f'Failed to set NumSampleSymb. Expected {number_sample_symbol}, got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to set NumSampleSymb. Expected {number_sample_symbol}, got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
                 # Trigger measurement
-                oid = f'{"docsPnmCmDsConstDispTrigEnable"}.{ofdm_idx}'
-                self.logger.debug(f'Setting TrigEnable [{oid}] = 1')
+                oid = f"{'docsPnmCmDsConstDispTrigEnable'}.{ofdm_idx}"
+                self.logger.debug(f"Setting TrigEnable [{oid}] = 1")
                 set_response = await self._snmp.set(oid, Snmp_v2c.TRUE, Integer32)
                 result = Snmp_v2c.snmp_set_result_value(set_response)
                 if not result or int(result[0]) != 1:
-                    self.logger.error(f'Failed to trigger measurement. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to trigger measurement. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
             self.logger.debug(
@@ -2242,11 +2587,16 @@ class CmSnmpOperation:
 
         except Exception as e:
             self.logger.exception(
-                f'Exception occurred while setting Constellation Display for OFDM index {ofdm_idx}: {e}'
+                f"Exception occurred while setting Constellation Display for OFDM index {ofdm_idx}: {e}"
             )
             return False
 
-    async def setDocsCmLatencyRptCfg(self, latency_rpt_file_name: str, num_of_reports: int = 1, set_and_go:bool=True) -> bool:
+    async def setDocsCmLatencyRptCfg(
+        self,
+        latency_rpt_file_name: str,
+        num_of_reports: int = 1,
+        set_and_go: bool = True,
+    ) -> bool:
         """
         Configures the CM upstream latency reporting feature. This enables
         the creation of latency report files containing per-Service Flow
@@ -2263,32 +2613,46 @@ class CmSnmpOperation:
         mac_idx = self.getIfTypeIndex(DocsisIfType.docsCableMaclayer)[0]
 
         try:
-            oid_file_name = f'{"docsCmLatencyRptCfgFileName"}.{mac_idx}'
-            self.logger.debug(f'Setting US Latency Report file name [{oid_file_name}] = "{latency_rpt_file_name}"')
-            set_response = await self._snmp.set(oid_file_name, latency_rpt_file_name, OctetString)
+            oid_file_name = f"{'docsCmLatencyRptCfgFileName'}.{mac_idx}"
+            self.logger.debug(
+                f'Setting US Latency Report file name [{oid_file_name}] = "{latency_rpt_file_name}"'
+            )
+            set_response = await self._snmp.set(
+                oid_file_name, latency_rpt_file_name, OctetString
+            )
             result = Snmp_v2c.snmp_set_result_value(set_response)
 
             if not result or str(result[0]) != latency_rpt_file_name:
-                self.logger.error(f'File name mismatch. Expected "{latency_rpt_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'File name mismatch. Expected "{latency_rpt_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
-                oid_num_reports = f'{"docsCmLatencyRptCfgNumFiles"}.{mac_idx}'
-                self.logger.debug(f'Setting number of latency reports [{oid_num_reports}] = {num_of_reports}')
-                set_response = await self._snmp.set(oid_num_reports, num_of_reports, Gauge32)
+                oid_num_reports = f"{'docsCmLatencyRptCfgNumFiles'}.{mac_idx}"
+                self.logger.debug(
+                    f"Setting number of latency reports [{oid_num_reports}] = {num_of_reports}"
+                )
+                set_response = await self._snmp.set(
+                    oid_num_reports, num_of_reports, Gauge32
+                )
                 result = Snmp_v2c.snmp_set_result_value(set_response)
 
                 if not result or int(result[0]) != num_of_reports:
-                    self.logger.error(f'Failed to enable latency report capture. Expected {num_of_reports}, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable latency report capture. Expected {num_of_reports}, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
             return True
 
         except Exception as e:
-            self.logger.exception(f'Exception during setDocsCmLatencyRptCfg: {e}')
+            self.logger.exception(f"Exception during setDocsCmLatencyRptCfg: {e}")
             return False
 
-    async def setDocsPnmCmDsHist(self, ds_histogram_file_name: str, set_and_go:bool=True, timeout:int=10) -> bool:
+    async def setDocsPnmCmDsHist(
+        self, ds_histogram_file_name: str, set_and_go: bool = True, timeout: int = 10
+    ) -> bool:
         """
         Configure and enable downstream histogram capture for the CM MAC layer interface.
 
@@ -2316,44 +2680,62 @@ class CmSnmpOperation:
             return False
 
         if len(idx_list) > 1:
-            self.logger.error(f"Expected a single index for docsCableMaclayer, but found multiple: {idx_list}")
+            self.logger.error(
+                f"Expected a single index for docsCableMaclayer, but found multiple: {idx_list}"
+            )
             return False
 
         idx = idx_list[0]
 
-        self.logger.debug(f'setDocsPnmCmDsHist -> idx: {idx}')
+        self.logger.debug(f"setDocsPnmCmDsHist -> idx: {idx}")
 
         try:
             # TODO: Need to make this dynamic
-            set_response = await self._snmp.set(f'{"docsPnmCmDsHistTimeOut"}.{idx}', timeout, Gauge32)
-            self.logger.debug(f'Setting Histogram Timeout: {timeout}')
+            set_response = await self._snmp.set(
+                f"{'docsPnmCmDsHistTimeOut'}.{idx}", timeout, Gauge32
+            )
+            self.logger.debug(f"Setting Histogram Timeout: {timeout}")
 
-            oid_file_name = f'{"docsPnmCmDsHistFileName"}.{idx}'
-            set_response = await self._snmp.set( oid_file_name, ds_histogram_file_name, OctetString)
-            self.logger.debug(f'Setting Histogram file name [{oid_file_name}] = "{ds_histogram_file_name}"')
+            oid_file_name = f"{'docsPnmCmDsHistFileName'}.{idx}"
+            set_response = await self._snmp.set(
+                oid_file_name, ds_histogram_file_name, OctetString
+            )
+            self.logger.debug(
+                f'Setting Histogram file name [{oid_file_name}] = "{ds_histogram_file_name}"'
+            )
 
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != ds_histogram_file_name:
-                self.logger.error(f'File name mismatch. Expected "{ds_histogram_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'File name mismatch. Expected "{ds_histogram_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
             if set_and_go:
-                oid_file_enable = f'{"docsPnmCmDsHistEnable"}.{idx}'
-                set_response = await self._snmp.set(oid_file_enable, Snmp_v2c.TRUE, Integer32)
-                self.logger.debug(f'Enabling Histogram capture [{oid_file_enable}] = 1')
+                oid_file_enable = f"{'docsPnmCmDsHistEnable'}.{idx}"
+                set_response = await self._snmp.set(
+                    oid_file_enable, Snmp_v2c.TRUE, Integer32
+                )
+                self.logger.debug(f"Enabling Histogram capture [{oid_file_enable}] = 1")
 
                 result = Snmp_v2c.snmp_set_result_value(set_response)
                 if not result or int(result[0]) != 1:
-                    self.logger.error(f'Failed to enable Histogram capture. Expected 1, got "{result[0] if result else "None"}"')
+                    self.logger.error(
+                        f'Failed to enable Histogram capture. Expected 1, got "{result[0] if result else "None"}"'
+                    )
                     return False
 
         except Exception as e:
-            self.logger.exception(f'Exception during setDocsPnmCmDsHist for index {idx}: {e}')
+            self.logger.exception(
+                f"Exception during setDocsPnmCmDsHist for index {idx}: {e}"
+            )
             return False
 
         return True
 
-    async def setDocsPnmCmDsOfdmSymTrig(self, ofdm_idx: int, symbol_trig_file_name: str) -> bool:
+    async def setDocsPnmCmDsOfdmSymTrig(
+        self, ofdm_idx: int, symbol_trig_file_name: str
+    ) -> bool:
         """
         Sets SNMP parameters for OFDM Downstream Symbol Capture.
 
@@ -2366,29 +2748,43 @@ class CmSnmpOperation:
         TODO: NOT ABLE TO TEST DUE TO CMTS DOES NOT SUPPORT
         """
         try:
-            oid_file_name = f'{"docsPnmCmDsOfdmSymCaptFileName"}.{ofdm_idx}'
-            self.logger.debug(f'Setting OFDM Downstream Symbol Capture File Name [{oid_file_name}] = "{symbol_trig_file_name}"')
-            set_response = await self._snmp.set(oid_file_name, symbol_trig_file_name, OctetString)
+            oid_file_name = f"{'docsPnmCmDsOfdmSymCaptFileName'}.{ofdm_idx}"
+            self.logger.debug(
+                f'Setting OFDM Downstream Symbol Capture File Name [{oid_file_name}] = "{symbol_trig_file_name}"'
+            )
+            set_response = await self._snmp.set(
+                oid_file_name, symbol_trig_file_name, OctetString
+            )
 
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or str(result[0]) != symbol_trig_file_name:
-                self.logger.error(f'Failed to set Downstream Symbol Capture file name. Expected "{symbol_trig_file_name}", got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to set Downstream Symbol Capture file name. Expected "{symbol_trig_file_name}", got "{result[0] if result else "None"}"'
+                )
                 return False
 
-            oid_trigger_enable = f'{"docsPnmCmDsConstDispTrigEnable"}.{ofdm_idx}'
-            self.logger.debug(f'Setting OFDM Downstream Symbol Capture Trigger Enable [{oid_trigger_enable}] = 1')
+            oid_trigger_enable = f"{'docsPnmCmDsConstDispTrigEnable'}.{ofdm_idx}"
+            self.logger.debug(
+                f"Setting OFDM Downstream Symbol Capture Trigger Enable [{oid_trigger_enable}] = 1"
+            )
             set_response = await self._snmp.set(oid_trigger_enable, 1, Integer32)
 
             result = Snmp_v2c.snmp_set_result_value(set_response)
             if not result or int(result[0]) != 1:
-                self.logger.error(f'Failed to enable OFDM Downstream Symbol Capture trigger. Expected 1, got "{result[0] if result else "None"}"')
+                self.logger.error(
+                    f'Failed to enable OFDM Downstream Symbol Capture trigger. Expected 1, got "{result[0] if result else "None"}"'
+                )
                 return False
 
-            self.logger.debug(f'Successfully configured OFDM Downstream Symbol Capturey for index {ofdm_idx} with file name "{symbol_trig_file_name}"')
+            self.logger.debug(
+                f'Successfully configured OFDM Downstream Symbol Capturey for index {ofdm_idx} with file name "{symbol_trig_file_name}"'
+            )
             return True
 
         except Exception as e:
-            self.logger.exception(f'Exception occurred while setting OFDM Downstream Symbol Capture for index {ofdm_idx}: {e}')
+            self.logger.exception(
+                f"Exception occurred while setting OFDM Downstream Symbol Capture for index {ofdm_idx}: {e}"
+            )
             return False
 
     async def getDocsIf3CmStatusUsEqData(self) -> DocsEqualizerData:
@@ -2406,7 +2802,7 @@ class CmSnmpOperation:
             for each upstream channel index.
             Returns None if SNMP walk fails, no data is returned, or parsing fails.
         """
-        oid = 'docsIf3CmStatusUsEqData'
+        oid = "docsIf3CmStatusUsEqData"
         try:
             result = await self._snmp.walk(oid)
 
@@ -2425,7 +2821,7 @@ class CmSnmpOperation:
                 us_idx = Snmp_v2c.extract_last_oid_index([varbind])[0]
                 eq_data = Snmp_v2c.snmp_get_result_value([varbind])[0]
                 eq_data = Format.non_ascii_to_hex(eq_data)
-                self.logger.debug(f'idx: {us_idx} -> eq-data: ({eq_data})')
+                self.logger.debug(f"idx: {us_idx} -> eq-data: ({eq_data})")
                 ded.add(us_idx, eq_data)
 
         except ValueError as e:
@@ -2435,6 +2831,7 @@ class CmSnmpOperation:
         if not ded.coefficients_found():
             self.logger.warning(
                 "No upstream pre-equalization coefficients found. "
-                "Ensure Pre-Equalization is enabled on the upstream interface(s).")
+                "Ensure Pre-Equalization is enabled on the upstream interface(s)."
+            )
 
         return ded

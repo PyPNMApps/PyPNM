@@ -87,9 +87,9 @@ class Snmp_v2c:
             write_community (SnmpWriteCommunity | None): Write community string override.
             port (int): SNMP port (default 161).
         """
-        self.logger     = logging.getLogger(self.__class__.__name__)
-        self._host      = host.inet
-        self._port      = port
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._host = host.inet
+        self._port = port
         if read_community is not None:
             self._read_community = str(read_community)
         elif community is not None:
@@ -106,8 +106,8 @@ class Snmp_v2c:
 
         if self._write_community == "":
             self._write_community = self._read_community
-        self._timeout   = timeout
-        self._retries   = retries
+        self._timeout = timeout
+        self._retries = retries
         self._snmp_engine = SnmpEngine()
 
     async def get(
@@ -145,10 +145,11 @@ class Snmp_v2c:
         errorIndication, errorStatus, errorIndex, varBinds = await get_cmd(
             self._snmp_engine,
             CommunityData(self._read_community, mpModel=1),
-            await UdpTransportTarget.create((self._host, self._port),
-                                            timeout=timeout_s,     # seconds
-                                            retries=retries_n,     # count
-                                            ),
+            await UdpTransportTarget.create(
+                (self._host, self._port),
+                timeout=timeout_s,  # seconds
+                retries=retries_n,  # count
+            ),
             ContextData(),
             obj,
         )
@@ -178,20 +179,19 @@ class Snmp_v2c:
         obj = ObjectType(identity)
         results: list[ObjectType] = []
 
-        transport = await UdpTransportTarget.create((self._host, self._port),
-                                                    timeout=self._timeout,
-                                                    retries=self._retries)
+        transport = await UdpTransportTarget.create(
+            (self._host, self._port), timeout=self._timeout, retries=self._retries
+        )
 
         objects = walk_cmd(
             self._snmp_engine,
             CommunityData(self._read_community, mpModel=1),
             transport,
             ContextData(),
-            obj
+            obj,
         )
 
         async for item in objects:
-
             errorIndication, errorStatus, errorIndex, varBinds = item
 
             try:
@@ -208,16 +208,20 @@ class Snmp_v2c:
                 oid_str = str(varBind[0])
 
                 if not self._is_oid_in_subtree(oid_str, str(identity)):
-                    self.logger.debug(f"End of OID subtree reached at {oid_str} -> {varBind} - List size {len(results)}")
+                    self.logger.debug(
+                        f"End of OID subtree reached at {oid_str} -> {varBind} - List size {len(results)}"
+                    )
                     return results if results else None
 
                 results.append(varBind)
 
-        self.logger.debug(f'List size {len(results)}')
+        self.logger.debug(f"List size {len(results)}")
 
         return results if results else None
 
-    async def set(self, oid: str, value: str | int, value_type: type)-> list[ObjectType] | None:
+    async def set(
+        self, oid: str, value: str | int, value_type: type
+    ) -> list[ObjectType] | None:
         """
         Perform an SNMP SET operation with explicit value type.
 
@@ -239,17 +243,20 @@ class Snmp_v2c:
         if value_type is None:
             raise ValueError("value_type must be explicitly specified")
 
-        self.logger.debug(f'SNMP-SET-OID: {oid} -> {value_type} -> {value}')
+        self.logger.debug(f"SNMP-SET-OID: {oid} -> {value_type} -> {value}")
 
         oid = Snmp_v2c.resolve_oid(oid)
 
-        transport = await UdpTransportTarget.create((self._host, self._port),
-                                                    timeout=self._timeout, retries=self._retries)
+        transport = await UdpTransportTarget.create(
+            (self._host, self._port), timeout=self._timeout, retries=self._retries
+        )
 
         try:
             snmp_value = value_type(value)
         except Exception as e:
-            raise ValueError(f"Failed to create SNMP value of type {value_type}: {e}") from e
+            raise ValueError(
+                f"Failed to create SNMP value of type {value_type}: {e}"
+            ) from e
 
         errorIndication, errorStatus, errorIndex, varBinds = await set_cmd(
             self._snmp_engine,
@@ -265,7 +272,7 @@ class Snmp_v2c:
             self.logger.error(f"Error extracting SNMP value: {e}")
             return None
 
-        return varBinds # type: ignore
+        return varBinds  # type: ignore
 
     def close(self) -> None:
         """
@@ -288,7 +295,7 @@ class Snmp_v2c:
         """
         if isinstance(oid, tuple):
             # Optional support for Tuple format: (base, suffix1, suffix2)
-            oid = '.'.join(map(str, oid))
+            oid = ".".join(map(str, oid))
 
         if Snmp_v2c.is_numeric_oid(oid):
             return oid
@@ -317,7 +324,9 @@ class Snmp_v2c:
         return bool(re.fullmatch(r"\.?(\d+\.)+\d+", oid))
 
     @staticmethod
-    def get_result_value(pysnmp_get_result: ObjectType | tuple[ObjectType, ...] | None) -> str | None:
+    def get_result_value(
+        pysnmp_get_result: ObjectType | tuple[ObjectType, ...] | None,
+    ) -> str | None:
         """
         Extract the value from a pysnmp GET result.
 
@@ -358,12 +367,16 @@ class Snmp_v2c:
         for response in snmp_responses:
             oid = response[0]
             index = Snmp_v2c.get_oid_index(oid)
-            logging.debug(f'extract_last_oid_index-IN-LOOP -> {response} -> {oid} -> {index}')
+            logging.debug(
+                f"extract_last_oid_index-IN-LOOP -> {response} -> {oid} -> {index}"
+            )
             last_oid_indexes.append(index)
         return last_oid_indexes
 
     @staticmethod
-    def extract_oid_indices(snmp_responses: list[ObjectType],num_indices: int = 1) -> list[list[SnmpIndex]]:
+    def extract_oid_indices(
+        snmp_responses: list[ObjectType], num_indices: int = 1
+    ) -> list[list[SnmpIndex]]:
         """
         Extract the last `num_indices` components from the OID index of each SNMP response.
 
@@ -374,7 +387,7 @@ class Snmp_v2c:
         Returns:
         - List of lists, each containing the extracted index components.
         """
-        extracted_indices:list[list[SnmpIndex]] = []
+        extracted_indices: list[list[SnmpIndex]] = []
 
         for response in snmp_responses:
             oid = response[0]
@@ -388,7 +401,9 @@ class Snmp_v2c:
                 logging.warning(f"Unexpected OID index format: {full_index}")
                 continue
 
-            selected = indices[-num_indices:] if len(indices) >= num_indices else indices
+            selected = (
+                indices[-num_indices:] if len(indices) >= num_indices else indices
+            )
             logging.debug(f"extract_oid_indices -> {response} -> {oid} -> {selected}")
             extracted_indices.append(selected)
 
@@ -422,7 +437,7 @@ class Snmp_v2c:
         for varbind in snmp_responses:
             value = varbind[1]
             # Attempt to get raw bytes directly if available
-            if hasattr(value, 'asOctets'):
+            if hasattr(value, "asOctets"):
                 result.append(value.asOctets())
             elif isinstance(value, bytes):
                 result.append(value)
@@ -432,7 +447,9 @@ class Snmp_v2c:
         return result
 
     @staticmethod
-    def snmp_get_result_last_idx_value(snmp_responses: list[ObjectType]) -> list[tuple[InterfaceIndex, str]]:
+    def snmp_get_result_last_idx_value(
+        snmp_responses: list[ObjectType],
+    ) -> list[tuple[InterfaceIndex, str]]:
         """
         Extract the last index and value from each SNMP response.
 
@@ -445,15 +462,17 @@ class Snmp_v2c:
         result = []
         for obj in snmp_responses:
             oid = obj[0]
-            last_idx = InterfaceIndex(int(str(oid).split('.')[-1]))
+            last_idx = InterfaceIndex(int(str(oid).split(".")[-1]))
             value = str(obj[1])
             result.append((last_idx, value))
         return result
 
     T = TypeVar("T", int, str)
+
     @staticmethod
-    def snmp_get_result_last_idx_force_value_type(snmp_responses: list[ObjectType],
-                                                  value_type: type[T] = str) -> list[tuple[int, T]]:
+    def snmp_get_result_last_idx_force_value_type(
+        snmp_responses: list[ObjectType], value_type: type[T] = str
+    ) -> list[tuple[int, T]]:
         """
         Extract the last index and value from each SNMP response,
         casting the value to the requested type (int or str).
@@ -485,7 +504,9 @@ class Snmp_v2c:
                 else:
                     cast_val = str(raw_val)
             except Exception as e:
-                logger.warning(f"Failed to cast SNMP value {raw_val!r} to {value_type}: {e}")
+                logger.warning(
+                    f"Failed to cast SNMP value {raw_val!r} to {value_type}: {e}"
+                )
                 # fallback: leave it in its raw form
                 cast_val = raw_val  # type: ignore
 
@@ -513,9 +534,9 @@ class Snmp_v2c:
         if not snmp_set_response:
             return []
 
-        logging.debug(f'snmp_set_result_value -> {snmp_set_response}')
+        logging.debug(f"snmp_set_result_value -> {snmp_set_response}")
 
-        return  [str(value[1]) for value in snmp_set_response]
+        return [str(value[1]) for value in snmp_set_response]
 
     @staticmethod
     def get_oid_index(oid: str) -> SnmpIndex | None:
@@ -532,9 +553,11 @@ class Snmp_v2c:
             oid = str(oid)
 
         try:
-            parts = oid.strip().split('.')
+            parts = oid.strip().split(".")
             index = SnmpIndex(int(parts[-1]))
-            logging.debug(f"Extracted OID index: OID='{oid}', Parts={parts}, Index={index}")
+            logging.debug(
+                f"Extracted OID index: OID='{oid}', Parts={parts}, Index={index}"
+            )
             return index
         except (ValueError, IndexError) as e:
             logging.error(f"Failed to extract index from OID '{oid}': {e}")
@@ -592,7 +615,7 @@ class Snmp_v2c:
             tz_hours = data[9]
             tz_minutes = data[10]
             offset_minutes = tz_hours * 60 + tz_minutes
-            if direction == '-':
+            if direction == "-":
                 offset_minutes = -offset_minutes
             tz = timezone(timedelta(minutes=offset_minutes))
             dt = dt.replace(tzinfo=tz)
@@ -647,10 +670,11 @@ class Snmp_v2c:
         # Convert hundredths of a second to total seconds and microseconds
         total_seconds = ticks // 100
         remainder_hundredths = ticks % 100
-        duration = timedelta(seconds=total_seconds, milliseconds=remainder_hundredths * 10)
+        duration = timedelta(
+            seconds=total_seconds, milliseconds=remainder_hundredths * 10
+        )
 
         return str(duration)
-
 
     ###################
     # Private Methods #
@@ -673,7 +697,12 @@ class Snmp_v2c:
             self.logger.debug(f"Resolving OID string: {oid}")
             return ObjectIdentity(oid)
 
-    def _raise_on_snmp_error(self, errorIndication: Exception | str | None, errorStatus: object | None, errorIndex: Integer32 | int | None) -> None:
+    def _raise_on_snmp_error(
+        self,
+        errorIndication: Exception | str | None,
+        errorStatus: object | None,
+        errorIndex: Integer32 | int | None,
+    ) -> None:
         """
         Raises RuntimeError if any SNMP error is detected.
 
@@ -692,9 +721,7 @@ class Snmp_v2c:
             # errorStatus objects from pysnmp typically expose prettyPrint()
             pretty = getattr(errorStatus, "prettyPrint", None)
             status_text = pretty() if callable(pretty) else str(errorStatus)
-            raise RuntimeError(
-                f"SNMP error {status_text} at index {errorIndex}"
-            )
+            raise RuntimeError(f"SNMP error {status_text} at index {errorIndex}")
 
     def _is_oid_in_subtree(self, oid_str: str, obj_str: str) -> bool:
         """
@@ -707,6 +734,6 @@ class Snmp_v2c:
         Returns:
             bool: True if oid_str is within the subtree of obj_str.
         """
-        oid_parts = oid_str.strip('.').split('.')
-        obj_parts = obj_str.strip('.').split('.')
-        return oid_parts[:len(obj_parts)] == obj_parts
+        oid_parts = oid_str.strip(".").split(".")
+        obj_parts = obj_str.strip(".").split(".")
+        return oid_parts[: len(obj_parts)] == obj_parts

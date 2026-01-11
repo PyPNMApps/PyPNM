@@ -62,8 +62,8 @@ def test_detect_thresholding_and_boxes_single_blob() -> None:
 @pytest.mark.pnm
 def test_find_boxes_multiple_disjoint_blobs() -> None:
     a = np.zeros((8, 8), dtype=float)
-    a[1:3, 1:3] = 10.0     # blob A
-    a[5:7, 5:7] = -10.0    # blob B (negative should also be flagged via |z|)
+    a[1:3, 1:3] = 10.0  # blob A
+    a[5:7, 5:7] = -10.0  # blob B (negative should also be flagged via |z|)
 
     det = HeatmapAnomalyDetector(a, threshold=1.0)
     det.detect()
@@ -104,4 +104,6 @@ def test_to_json_structure_after_detection() -> None:
     assert "threshold" in payload and payload["threshold"] == 1.5
     assert "boxes" in payload and isinstance(payload["boxes"], list)
     # one 1x1 box expected
-    assert payload["boxes"] == [{"row_min": 2, "col_min": 2, "row_max": 2, "col_max": 2}]
+    assert payload["boxes"] == [
+        {"row_min": 2, "col_min": 2, "row_max": 2, "col_max": 2}
+    ]

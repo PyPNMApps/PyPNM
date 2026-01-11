@@ -48,8 +48,11 @@ class UsOfdmaPreEqualizationRouter:
         prefix = "/docs/pnm/us/ofdma"
         self.base_endpoint = "/preEqualization"
         self.router = APIRouter(
-            prefix=prefix, tags=["PNM Operations - Upstream OFDMA Pre-Equalization"])
-        self.logger = logging.getLogger(f'UsOfdmaPreEqualizationRouter.{self.base_endpoint.strip("/")}')
+            prefix=prefix, tags=["PNM Operations - Upstream OFDMA Pre-Equalization"]
+        )
+        self.logger = logging.getLogger(
+            f"UsOfdmaPreEqualizationRouter.{self.base_endpoint.strip('/')}"
+        )
         self.__routes()
 
     def __routes(self) -> None:
@@ -57,8 +60,11 @@ class UsOfdmaPreEqualizationRouter:
             f"{self.base_endpoint}/getCapture",
             summary="Get Upstream OFDMA Pre-Equalization Capture",
             response_model=None,
-            responses=FAST_API_RESPONSE,)
-        async def get_capture(request: PnmSingleCaptureRequest) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
+            responses=FAST_API_RESPONSE,
+        )
+        async def get_capture(
+            request: PnmSingleCaptureRequest,
+        ) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
             """
             Capture Upstream OFDMA Pre-Equalization Coefficients.
 
@@ -67,22 +73,31 @@ class UsOfdmaPreEqualizationRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
 
             self.logger.info(
-                f"Starting Upstream OFDMA Pre-Equalization measurement for MAC: {mac}, IP: {ip}")
+                f"Starting Upstream OFDMA Pre-Equalization measurement for MAC: {mac}, IP: {ip}"
+            )
 
             cm = CableModem(MacAddress(mac), Inet(ip), write_community=community)
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm,
-                                                          validate_ofdma_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm, validate_ofdma_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            service: CmUsOfdmaPreEqService = CmUsOfdmaPreEqService(cm, tftp_servers,)
+            service: CmUsOfdmaPreEqService = CmUsOfdmaPreEqService(
+                cm,
+                tftp_servers,
+            )
             msg_rsp: MessageResponse = await service.set_and_go()
             msg_rsp.log_payload()
 
@@ -91,9 +106,10 @@ class UsOfdmaPreEqualizationRouter:
                 return SnmpResponse(mac_address=mac, message=err, status=msg_rsp.status)
 
             channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
-            measurement_stats:list[DocsPnmCmUsPreEqEntry] = \
-                cast(list[DocsPnmCmUsPreEqEntry],
-                    await service.getPnmMeasurementStatistics(channel_ids=channel_ids))
+            measurement_stats: list[DocsPnmCmUsPreEqEntry] = cast(
+                list[DocsPnmCmUsPreEqEntry],
+                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),
+            )
 
             cps = CommonProcessService(msg_rsp)
             msg_rsp = cps.process()
@@ -105,26 +121,33 @@ class UsOfdmaPreEqualizationRouter:
 
                 # Clean up payload by removing unneeded or redundant sections
                 DictGenerate.pop_keys_recursive(payload, ["pnm_header"])
-                primative:dict[Any,Any] = msg_rsp.payload_to_dict('primative')
+                primative: dict[Any, Any] = msg_rsp.payload_to_dict("primative")
                 DictGenerate.pop_keys_recursive(primative, ["device_details"])
                 payload.update(primative)
-                payload.update(DictGenerate.models_to_nested_dict(measurement_stats, 'measurement_stats',))
+                payload.update(
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
 
                 return PnmAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    data        =   payload,)
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=payload,
+                )
 
             elif request.analysis.output.type == OutputType.ARCHIVE:
                 analysis_rpt = CmUsOfdmaPreEqReport(analysis)
-                rpt: Path    = cast(Path, analysis_rpt.build_report())
+                rpt: Path = cast(Path, analysis_rpt.build_report())
                 return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
             else:
                 return PnmAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                    data        =   {},)
+                    mac_address=mac,
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    data={},
+                )
 
 
 # Required for dynamic auto-registration

@@ -19,11 +19,22 @@ from .shannon import Shannon
 
 
 class ShannonSeriesModel(BaseModel):
-    snr_db_values: list[SNRdB]                  = Field(..., description="Input SNR values in dB per subcarrier.")
-    bits_per_symbol: BitsPerSymbolSeries        = Field(..., description="Computed bits-per-symbol (capacity) for each SNR.")
-    modulations: StringArray                    = Field(..., description="Recommended QAM modulation names per SNR sample.")
-    snr_db_min: list[SNRdB]                     = Field(..., description="Minimum SNR thresholds corresponding to each supported modulation.")
-    supported_modulation_counts: dict[str, int] = Field(..., description="Mapping of modulation name → number of supported subcarriers.")
+    snr_db_values: list[SNRdB] = Field(
+        ..., description="Input SNR values in dB per subcarrier."
+    )
+    bits_per_symbol: BitsPerSymbolSeries = Field(
+        ..., description="Computed bits-per-symbol (capacity) for each SNR."
+    )
+    modulations: StringArray = Field(
+        ..., description="Recommended QAM modulation names per SNR sample."
+    )
+    snr_db_min: list[SNRdB] = Field(
+        ...,
+        description="Minimum SNR thresholds corresponding to each supported modulation.",
+    )
+    supported_modulation_counts: dict[str, int] = Field(
+        ..., description="Mapping of modulation name → number of supported subcarriers."
+    )
 
 
 class ShannonSeries:
@@ -35,6 +46,7 @@ class ShannonSeries:
         bits_list        : Supported bits per symbol for each SNR.
         modulations      : Recommended QAM modulation names per SNR.
     """
+
     def __init__(self, snr_db_values: FloatSequence) -> None:
         """
         Initialize the series calculator.
@@ -52,7 +64,12 @@ class ShannonSeries:
         # Validate inputs
         self.snr_db_values: list[SNRdB] = []
         for db in snr_db_values:
-            if not isinstance(db, (int, float)) or db < 0 or db != db or db == float('inf'):
+            if (
+                not isinstance(db, (int, float))
+                or db < 0
+                or db != db
+                or db == float("inf")
+            ):
                 raise ValueError(f"Invalid SNR dB value: {db}")
             self.snr_db_values.append(SNRdB(db))
 
@@ -60,20 +77,23 @@ class ShannonSeries:
         self._instances: list[Shannon] = [Shannon(db) for db in self.snr_db_values]
 
         # Extract bits and modulations
-        self.bits_list: list[BitsPerSymbol] = cast(list[BitsPerSymbol], [inst.bits for inst in self._instances])
-        self.modulations: list[str]         = [inst.get_modulation() for inst in self._instances]
-        self.snr_db_limit: list[SNRdB]      = self.limit()
+        self.bits_list: list[BitsPerSymbol] = cast(
+            list[BitsPerSymbol], [inst.bits for inst in self._instances]
+        )
+        self.modulations: list[str] = [
+            inst.get_modulation() for inst in self._instances
+        ]
+        self.snr_db_limit: list[SNRdB] = self.limit()
 
-        self._model:ShannonSeriesModel = self.__build_model()
+        self._model: ShannonSeriesModel = self.__build_model()
 
     def __build_model(self) -> ShannonSeriesModel:
-
-        _:ShannonSeriesModel = ShannonSeriesModel (
-            bits_per_symbol             =   self.bits_list,
-            modulations                 =   self.modulations,
-            snr_db_values               =   self.snr_db_values,
-            supported_modulation_counts =   self.supported_modulation_counts(),
-            snr_db_min                  =   self.limit()
+        _: ShannonSeriesModel = ShannonSeriesModel(
+            bits_per_symbol=self.bits_list,
+            modulations=self.modulations,
+            snr_db_values=self.snr_db_values,
+            supported_modulation_counts=self.supported_modulation_counts(),
+            snr_db_min=self.limit(),
         )
 
         return _
@@ -108,7 +128,7 @@ class ShannonSeries:
         """
         return self.to_model().model_dump()
 
-    def to_json(self, indent:int=2) -> str:
+    def to_json(self, indent: int = 2) -> str:
         """
         Serialize the series results to a JSON string.
 

@@ -54,8 +54,9 @@ class RxMerRouter:
         prefix = "/docs/pnm/ds/ofdm"
         self.base_endpoint = "/rxMer"
         self.router = APIRouter(
-            prefix=prefix, tags=["PNM Operations - Downstream OFDM RxMER"])
-        self.logger = logging.getLogger(f'RxMerRouter.{self.base_endpoint.strip("/")}')
+            prefix=prefix, tags=["PNM Operations - Downstream OFDM RxMER"]
+        )
+        self.logger = logging.getLogger(f"RxMerRouter.{self.base_endpoint.strip('/')}")
         self.__routes()
 
     def __routes(self) -> None:
@@ -63,8 +64,11 @@ class RxMerRouter:
             f"{self.base_endpoint}/getCapture",
             summary="Get RxMER PNM Capture File",
             response_model=None,
-            responses=FAST_API_RESPONSE,)
-        async def get_capture(request: PnmSingleCaptureRequest) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
+            responses=FAST_API_RESPONSE,
+        )
+        async def get_capture(
+            request: PnmSingleCaptureRequest,
+        ) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
             """
             Capture Downstream OFDM RxMER Per-Subcarrier Values.
 
@@ -73,15 +77,22 @@ class RxMerRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
 
             self.logger.info(f"Starting RxMER measurement for MAC: {mac}, IP: {ip}")
 
-            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+            cm = CableModem(
+                mac_address=MacAddress(mac), inet=Inet(ip), write_community=community
+            )
 
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+                cable_modem=cm, validate_ofdm_exist=True
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
@@ -90,15 +101,18 @@ class RxMerRouter:
             service: CmDsOfdmRxMerService = CmDsOfdmRxMerService(cm, tftp_servers)
             channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
             interface_parameters = self._resolve_interface_parameters(channel_ids)
-            msg_rsp: MessageResponse = await service.set_and_go(interface_parameters=interface_parameters)
+            msg_rsp: MessageResponse = await service.set_and_go(
+                interface_parameters=interface_parameters
+            )
 
             if msg_rsp.status != ServiceStatusCode.SUCCESS:
                 err = "Unable to complete RxMER measurement."
                 return SnmpResponse(mac_address=mac, message=err, status=msg_rsp.status)
 
-            measurement_stats:list[DocsPnmCmDsOfdmRxMerEntry] = \
-                cast(list[DocsPnmCmDsOfdmRxMerEntry],
-                    await service.getPnmMeasurementStatistics(channel_ids=channel_ids))
+            measurement_stats: list[DocsPnmCmDsOfdmRxMerEntry] = cast(
+                list[DocsPnmCmDsOfdmRxMerEntry],
+                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),
+            )
 
             cps = CommonProcessService(msg_rsp)
             msg_rsp = cps.process()
@@ -109,29 +123,40 @@ class RxMerRouter:
                 payload: dict[str, Any] = cast(dict[str, Any], analysis.get_results())
 
                 # Clean up payload by removing unneeded or redundant sections
-                DictGenerate.pop_keys_recursive(payload, ["pnm_header", "modulations", "snr_db_values"])
-                primative = msg_rsp.payload_to_dict('primative')
-                DictGenerate.pop_keys_recursive(primative, ["device_details", "modulation_statistics"])
+                DictGenerate.pop_keys_recursive(
+                    payload, ["pnm_header", "modulations", "snr_db_values"]
+                )
+                primative = msg_rsp.payload_to_dict("primative")
+                DictGenerate.pop_keys_recursive(
+                    primative, ["device_details", "modulation_statistics"]
+                )
                 payload.update({str(k): v for k, v in primative.items()})
-                payload.update(DictGenerate.models_to_nested_dict(measurement_stats, 'measurement_stats',))
+                payload.update(
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
 
                 return PnmAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    data        =   payload,)
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=payload,
+                )
 
             elif request.analysis.output.type == OutputType.ARCHIVE:
                 theme = request.analysis.plot.ui.theme
-                plot_config = AnalysisRptMatplotConfig(theme = theme)
+                plot_config = AnalysisRptMatplotConfig(theme=theme)
                 analysis_rpt = RxMerAnalysisReport(analysis, plot_config)
                 rpt: Path = cast(Path, analysis_rpt.build_report())
                 return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
             else:
                 return PnmAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                    data        =   {},)
+                    mac_address=mac,
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    data={},
+                )
 
     @staticmethod
     def _resolve_interface_parameters(

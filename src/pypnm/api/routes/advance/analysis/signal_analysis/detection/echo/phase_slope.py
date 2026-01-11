@@ -25,6 +25,7 @@ class PhaseSlopeEchoDetector:
       - dataset_info()  -> dict: {'subcarriers', 'snapshots'}
       - to_dict()       -> dict: comprehensive dump of inputs and outputs
     """
+
     # Speed of light in vacuum (m/s)
     c0 = 299_792_458
 
@@ -32,7 +33,7 @@ class PhaseSlopeEchoDetector:
         self,
         H: Sequence | np.ndarray,
         f: Sequence[float],
-        prop_speed_frac: float = 0.87
+        prop_speed_frac: float = 0.87,
     ) -> None:
         """
         Initialize the PhaseSlopeEchoDetector.
@@ -105,16 +106,16 @@ class PhaseSlopeEchoDetector:
         tau_rt = self.estimate_delay()
         tau_oneway = abs(tau_rt) / 2
         distance = self.v * tau_oneway
-        return {'delay_rt_s': tau_rt, 'delay_s': tau_oneway, 'distance_m': distance}
+        return {"delay_rt_s": tau_rt, "delay_s": tau_oneway, "distance_m": distance}
 
     def dataset_info(self) -> dict[str, int]:
         """
         Metadata on number of subcarriers and snapshots.
         """
         M, K = self.H_raw.shape
-        info = {'subcarriers': K}
+        info = {"subcarriers": K}
         if M > 1:
-            info['snapshots'] = M
+            info["snapshots"] = M
         return info
 
     def to_dict(self) -> dict[str, Any]:
@@ -122,10 +123,10 @@ class PhaseSlopeEchoDetector:
         Return all inputs and computed outputs as a dictionary.
         """
         data = {
-            'f': self.f.tolist(),
-            'H_raw': [row.tolist() for row in self.H_raw],
-            'H_avg': self.H.tolist(),
-            'dataset_info': self.dataset_info()
+            "f": self.f.tolist(),
+            "H_raw": [row.tolist() for row in self.H_raw],
+            "H_avg": self.H.tolist(),
+            "dataset_info": self.dataset_info(),
         }
         data.update(self.detect_echo())
         return data

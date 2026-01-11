@@ -66,7 +66,9 @@ class SpectrumAnalyzerRouter:
     def __init__(self) -> None:
         prefix = "/docs/pnm/ds"
         self.base_endpoint = "/spectrumAnalyzer"
-        self.router = APIRouter(prefix=prefix, tags=["PNM Operations - Spectrum Analyzer"])
+        self.router = APIRouter(
+            prefix=prefix, tags=["PNM Operations - Spectrum Analyzer"]
+        )
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self.__routes()
 
@@ -77,7 +79,9 @@ class SpectrumAnalyzerRouter:
             response_model=None,
             responses=FAST_API_RESPONSE,
         )
-        async def get_capture(request: SingleCaptureSpectrumAnalyzer) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
+        async def get_capture(
+            request: SingleCaptureSpectrumAnalyzer,
+        ) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
             """
             Perform Spectrum Analyzer Capture And Return Analysis Results.
 
@@ -96,18 +100,30 @@ class SpectrumAnalyzerRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
 
-            self.logger.info("Starting Spectrum Analyzer capture for MAC: %s, IP: %s, Output Type: %s",
-                mac, ip, request.analysis.output.type,)
+            self.logger.info(
+                "Starting Spectrum Analyzer capture for MAC: %s, IP: %s, Output Type: %s",
+                mac,
+                ip,
+                request.analysis.output.type,
+            )
 
-            cm = CableModem(mac_address=MacAddress(mac),
-                            inet=Inet(ip),
-                            write_community=community,)
+            cm = CableModem(
+                mac_address=MacAddress(mac),
+                inet=Inet(ip),
+                write_community=community,
+            )
 
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_pnm_ready_status=True,).run_precheck()
+                cable_modem=cm,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
@@ -116,7 +132,8 @@ class SpectrumAnalyzerRouter:
             service = CmSpectrumAnalysisService(
                 cable_modem=cm,
                 tftp_servers=tftp_servers,
-                capture_parameters=request.capture_parameters,)
+                capture_parameters=request.capture_parameters,
+            )
 
             msg_rsp: MessageResponse = await service.set_and_go()
 
@@ -128,17 +145,24 @@ class SpectrumAnalyzerRouter:
             channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
             measurement_stats: list[DocsIf3CmSpectrumAnalysisEntry] = cast(
                 list[DocsIf3CmSpectrumAnalysisEntry],
-                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),)
+                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),
+            )
 
             cps = CommonProcessService(msg_rsp)
             msg_rsp = cps.process()
 
-            analysis = Analysis(AnalysisType.BASIC, msg_rsp, skip_automatic_process=True)
-            analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
+            analysis = Analysis(
+                AnalysisType.BASIC, msg_rsp, skip_automatic_process=True
+            )
+            analysis.process(
+                cast(AnalysisProcessParameters, request.analysis.spectrum_analysis)
+            )
 
             if request.analysis.output.type == OutputType.JSON:
                 payload: dict[str, Any] = cast(dict[str, Any], analysis.get_results())
-                DictGenerate.pop_keys_recursive(payload, ["pnm_header", "mac_address", "channel_id"])
+                DictGenerate.pop_keys_recursive(
+                    payload, ["pnm_header", "mac_address", "channel_id"]
+                )
 
                 primative = msg_rsp.payload_to_dict("primative")
                 DictGenerate.pop_keys_recursive(
@@ -178,7 +202,9 @@ class SpectrumAnalyzerRouter:
             response_model=None,
             responses=FAST_API_RESPONSE,
         )
-        async def get_ofdm_ds_channels_analysis(request: OfdmSpecAnaAnalysisRequest) -> OfdmSpecAnaAnalysisResponse | FileResponse:
+        async def get_ofdm_ds_channels_analysis(
+            request: OfdmSpecAnaAnalysisRequest,
+        ) -> OfdmSpecAnaAnalysisResponse | FileResponse:
             """
             Perform OFDM Downstream Spectrum Capture Across All DS OFDM Channels.
 
@@ -196,31 +222,49 @@ class SpectrumAnalyzerRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
 
-            cm = CableModem(mac_address=MacAddress(mac),
-                            inet=Inet(ip),
-                            write_community=community)
+            cm = CableModem(
+                mac_address=MacAddress(mac), inet=Inet(ip), write_community=community
+            )
             multi_analysis = MultiAnalysis()
 
-            self.logger.info("DOCSIS 3.1 OFDM Downstream Spectrum Capture for MAC %s, IP %s", mac, ip,)
+            self.logger.info(
+                "DOCSIS 3.1 OFDM Downstream Spectrum Capture for MAC %s, IP %s",
+                mac,
+                ip,
+            )
 
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_ofdm_exist=True, validate_pnm_ready_status=True,).run_precheck()
+                cable_modem=cm,
+                validate_ofdm_exist=True,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return OfdmSpecAnaAnalysisResponse(
-                    mac_address=mac, status=status, message=msg, data={},)
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    data={},
+                )
 
             service = DsOfdmChannelSpectrumAnalyzer(
-                cable_modem             =   cm,
-                tftp_servers            =   tftp_servers,
-                number_of_averages      =   request.capture_parameters.number_of_averages,
-                spectrum_retrieval_type =   request.capture_parameters.spectrum_retrieval_type)
+                cable_modem=cm,
+                tftp_servers=tftp_servers,
+                number_of_averages=request.capture_parameters.number_of_averages,
+                spectrum_retrieval_type=request.capture_parameters.spectrum_retrieval_type,
+            )
 
-            msg_responses: list[tuple[ChannelId, MessageResponse]] = await service.start()
+            msg_responses: list[
+                tuple[ChannelId, MessageResponse]
+            ] = await service.start()
 
             measurement_stats: list[DocsIf3CmSpectrumAnalysisEntry] = cast(
                 list[DocsIf3CmSpectrumAnalysisEntry],
@@ -232,8 +276,14 @@ class SpectrumAnalyzerRouter:
             for idx, (chan_id, msg_rsp) in enumerate(msg_responses):
                 cps_msg_rsp = CommonProcessService(msg_rsp).process()
 
-                analysis = Analysis(AnalysisType.BASIC, cps_msg_rsp, skip_automatic_process=True,)
-                analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
+                analysis = Analysis(
+                    AnalysisType.BASIC,
+                    cps_msg_rsp,
+                    skip_automatic_process=True,
+                )
+                analysis.process(
+                    cast(AnalysisProcessParameters, request.analysis.spectrum_analysis)
+                )
                 multi_analysis.add(chan_id, analysis)
 
                 primative_entry = cps_msg_rsp.payload_to_dict(idx)
@@ -246,23 +296,28 @@ class SpectrumAnalyzerRouter:
                 analyzer_rpt_dict = analyzer_rpt.to_dict()
                 analyzer_rpt_dict.update(primative)
                 analyzer_rpt_dict.update(
-                    DictGenerate.models_to_nested_dict(measurement_stats, "measurement_stats",))
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
 
                 return OfdmSpecAnaAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    data        =   analyzer_rpt_dict,
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=analyzer_rpt_dict,
                 )
 
             if request.analysis.output.type == OutputType.ARCHIVE:
                 return PnmFileService().get_file(
-                    FileType.ARCHIVE, analyzer_rpt.get_archive(),
+                    FileType.ARCHIVE,
+                    analyzer_rpt.get_archive(),
                 )
 
             return OfdmSpecAnaAnalysisResponse(
-                mac_address =   mac,
-                status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                message     =   f"Unsupported output type: {request.analysis.output.type}",
+                mac_address=mac,
+                status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                message=f"Unsupported output type: {request.analysis.output.type}",
                 data={},
             )
 
@@ -272,7 +327,9 @@ class SpectrumAnalyzerRouter:
             response_model=None,
             responses=FAST_API_RESPONSE,
         )
-        async def get_scqam_ds_channels_analysis(request: ScQamSpecAnaAnalysisRequest) -> ScQamSpecAnaAnalysisResponse | FileResponse:
+        async def get_scqam_ds_channels_analysis(
+            request: ScQamSpecAnaAnalysisRequest,
+        ) -> ScQamSpecAnaAnalysisResponse | FileResponse:
             """
             Perform SC-QAM Downstream Spectrum Capture Across All DS SC-QAM Channels.
 
@@ -290,34 +347,51 @@ class SpectrumAnalyzerRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
 
-            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+            cm = CableModem(
+                mac_address=MacAddress(mac), inet=Inet(ip), write_community=community
+            )
             multi_analysis = MultiAnalysis()
 
-            self.logger.info("DOCSIS 3.0 SC-QAM downstream spectrum capture for MAC %s, IP %s", mac, ip)
+            self.logger.info(
+                "DOCSIS 3.0 SC-QAM downstream spectrum capture for MAC %s, IP %s",
+                mac,
+                ip,
+            )
 
             status, msg = await CableModemServicePreCheck(
                 cable_modem=cm,
-                validate_scqam_exist=True, validate_pnm_ready_status=True,).run_precheck()
+                validate_scqam_exist=True,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return ScQamSpecAnaAnalysisResponse(
                     mac_address=mac,
-                    status=status, message=msg, data={}, )
+                    status=status,
+                    message=msg,
+                    data={},
+                )
 
             number_of_averages: int = request.capture_parameters.number_of_averages
             spectrum_retrieval_type = request.capture_parameters.spectrum_retrieval_type
             service = DsScQamChannelSpectrumAnalyzer(
-                cable_modem             =   cm,
-                tftp_servers            =   tftp_servers,
-                number_of_averages      =   number_of_averages,
-                spectrum_retrieval_type =   spectrum_retrieval_type,
+                cable_modem=cm,
+                tftp_servers=tftp_servers,
+                number_of_averages=number_of_averages,
+                spectrum_retrieval_type=spectrum_retrieval_type,
             )
 
-            msg_responses: list[tuple[ChannelId, MessageResponse]] = await service.start()
+            msg_responses: list[
+                tuple[ChannelId, MessageResponse]
+            ] = await service.start()
 
             measurement_stats: list[DocsIf3CmSpectrumAnalysisEntry] = cast(
                 list[DocsIf3CmSpectrumAnalysisEntry],
@@ -329,8 +403,14 @@ class SpectrumAnalyzerRouter:
             for idx, (chan_id, msg_rsp) in enumerate(msg_responses):
                 cps_msg_rsp = CommonProcessService(msg_rsp).process()
 
-                analysis = Analysis(AnalysisType.BASIC, cps_msg_rsp, skip_automatic_process=True,)
-                analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
+                analysis = Analysis(
+                    AnalysisType.BASIC,
+                    cps_msg_rsp,
+                    skip_automatic_process=True,
+                )
+                analysis.process(
+                    cast(AnalysisProcessParameters, request.analysis.spectrum_analysis)
+                )
                 multi_analysis.add(chan_id, analysis)
 
                 primative_entry = cps_msg_rsp.payload_to_dict(idx)
@@ -343,16 +423,23 @@ class SpectrumAnalyzerRouter:
                 analyzer_rpt_dict = analyzer_rpt.to_dict()
                 analyzer_rpt_dict.update(primative)
                 analyzer_rpt_dict.update(
-                    DictGenerate.models_to_nested_dict(measurement_stats, "measurement_stats",))
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
 
                 return ScQamSpecAnaAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    data        =   analyzer_rpt_dict,
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=analyzer_rpt_dict,
                 )
 
             if request.analysis.output.type == OutputType.ARCHIVE:
-                return PnmFileService().get_file(FileType.ARCHIVE, analyzer_rpt.get_archive(),)
+                return PnmFileService().get_file(
+                    FileType.ARCHIVE,
+                    analyzer_rpt.get_archive(),
+                )
 
             return ScQamSpecAnaAnalysisResponse(
                 mac_address=mac,

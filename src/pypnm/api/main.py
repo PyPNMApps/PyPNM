@@ -60,6 +60,7 @@ def health() -> dict[str, str]:
     """Lightweight health endpoint for probes."""
     return {"status": "ok", "version": __version__}
 
+
 app.add_middleware(GZipMiddleware, minimum_size=100_000)
 app.add_middleware(
     CORSMiddleware,

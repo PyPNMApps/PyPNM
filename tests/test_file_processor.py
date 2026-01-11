@@ -65,10 +65,12 @@ def test_to_hex_and_to_binary_roundtrip(tmp_path: Path) -> None:
     assert fp.to_binary("zzz") == b""
 
 
-def test_print_hex_captures_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_print_hex_captures_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     p = tmp_path / "h.bin"
     fp = FileProcessor(p)
-    fp.write_file(b"\xAA\xBB\xCC\xDD")
+    fp.write_file(b"\xaa\xbb\xcc\xdd")
     fp.print_hex(limit=4)
     out = capsys.readouterr().out
     assert "Hex Preview:" in out
@@ -106,14 +108,24 @@ def test_write_csv_with_list_rows_and_headers_and_append(tmp_path: Path) -> None
     assert text[-1] == "5,6"  # appended row
 
 
-@pytest.mark.parametrize("fmt,ext", [("tar", ".tar"), ("gztar", ".tar.gz"), ("bztar", ".tar.bz2"), ("xztar", ".tar.xz")])
+@pytest.mark.parametrize(
+    "fmt,ext",
+    [
+        ("tar", ".tar"),
+        ("gztar", ".tar.gz"),
+        ("bztar", ".tar.bz2"),
+        ("xztar", ".tar.xz"),
+    ],
+)
 def test_archive_file_tar_formats(tmp_path: Path, fmt: str, ext: str) -> None:
     src = tmp_path / "payload.txt"
     src.write_text("hello", encoding="utf-8")
     arc = tmp_path / f"bundle{ext}"
 
     fp = FileProcessor(src)
-    out = fp.archive_file(archive_path=arc, archive_format=fmt, arcname="inside.txt", overwrite=True)
+    out = fp.archive_file(
+        archive_path=arc, archive_format=fmt, arcname="inside.txt", overwrite=True
+    )
     assert out == arc and arc.exists() is True
 
     # Inspect tar-like with tarfile open auto-detect
@@ -136,7 +148,9 @@ def test_archive_file_zip_append(tmp_path: Path) -> None:
     assert out1 == arc and arc.exists()
 
     fp2 = FileProcessor(src2)
-    out2 = fp2.archive_file(archive_path=arc, archive_format="zip", arcname="second.txt")
+    out2 = fp2.archive_file(
+        archive_path=arc, archive_format="zip", arcname="second.txt"
+    )
     assert out2 == arc
 
     with zipfile.ZipFile(arc, "r") as zf:
@@ -167,7 +181,12 @@ def test_write_file_archives_with_custom_arcname(tmp_path: Path) -> None:
     p = tmp_path / "note.txt"
     z = tmp_path / "pkg.zip"
     fp = FileProcessor(p)
-    assert fp.write_file("data", archive_path=z, archive_format="zip", arcname="renamed.txt") is True
+    assert (
+        fp.write_file(
+            "data", archive_path=z, archive_format="zip", arcname="renamed.txt"
+        )
+        is True
+    )
 
     with zipfile.ZipFile(z, "r") as zf:
         assert "renamed.txt" in zf.namelist()

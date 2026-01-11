@@ -56,13 +56,17 @@ class _FakeOfdmModem:
     def get_inet_address(self) -> str:
         return self._inet
 
-    async def getDocsIf31CmDsOfdmChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmDsOfdmChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return [
             (InterfaceIndex(10), ChannelId(193)),
             (InterfaceIndex(11), ChannelId(194)),
         ]
 
-    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return []
 
     async def getDocsPnmCmDsOfdmModProfEntry(self) -> list[DocsPnmCmDsOfdmModProfEntry]:
@@ -85,13 +89,17 @@ class _FakeFecModem:
     def get_inet_address(self) -> str:
         return self._inet
 
-    async def getDocsIf31CmDsOfdmChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmDsOfdmChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return [
             (InterfaceIndex(20), ChannelId(193)),
             (InterfaceIndex(21), ChannelId(194)),
         ]
 
-    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
+    async def getDocsIf31CmUsOfdmaChannelIdIndexStack(
+        self,
+    ) -> list[tuple[InterfaceIndex, ChannelId]]:
         return []
 
     async def getDocsPnmCmDsOfdmFecEntry(self) -> list[DocsPnmCmDsOfdmFecEntry]:

@@ -27,7 +27,7 @@ class HostEndpoint:
         - host: Hostname or IP address that will be used for DNS lookup and ping.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.host   = host
+        self.host = host
 
     def ping(self, timeout: int = 1, count: int = 1) -> bool:
         """
@@ -43,9 +43,9 @@ class HostEndpoint:
         - True if the host is reachable, False otherwise.
         """
         return Ping.is_reachable(
-            host    = self.host,
-            timeout = timeout,
-            count   = count,
+            host=self.host,
+            timeout=timeout,
+            count=count,
         )
 
     def resolve(self) -> list[InetAddressStr]:

@@ -35,9 +35,9 @@ class PreEqCoAdjStatus(Enum):
         CM-SP-CM-OSSI, CmUsPreEq::PreEqCoAdjStatus
     """
 
-    OTHER    = 1  # Any state not described below
-    SUCCESS  = 2  # Adjustments fully applied
-    CLIPPED  = 3  # Partially applied due to excessive ripple/tilt
+    OTHER = 1  # Any state not described below
+    SUCCESS = 2  # Adjustments fully applied
+    CLIPPED = 3  # Partially applied due to excessive ripple/tilt
     REJECTED = 4  # Rejected / not applied
 
     def __str__(self) -> str:
@@ -58,6 +58,7 @@ class DocsPnmCmUsPreEqFields(BaseModel):
     docsPnmCmUsPreEqAmpMean: float
     docsPnmCmUsPreEqGrpDelaySlope: float
     docsPnmCmUsPreEqGrpDelayMean: float
+
 
 class DocsPnmCmUsPreEqEntry(BaseModel):
     index: int
@@ -128,7 +129,10 @@ class DocsPnmCmUsPreEqEntry(BaseModel):
     @classmethod
     async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsPnmCmUsPreEqEntry:
         logger = logging.getLogger(cls.__name__)
-        async def fetch(oid: str, cast_fn: Callable[[object], T] | None = None) -> T | object | None:
+
+        async def fetch(
+            oid: str, cast_fn: Callable[[object], T] | None = None
+        ) -> T | object | None:
             try:
                 result = await snmp.get(f"{oid}.{index}")
                 value = Snmp_v2c.get_result_value(result)
@@ -140,26 +144,54 @@ class DocsPnmCmUsPreEqEntry(BaseModel):
                 return None
 
         fields = DocsPnmCmUsPreEqFields(
-            docsPnmCmUsPreEqFileEnable           = await fetch("docsPnmCmUsPreEqFileEnable", Snmp_v2c.truth_value),
-            docsPnmCmUsPreEqAmpRipplePkToPk      = await fetch("docsPnmCmUsPreEqAmpRipplePkToPk", cls.thousandth_db),
-            docsPnmCmUsPreEqAmpRippleRms         = await fetch("docsPnmCmUsPreEqAmpRippleRms", cls.thousandth_db),
-            docsPnmCmUsPreEqAmpSlope             = await fetch("docsPnmCmUsPreEqAmpSlope", cls.thousandth_db_per_mhz),
-            docsPnmCmUsPreEqGrpDelayRipplePkToPk = await fetch("docsPnmCmUsPreEqGrpDelayRipplePkToPk", cls.thousandth_ns),
-            docsPnmCmUsPreEqGrpDelayRippleRms    = await fetch("docsPnmCmUsPreEqGrpDelayRippleRms", cls.thousandth_ns),
-            docsPnmCmUsPreEqPreEqCoAdjStatus     = await fetch("docsPnmCmUsPreEqPreEqCoAdjStatus", cls.to_pre_eq_status_str),
-            docsPnmCmUsPreEqMeasStatus           = await fetch("docsPnmCmUsPreEqMeasStatus", measurement_status),
-            docsPnmCmUsPreEqLastUpdateFileName   = await fetch("docsPnmCmUsPreEqLastUpdateFileName", str),
-            docsPnmCmUsPreEqFileName             = await fetch("docsPnmCmUsPreEqFileName", str),
-            docsPnmCmUsPreEqAmpMean              = await fetch("docsPnmCmUsPreEqAmpMean", cls.thousandth_db),
-            docsPnmCmUsPreEqGrpDelaySlope        = await fetch("docsPnmCmUsPreEqGrpDelaySlope", cls.thousandth_ns_per_mhz),
-            docsPnmCmUsPreEqGrpDelayMean         = await fetch("docsPnmCmUsPreEqGrpDelayMean", cls.thousandth_ns),
+            docsPnmCmUsPreEqFileEnable=await fetch(
+                "docsPnmCmUsPreEqFileEnable", Snmp_v2c.truth_value
+            ),
+            docsPnmCmUsPreEqAmpRipplePkToPk=await fetch(
+                "docsPnmCmUsPreEqAmpRipplePkToPk", cls.thousandth_db
+            ),
+            docsPnmCmUsPreEqAmpRippleRms=await fetch(
+                "docsPnmCmUsPreEqAmpRippleRms", cls.thousandth_db
+            ),
+            docsPnmCmUsPreEqAmpSlope=await fetch(
+                "docsPnmCmUsPreEqAmpSlope", cls.thousandth_db_per_mhz
+            ),
+            docsPnmCmUsPreEqGrpDelayRipplePkToPk=await fetch(
+                "docsPnmCmUsPreEqGrpDelayRipplePkToPk", cls.thousandth_ns
+            ),
+            docsPnmCmUsPreEqGrpDelayRippleRms=await fetch(
+                "docsPnmCmUsPreEqGrpDelayRippleRms", cls.thousandth_ns
+            ),
+            docsPnmCmUsPreEqPreEqCoAdjStatus=await fetch(
+                "docsPnmCmUsPreEqPreEqCoAdjStatus", cls.to_pre_eq_status_str
+            ),
+            docsPnmCmUsPreEqMeasStatus=await fetch(
+                "docsPnmCmUsPreEqMeasStatus", measurement_status
+            ),
+            docsPnmCmUsPreEqLastUpdateFileName=await fetch(
+                "docsPnmCmUsPreEqLastUpdateFileName", str
+            ),
+            docsPnmCmUsPreEqFileName=await fetch("docsPnmCmUsPreEqFileName", str),
+            docsPnmCmUsPreEqAmpMean=await fetch(
+                "docsPnmCmUsPreEqAmpMean", cls.thousandth_db
+            ),
+            docsPnmCmUsPreEqGrpDelaySlope=await fetch(
+                "docsPnmCmUsPreEqGrpDelaySlope", cls.thousandth_ns_per_mhz
+            ),
+            docsPnmCmUsPreEqGrpDelayMean=await fetch(
+                "docsPnmCmUsPreEqGrpDelayMean", cls.thousandth_ns
+            ),
         )
 
-        channel_id = await fetch("docsIf31CmUsOfdmaChanChannelId", ChannelId) or ChannelId(index)
+        channel_id = await fetch(
+            "docsIf31CmUsOfdmaChanChannelId", ChannelId
+        ) or ChannelId(index)
         return cls(index=index, channel_id=channel_id, entry=fields)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsPnmCmUsPreEqEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsPnmCmUsPreEqEntry]:
         logger = logging.getLogger(cls.__name__)
         results: list[DocsPnmCmUsPreEqEntry] = []
 
@@ -167,7 +199,9 @@ class DocsPnmCmUsPreEqEntry(BaseModel):
             try:
                 return await cls.from_snmp(idx, snmp)
             except Exception as e:
-                logger.warning("Failed to fetch US PreEq entry for index %s: %s", idx, e)
+                logger.warning(
+                    "Failed to fetch US PreEq entry for index %s: %s", idx, e
+                )
                 return None
 
         for idx in indices:

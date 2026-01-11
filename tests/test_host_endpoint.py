@@ -25,7 +25,7 @@ def test_ping_delegates_to_ping_is_reachable(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(Ping, "is_reachable", fake_is_reachable)
 
     endpoint = HostEndpoint(HostNameStr("example.com"))
-    result = endpoint.ping(timeout = 2, count = 3)
+    result = endpoint.ping(timeout=2, count=3)
 
     assert result is True
     assert called["host"] == "example.com"
@@ -33,7 +33,9 @@ def test_ping_delegates_to_ping_is_reachable(monkeypatch: pytest.MonkeyPatch) ->
     assert called["count"] == 3
 
 
-def test_resolve_returns_unique_addresses_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_returns_unique_addresses_on_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_getaddrinfo(host: str, _service: object) -> list[tuple[object, ...]]:
         assert host == "example.com"
         return [
@@ -44,7 +46,7 @@ def test_resolve_returns_unique_addresses_on_success(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
 
-    endpoint  = HostEndpoint(HostNameStr("example.com"))
+    endpoint = HostEndpoint(HostNameStr("example.com"))
     addresses = endpoint.resolve()
 
     assert "192.0.2.1" in addresses
@@ -56,7 +58,9 @@ def test_resolve_logs_error_and_returns_empty_on_dns_failure(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def fake_getaddrinfo(host: str, _service: int | str | None) -> list[tuple[object, ...]]:
+    def fake_getaddrinfo(
+        host: str, _service: int | str | None
+    ) -> list[tuple[object, ...]]:
         raise OSError("temporary failure in name resolution")
 
     monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
@@ -64,7 +68,7 @@ def test_resolve_logs_error_and_returns_empty_on_dns_failure(
     endpoint = HostEndpoint(HostNameStr("bad-hostname.invalid"))
 
     logger_name = "HostEndpoint"
-    with caplog.at_level(logging.ERROR, logger = logger_name):
+    with caplog.at_level(logging.ERROR, logger=logger_name):
         addresses = endpoint.resolve()
 
     assert addresses == []
@@ -80,7 +84,7 @@ def test_resolve_google_dns_smoke() -> None:
     or sandboxed environment), the test is skipped instead of treated as a
     hard failure.
     """
-    endpoint  = HostEndpoint(HostNameStr("www.google.com"))
+    endpoint = HostEndpoint(HostNameStr("www.google.com"))
     addresses = endpoint.resolve()
 
     if not addresses:
@@ -100,4 +104,4 @@ def test_ping_localhost_reachable() -> None:
     correctly in the current environment.
     """
     endpoint = HostEndpoint(HostNameStr("localhost"))
-    assert endpoint.ping(timeout = 1, count = 1) is True
+    assert endpoint.ping(timeout=1, count=1) is True

@@ -35,11 +35,11 @@ class SSHConnector:
     - Plaintext password is not stored on the instance.
     """
 
-    DEFAULT_CONNECT_TIMEOUT_SEC: int     = 10
-    DEFAULT_RSA_KEY_BITS: int            = 2048
-    DEFAULT_SSH_PORT: int                = 22
+    DEFAULT_CONNECT_TIMEOUT_SEC: int = 10
+    DEFAULT_RSA_KEY_BITS: int = 2048
+    DEFAULT_SSH_PORT: int = 22
 
-    ENCRYPTED_TOKEN_PREFIX: str          = "ENC["
+    ENCRYPTED_TOKEN_PREFIX: str = "ENC["
 
     def __init__(
         self,
@@ -63,9 +63,9 @@ class SSHConnector:
 
         self.hostname = hostname
         self.username = username
-        self.port     = int(port)
+        self.port = int(port)
 
-        self.ssh_client: paramiko.SSHClient | None   = None
+        self.ssh_client: paramiko.SSHClient | None = None
         self.sftp_client: paramiko.SFTPClient | None = None
 
     def connect(
@@ -93,7 +93,7 @@ class SSHConnector:
             True on success, False on failure.
         """
         password_token = password_enc.strip()
-        key_path       = private_key_path.strip()
+        key_path = private_key_path.strip()
 
         auth_modes: list[str] = []
         if key_path != "":
@@ -113,7 +113,9 @@ class SSHConnector:
         if password_token != "":
             if password_token.startswith(self.ENCRYPTED_TOKEN_PREFIX):
                 try:
-                    password_clear = SecretCryptoManager.decrypt_password(password_token)
+                    password_clear = SecretCryptoManager.decrypt_password(
+                        password_token
+                    )
                 except SecretCryptoError as exc:
                     self.logger.error("Failed to decrypt password token: %s", exc)
                     return False
@@ -125,14 +127,16 @@ class SSHConnector:
 
             client = paramiko.SSHClient()
             client.load_system_host_keys()
-            policy = paramiko.AutoAddPolicy() if auto_add_policy else paramiko.RejectPolicy()
+            policy = (
+                paramiko.AutoAddPolicy() if auto_add_policy else paramiko.RejectPolicy()
+            )
             client.set_missing_host_key_policy(policy)
 
             connect_kwargs: dict[str, object] = {
                 "hostname": self.hostname,
-                "port":     self.port,
+                "port": self.port,
                 "username": self.username,
-                "timeout":  float(self.DEFAULT_CONNECT_TIMEOUT_SEC),
+                "timeout": float(self.DEFAULT_CONNECT_TIMEOUT_SEC),
             }
 
             if use_key:
@@ -151,11 +155,13 @@ class SSHConnector:
                         client.close()
                     return False
 
-                self.ssh_client  = client
+                self.ssh_client = client
                 self.sftp_client = paramiko.SFTPClient.from_transport(transport)
 
                 self.logger.info("SSH auth succeeded: %s", label)
-                self.logger.debug("Connected to %s:%d via SFTP", self.hostname, self.port)
+                self.logger.debug(
+                    "Connected to %s:%d via SFTP", self.hostname, self.port
+                )
                 return True
 
             except Exception as exc:
@@ -171,7 +177,9 @@ class SSHConnector:
 
                 self.disconnect()
                 return _attempt(
-                    label="password_enc" if password_token.startswith(self.ENCRYPTED_TOKEN_PREFIX) else "password(clear-legacy)",
+                    label="password_enc"
+                    if password_token.startswith(self.ENCRYPTED_TOKEN_PREFIX)
+                    else "password(clear-legacy)",
                     use_key=False,
                     use_password=True,
                 )
@@ -181,12 +189,16 @@ class SSHConnector:
 
             if password_clear != "":
                 return _attempt(
-                    label="password_enc" if password_token.startswith(self.ENCRYPTED_TOKEN_PREFIX) else "password(clear-legacy)",
+                    label="password_enc"
+                    if password_token.startswith(self.ENCRYPTED_TOKEN_PREFIX)
+                    else "password(clear-legacy)",
                     use_key=False,
                     use_password=True,
                 )
 
-            self.logger.error("No SSH authentication configured (missing key and password_enc).")
+            self.logger.error(
+                "No SSH authentication configured (missing key and password_enc)."
+            )
             return False
 
         finally:
@@ -297,9 +309,9 @@ class SSHConnector:
 
         try:
             _stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            code    = stdout.channel.recv_exit_status()
-            out     = stdout.read().decode(errors="replace")
-            err     = stderr.read().decode(errors="replace")
+            code = stdout.channel.recv_exit_status()
+            out = stdout.read().decode(errors="replace")
+            err = stderr.read().decode(errors="replace")
             return out, err, int(code)
         except Exception as exc:
             self.logger.error("Command failed: %s", exc)
@@ -329,7 +341,9 @@ class SSHConnector:
             return []
 
     @staticmethod
-    def generate_ssh_key_pair(key_path: PathLike = "~/.ssh/id_rsa", key_size: int = DEFAULT_RSA_KEY_BITS) -> SshOk:
+    def generate_ssh_key_pair(
+        key_path: PathLike = "~/.ssh/id_rsa", key_size: int = DEFAULT_RSA_KEY_BITS
+    ) -> SshOk:
         """
         Generate An RSA Key Pair Locally.
 
@@ -358,8 +372,8 @@ class SSHConnector:
             key.write_private_key_file(path)
 
             pub_path = f"{path}.pub"
-            user     = os.getenv("USER", "user")
-            host     = os.uname().nodename
+            user = os.getenv("USER", "user")
+            host = os.uname().nodename
 
             with open(pub_path, "w", encoding="utf-8") as handle:
                 handle.write(f"ssh-rsa {key.get_base64()} {user}@{host}\n")
@@ -425,7 +439,7 @@ class SSHConnector:
             return
 
         parts = cleaned.strip("/").split("/")
-        path  = ""
+        path = ""
 
         for part in parts:
             if part == "":

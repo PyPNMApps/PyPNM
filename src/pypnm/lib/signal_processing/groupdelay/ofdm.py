@@ -18,14 +18,17 @@ from pypnm.lib.types import (
 
 
 class SignConvention(Enum):
-    PLUS  = 1  # τ = +(1/2π)·dφ/df  (house convention → non-negative for linear-phase delay)
-    MINUS = -1 # τ = −(1/2π)·dφ/df  (textbook for e^{-j2π f τ})
+    PLUS = (
+        1  # τ = +(1/2π)·dφ/df  (house convention → non-negative for linear-phase delay)
+    )
+    MINUS = -1  # τ = −(1/2π)·dφ/df  (textbook for e^{-j2π f τ})
 
 
 class SpacedFrequencyAxisHz(BaseModel):
     """Evenly spaced OFDM frequency axis in Hz: f[k] = f0_hz + k·df_hz."""
+
     f0_hz: FrequencyHz = Field(..., description="Absolute frequency of bin 0 (Hz).")
-    df_hz: float       = Field(..., description="Strictly positive subcarrier spacing (Hz).")
+    df_hz: float = Field(..., description="Strictly positive subcarrier spacing (Hz).")
 
     @field_validator("df_hz")
     @classmethod
@@ -37,9 +40,16 @@ class SpacedFrequencyAxisHz(BaseModel):
 
 class GroupDelayOptions(BaseModel):
     """Options controlling group-delay calculation and post-processing."""
-    sign: SignConvention      = Field(default=SignConvention.PLUS, description="PLUS or MINUS convention.")
-    smooth_win: int | None = Field(default=None, description="Centered moving-average window (odd, ≥3).")
-    enforce_nonnegative: bool = Field(default=False, description="Clamp negative τ(s) to 0.0 if True.")
+
+    sign: SignConvention = Field(
+        default=SignConvention.PLUS, description="PLUS or MINUS convention."
+    )
+    smooth_win: int | None = Field(
+        default=None, description="Centered moving-average window (odd, ≥3)."
+    )
+    enforce_nonnegative: bool = Field(
+        default=False, description="Clamp negative τ(s) to 0.0 if True."
+    )
 
     @field_validator("smooth_win")
     @classmethod
@@ -53,20 +63,34 @@ class GroupDelayOptions(BaseModel):
 
 class GroupDelayCompact(BaseModel):
     """Compact return payload: frequency axis (Hz) and group delay (s)."""
-    freq_hz: FrequencySeriesHz = Field(..., description="Frequency axis (Hz), integer-valued.")
-    tau_s: FloatSeries         = Field(..., description="Group delay per bin (seconds).")
+
+    freq_hz: FrequencySeriesHz = Field(
+        ..., description="Frequency axis (Hz), integer-valued."
+    )
+    tau_s: FloatSeries = Field(..., description="Group delay per bin (seconds).")
 
 
 class GroupDelayFull(BaseModel):
     """Full return payload including intermediate series and summary metric."""
-    freq_hz: FrequencySeriesHz   = Field(..., description="Frequency axis (Hz), integer-valued.")
-    wrapped_phase: FloatSeries   = Field(..., description="Wrapped phase φ[k] in radians.")
-    unwrapped_phase: FloatSeries = Field(..., description="Unwrapped phase φ[k] in radians.")
-    dphi_df: FloatSeries         = Field(..., description="Phase slope dφ/df (rad/Hz).")
-    tau_s: FloatSeries           = Field(..., description="Group delay τ[k] (seconds).")
-    tau_us: FloatSeries          = Field(..., description="Group delay τ[k] (microseconds).")
-    valid_mask: IntSeries        = Field(..., description="1 where τ is finite and bin is active; else 0.")
-    mean_group_delay_us: float   = Field(default=math.nan, description="Mean τ over valid bins (microseconds).")
+
+    freq_hz: FrequencySeriesHz = Field(
+        ..., description="Frequency axis (Hz), integer-valued."
+    )
+    wrapped_phase: FloatSeries = Field(
+        ..., description="Wrapped phase φ[k] in radians."
+    )
+    unwrapped_phase: FloatSeries = Field(
+        ..., description="Unwrapped phase φ[k] in radians."
+    )
+    dphi_df: FloatSeries = Field(..., description="Phase slope dφ/df (rad/Hz).")
+    tau_s: FloatSeries = Field(..., description="Group delay τ[k] (seconds).")
+    tau_us: FloatSeries = Field(..., description="Group delay τ[k] (microseconds).")
+    valid_mask: IntSeries = Field(
+        ..., description="1 where τ is finite and bin is active; else 0."
+    )
+    mean_group_delay_us: float = Field(
+        default=math.nan, description="Mean τ over valid bins (microseconds)."
+    )
 
 
 class OFDMGroupDelay(BaseModel):
@@ -86,21 +110,29 @@ class OFDMGroupDelay(BaseModel):
     8) Produce validity mask and mean τ(µs).
     """
 
-    H: ComplexSeries                 = Field(..., description="Channel estimate H[k] as Python complex list.")
-    axis: SpacedFrequencyAxisHz      = Field(..., description="Frequency origin and uniform spacing (Hz).")
-    options: GroupDelayOptions       = Field(default_factory=GroupDelayOptions, description="Computation options.")
-    active_mask: IntSeries | None = Field(default=None, description="1=active bin, 0=inactive; defaults to all 1s.")
+    H: ComplexSeries = Field(
+        ..., description="Channel estimate H[k] as Python complex list."
+    )
+    axis: SpacedFrequencyAxisHz = Field(
+        ..., description="Frequency origin and uniform spacing (Hz)."
+    )
+    options: GroupDelayOptions = Field(
+        default_factory=GroupDelayOptions, description="Computation options."
+    )
+    active_mask: IntSeries | None = Field(
+        default=None, description="1=active bin, 0=inactive; defaults to all 1s."
+    )
 
     # Private caches (Pydantic v2: use PrivateAttr for underscore names)
-    _freq_hz: FrequencySeriesHz   = PrivateAttr(default_factory=list)
-    _work_mask: IntSeries         = PrivateAttr(default_factory=list)
-    _wrapped_phase: FloatSeries   = PrivateAttr(default_factory=list)
+    _freq_hz: FrequencySeriesHz = PrivateAttr(default_factory=list)
+    _work_mask: IntSeries = PrivateAttr(default_factory=list)
+    _wrapped_phase: FloatSeries = PrivateAttr(default_factory=list)
     _unwrapped_phase: FloatSeries = PrivateAttr(default_factory=list)
-    _dphi_df: FloatSeries         = PrivateAttr(default_factory=list)
-    _tau_s: FloatSeries           = PrivateAttr(default_factory=list)
-    _tau_us: FloatSeries          = PrivateAttr(default_factory=list)
-    _valid_mask: IntSeries        = PrivateAttr(default_factory=list)
-    _mean_us: float               = PrivateAttr(default=math.nan)
+    _dphi_df: FloatSeries = PrivateAttr(default_factory=list)
+    _tau_s: FloatSeries = PrivateAttr(default_factory=list)
+    _tau_us: FloatSeries = PrivateAttr(default_factory=list)
+    _valid_mask: IntSeries = PrivateAttr(default_factory=list)
+    _mean_us: float = PrivateAttr(default=math.nan)
 
     def model_post_init(self, _context: dict | None) -> None:
         """Run the computation pipeline after model creation."""
@@ -128,14 +160,14 @@ class OFDMGroupDelay(BaseModel):
             validity mask, and mean τ in µs.
         """
         return GroupDelayFull(
-            freq_hz             =   self._freq_hz,
-            wrapped_phase       =   self._wrapped_phase,
-            unwrapped_phase     =   self._unwrapped_phase,
-            dphi_df             =   self._dphi_df,
-            tau_s               =   self._tau_s,
-            tau_us              =   self._tau_us,
-            valid_mask          =   self._valid_mask,
-            mean_group_delay_us =   self._mean_us,
+            freq_hz=self._freq_hz,
+            wrapped_phase=self._wrapped_phase,
+            unwrapped_phase=self._unwrapped_phase,
+            dphi_df=self._dphi_df,
+            tau_s=self._tau_s,
+            tau_us=self._tau_us,
+            valid_mask=self._valid_mask,
+            mean_group_delay_us=self._mean_us,
         )
 
     # ── Internal helpers ──────────────────────────────────────────────────────
@@ -171,19 +203,21 @@ class OFDMGroupDelay(BaseModel):
         out: FloatSeries = [segment[0]]
         for k in range(1, len(segment)):
             prev = out[-1]
-            cur  = segment[k]
+            cur = segment[k]
             diff = cur - prev
             while diff <= -math.pi:
-                cur  += 2.0 * math.pi
-                diff  = cur - prev
+                cur += 2.0 * math.pi
+                diff = cur - prev
             while diff > math.pi:
-                cur  -= 2.0 * math.pi
-                diff  = cur - prev
+                cur -= 2.0 * math.pi
+                diff = cur - prev
             out.append(cur)
         return out
 
     @staticmethod
-    def _central_gradient(phase_unwrapped: FloatSeries, df_hz: float, mask: IntSeries) -> FloatSeries:
+    def _central_gradient(
+        phase_unwrapped: FloatSeries, df_hz: float, mask: IntSeries
+    ) -> FloatSeries:
         """
         Compute dφ/df (rad/Hz) using finite differences:
           • interior bins → central difference
@@ -211,7 +245,9 @@ class OFDMGroupDelay(BaseModel):
         return out
 
     @staticmethod
-    def _moving_average_masked(series_s: FloatSeries, mask: IntSeries, window: int) -> FloatSeries:
+    def _moving_average_masked(
+        series_s: FloatSeries, mask: IntSeries, window: int
+    ) -> FloatSeries:
         """
         Centered moving average of τ(s) over valid contributors only.
         Preserves NaN when the center is invalid or the window has no valid data.
@@ -269,7 +305,10 @@ class OFDMGroupDelay(BaseModel):
         self._freq_hz = [FrequencyHz(int(round(f0 + k * df_hz))) for k in range(n_bins)]
 
         # Valid where both the complex sample is finite and bin is active
-        finite_mask: IntSeries = [1 if (math.isfinite(h.real) and math.isfinite(h.imag)) else 0 for h in H_vals]
+        finite_mask: IntSeries = [
+            1 if (math.isfinite(h.real) and math.isfinite(h.imag)) else 0
+            for h in H_vals
+        ]
         if self.active_mask is None:
             active_mask: IntSeries = [1] * n_bins
         else:
@@ -277,7 +316,10 @@ class OFDMGroupDelay(BaseModel):
                 raise ValueError("active_mask length must match H length.")
             active_mask = [1 if bool(v) else 0 for v in self.active_mask]
 
-        self._work_mask = [1 if (finite_mask[i] == 1 and active_mask[i] == 1) else 0 for i in range(n_bins)]
+        self._work_mask = [
+            1 if (finite_mask[i] == 1 and active_mask[i] == 1) else 0
+            for i in range(n_bins)
+        ]
 
         # Wrapped phase; NaN for inactive/invalid bins maintains gaps
         self._wrapped_phase = [
@@ -286,29 +328,41 @@ class OFDMGroupDelay(BaseModel):
         ]
 
         # Unwrap only within contiguous active runs
-        self._unwrapped_phase = self._unwrap_on_mask(self._wrapped_phase, self._work_mask)
+        self._unwrapped_phase = self._unwrap_on_mask(
+            self._wrapped_phase, self._work_mask
+        )
 
         # Phase slope dφ/df (rad/Hz)
-        self._dphi_df = self._central_gradient(self._unwrapped_phase, df_hz, self._work_mask)
+        self._dphi_df = self._central_gradient(
+            self._unwrapped_phase, df_hz, self._work_mask
+        )
 
         # τ(s) = sign · (1 / 2π) · dφ/df
-        sign   = 1.0 if self.options.sign is SignConvention.PLUS else -1.0
+        sign = 1.0 if self.options.sign is SignConvention.PLUS else -1.0
         two_pi = 2.0 * math.pi
-        tau_s: FloatSeries = [(sign * v / two_pi) if math.isfinite(v) else float("nan") for v in self._dphi_df]
+        tau_s: FloatSeries = [
+            (sign * v / two_pi) if math.isfinite(v) else float("nan")
+            for v in self._dphi_df
+        ]
 
         # Optional smoothing
         if self.options.smooth_win is not None:
-            tau_s = self._moving_average_masked(tau_s, self._work_mask, self.options.smooth_win)
+            tau_s = self._moving_average_masked(
+                tau_s, self._work_mask, self.options.smooth_win
+            )
 
         # Optional clamp (domain preference: no negative “time”)
         if self.options.enforce_nonnegative:
             tau_s = [max(v, 0.0) if math.isfinite(v) else float("nan") for v in tau_s]
 
-        self._tau_s  = tau_s
+        self._tau_s = tau_s
         self._tau_us = [(v * 1e6) if math.isfinite(v) else float("nan") for v in tau_s]
 
         # Valid where both work_mask is 1 and τ(s) is finite
-        self._valid_mask = [1 if (self._work_mask[i] == 1 and math.isfinite(self._tau_s[i])) else 0 for i in range(n_bins)]
+        self._valid_mask = [
+            1 if (self._work_mask[i] == 1 and math.isfinite(self._tau_s[i])) else 0
+            for i in range(n_bins)
+        ]
 
         # Summary statistic
         self._mean_us = self._masked_mean_us(self._tau_us, self._valid_mask)

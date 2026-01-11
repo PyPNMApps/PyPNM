@@ -19,6 +19,7 @@ from pypnm.pnm.parser.fetch_pnm_process import PnmFileTypeObjectFetcher
 
 DATA_DIR = Path(__file__).parent / "files"
 
+
 @pytest.mark.pnm
 @pytest.mark.parametrize(
     "filename, expected_cls",
@@ -32,7 +33,9 @@ DATA_DIR = Path(__file__).parent / "files"
         ("spectrum_analyzer.bin", CmSpectrumAnalysis),
     ],
 )
-def test_factory_returns_correct_parser(filename: str, expected_cls: type[object]) -> None:
+def test_factory_returns_correct_parser(
+    filename: str, expected_cls: type[object]
+) -> None:
     blob = (DATA_DIR / filename).read_bytes()
     parser = PnmFileTypeObjectFetcher(blob).get_parser()
     assert isinstance(parser, expected_cls)

@@ -20,23 +20,39 @@ from pypnm.pnm.parser.CmDsOfdmModulationProfile import ProfileId
 
 
 class CodewordSummaryTotalsModel(BaseModel):
-    total_codewords: CodeWord    = Field(..., description="Total codewords observed")
-    corrected: CodeWord          = Field(..., description="FEC-corrected codewords")
-    uncorrectable: CodeWord      = Field(..., description="Uncorrectable codewords")
+    total_codewords: CodeWord = Field(..., description="Total codewords observed")
+    corrected: CodeWord = Field(..., description="FEC-corrected codewords")
+    uncorrectable: CodeWord = Field(..., description="Uncorrectable codewords")
+
 
 class ProfileSummaryTotalsModel(BaseModel):
-    profile_id: ProfileId                 = Field(..., description="Modulation profile identifier.")
-    summary:   CodewordSummaryTotalsModel = Field(..., description="Aggregated FEC codeword summary for the profile.")
+    profile_id: ProfileId = Field(..., description="Modulation profile identifier.")
+    summary: CodewordSummaryTotalsModel = Field(
+        ..., description="Aggregated FEC codeword summary for the profile."
+    )
+
 
 class FecSummaryTotalsModel(BaseModel):
-    start:       TimeStamp                       = Field(..., description="Start timestamp for the aggregated FEC interval.")
-    end:         TimeStamp                       = Field(..., description="End timestamp for the aggregated FEC interval.")
-    channel_id:  ChannelId                       = Field(..., description="OFDM downstream channel identifier.")
-    summary:     list[ProfileSummaryTotalsModel] = Field(..., description="List of profile-level FEC summaries within the interval.")
+    start: TimeStamp = Field(
+        ..., description="Start timestamp for the aggregated FEC interval."
+    )
+    end: TimeStamp = Field(
+        ..., description="End timestamp for the aggregated FEC interval."
+    )
+    channel_id: ChannelId = Field(
+        ..., description="OFDM downstream channel identifier."
+    )
+    summary: list[ProfileSummaryTotalsModel] = Field(
+        ..., description="List of profile-level FEC summaries within the interval."
+    )
+
 
 class TimeStampProfileCollectionModel(BaseModel):
-    timestamp:  TimeStamp                                   = Field(..., description="Capture timestamp (epoch seconds).")
-    profiles:   dict[ProfileId, ProfileSummaryTotalsModel]  = Field(..., description="Mapping of profile_id → FEC summary totals for that timestamp.")
+    timestamp: TimeStamp = Field(..., description="Capture timestamp (epoch seconds).")
+    profiles: dict[ProfileId, ProfileSummaryTotalsModel] = Field(
+        ...,
+        description="Mapping of profile_id → FEC summary totals for that timestamp.",
+    )
 
 
 TimeStampProfileCollection = dict[TimeStamp, TimeStampProfileCollectionModel]
@@ -58,7 +74,9 @@ class FecSummaryAggregator(MultiPnmCollection):
         """
         super().__init__(CmDsOfdmFecSummary)
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._store_channel_timestamps: dict[ChannelId, dict[TimeStamp, TimeStampProfileCollectionModel]] = {}
+        self._store_channel_timestamps: dict[
+            ChannelId, dict[TimeStamp, TimeStampProfileCollectionModel]
+        ] = {}
 
     @override
     def add(self, obj: MultiPnmCollectionObject) -> None:
@@ -71,7 +89,9 @@ class FecSummaryAggregator(MultiPnmCollection):
             Must be an instance of CmDsOfdmFecSummary.
         """
         if not isinstance(obj, CmDsOfdmFecSummary):
-            raise TypeError(f"FecSummaryAggregator only accepts CmDsOfdmFecSummary instances, got {type(obj)}")
+            raise TypeError(
+                f"FecSummaryAggregator only accepts CmDsOfdmFecSummary instances, got {type(obj)}"
+            )
         super().add(obj)
         self.__update_channel_temporal_db(obj)
 
@@ -113,7 +133,9 @@ class FecSummaryAggregator(MultiPnmCollection):
             s.update(bucket.profiles.keys())
         return sorted(s, key=int)
 
-    def get_timestamps(self, channel_id: ChannelId, profile_id: ProfileId) -> list[TimeStamp]:
+    def get_timestamps(
+        self, channel_id: ChannelId, profile_id: ProfileId
+    ) -> list[TimeStamp]:
         """Return sorted timestamps for which a profile has data in a channel.
 
         Parameters
@@ -138,7 +160,9 @@ class FecSummaryAggregator(MultiPnmCollection):
         out.sort()
         return out
 
-    def has_entry(self, channel_id: ChannelId, profile_id: ProfileId, timestamp: TimeStamp) -> bool:
+    def has_entry(
+        self, channel_id: ChannelId, profile_id: ProfileId, timestamp: TimeStamp
+    ) -> bool:
         """Test if a channel/profile has an entry at a specific timestamp.
 
         Parameters
@@ -163,7 +187,13 @@ class FecSummaryAggregator(MultiPnmCollection):
             return False
         return profile_id in bucket.profiles
 
-    def get_entry(self, channel_id: ChannelId, profile_id: ProfileId, timestamp: TimeStamp, closest_entry: int = 0) -> TimeStampProfileCollectionModel | None:
+    def get_entry(
+        self,
+        channel_id: ChannelId,
+        profile_id: ProfileId,
+        timestamp: TimeStamp,
+        closest_entry: int = 0,
+    ) -> TimeStampProfileCollectionModel | None:
         """Retrieve the TimeStampProfileCollectionModel at an exact or nearest timestamp containing the profile.
 
         Behavior
@@ -210,38 +240,54 @@ class FecSummaryAggregator(MultiPnmCollection):
             ts_sel = min(candidates)
         return channel_store.get(ts_sel)
 
-    def get_summary_totals(self, channel_id: ChannelId, start_time: TimeStamp, end_time: TimeStamp) -> FecSummaryTotalsModel:
+    def get_summary_totals(
+        self, channel_id: ChannelId, start_time: TimeStamp, end_time: TimeStamp
+    ) -> FecSummaryTotalsModel:
         """Aggregate FEC summary counters per profile between two timestamps (inclusive)."""
 
-        self.logger.debug(f"FEC Summary aggregation requested: ch={channel_id} range=({start_time} - {end_time})")
+        self.logger.debug(
+            f"FEC Summary aggregation requested: ch={channel_id} range=({start_time} - {end_time})"
+        )
 
         channel_store = self._store_channel_timestamps.get(channel_id, {})
         if not channel_store:
-            self.logger.warning(f"No FEC Summary entries found for ch={channel_id} in global store")
+            self.logger.warning(
+                f"No FEC Summary entries found for ch={channel_id} in global store"
+            )
             return FecSummaryTotalsModel(
-                start       =   start_time,
-                end         =   end_time,
-                channel_id  =   channel_id,
-                summary     =   [],)
+                start=start_time,
+                end=end_time,
+                channel_id=channel_id,
+                summary=[],
+            )
 
-        ts_range:list[TimeStamp] = [ts for ts in channel_store if start_time <= ts <= end_time]
+        ts_range: list[TimeStamp] = [
+            ts for ts in channel_store if start_time <= ts <= end_time
+        ]
         ts_range.sort()
 
         if not ts_range:
-            self.logger.warning(f"No timestamps found in requested range for ch={channel_id} (store_size={len(channel_store)}, range={start_time}-{end_time})")
+            self.logger.warning(
+                f"No timestamps found in requested range for ch={channel_id} (store_size={len(channel_store)}, range={start_time}-{end_time})"
+            )
             return FecSummaryTotalsModel(
-                start       =   start_time,
-                end         =   end_time,
-                channel_id  =   channel_id,
-                summary     =   [],)
+                start=start_time,
+                end=end_time,
+                channel_id=channel_id,
+                summary=[],
+            )
 
-        self.logger.debug(f"Channel {channel_id} -> Found {len(ts_range)} timestamps in range: {ts_range}")
+        self.logger.debug(
+            f"Channel {channel_id} -> Found {len(ts_range)} timestamps in range: {ts_range}"
+        )
 
         profile_totals: dict[ProfileId, CodewordSummaryTotalsModel] = {}
 
         for ts in ts_range:
             bucket = channel_store[ts]
-            self.logger.debug(f"Processing timestamp {ts} with {len(bucket.profiles)} profiles for ch={channel_id}")
+            self.logger.debug(
+                f"Processing timestamp {ts} with {len(bucket.profiles)} profiles for ch={channel_id}"
+            )
 
             for pid, entry in bucket.profiles.items():
                 self.logger.debug(
@@ -251,30 +297,35 @@ class FecSummaryAggregator(MultiPnmCollection):
                 agg = profile_totals.get(pid)
                 if agg is None:
                     profile_totals[pid] = CodewordSummaryTotalsModel(
-                        total_codewords =   entry.summary.total_codewords,
-                        corrected       =   entry.summary.corrected,
-                        uncorrectable   =   entry.summary.uncorrectable,)
+                        total_codewords=entry.summary.total_codewords,
+                        corrected=entry.summary.corrected,
+                        uncorrectable=entry.summary.uncorrectable,
+                    )
                 else:
                     agg.total_codewords += entry.summary.total_codewords
-                    agg.corrected       += entry.summary.corrected
-                    agg.uncorrectable   += entry.summary.uncorrectable
+                    agg.corrected += entry.summary.corrected
+                    agg.uncorrectable += entry.summary.uncorrectable
 
         if not profile_totals:
-            self.logger.warning(f"No profile entries aggregated for ch={channel_id} in range ({start_time} - {end_time})")
+            self.logger.warning(
+                f"No profile entries aggregated for ch={channel_id} in range ({start_time} - {end_time})"
+            )
 
         summary_list: list[ProfileSummaryTotalsModel] = [
-            ProfileSummaryTotalsModel(profile_id    =   pid,
-                                      summary       =   totals)
+            ProfileSummaryTotalsModel(profile_id=pid, summary=totals)
             for pid, totals in profile_totals.items()
         ]
 
-        self.logger.debug(f"FEC Summary aggregation complete: ch={channel_id} profiles={len(summary_list)} timestamps={len(ts_range)} range=({start_time}-{end_time})")
+        self.logger.debug(
+            f"FEC Summary aggregation complete: ch={channel_id} profiles={len(summary_list)} timestamps={len(ts_range)} range=({start_time}-{end_time})"
+        )
 
         return FecSummaryTotalsModel(
-            start       =   start_time,
-            end         =   end_time,
-            channel_id  =   channel_id,
-            summary     =   summary_list,)
+            start=start_time,
+            end=end_time,
+            channel_id=channel_id,
+            summary=summary_list,
+        )
 
     def __update_channel_temporal_db(self, obj: CmDsOfdmFecSummary) -> None:
         """
@@ -296,23 +347,29 @@ class FecSummaryAggregator(MultiPnmCollection):
                 entries.timestamp,
                 entries.total_codewords,
                 entries.corrected,
-                entries.uncorrectable, strict=False,
+                entries.uncorrectable,
+                strict=False,
             ):
                 ts_bucket = channel_store.get(ts)
                 if ts_bucket is None:
-                    ts_bucket = TimeStampProfileCollectionModel(timestamp=ts, profiles={})
+                    ts_bucket = TimeStampProfileCollectionModel(
+                        timestamp=ts, profiles={}
+                    )
                     channel_store[ts] = ts_bucket
                 profiles_map = ts_bucket.profiles
-                new_summary = CodewordSummaryTotalsModel(total_codewords=total, corrected=corrected, uncorrectable=uncorrectable)
-                new_profile_totals = ProfileSummaryTotalsModel(profile_id=profile_id, summary=new_summary)
+                new_summary = CodewordSummaryTotalsModel(
+                    total_codewords=total,
+                    corrected=corrected,
+                    uncorrectable=uncorrectable,
+                )
+                new_profile_totals = ProfileSummaryTotalsModel(
+                    profile_id=profile_id, summary=new_summary
+                )
                 existing = profiles_map.get(profile_id)
-                if (
-                    existing is not None
-                    and (
-                        existing.summary.total_codewords != new_summary.total_codewords
-                        or existing.summary.corrected != new_summary.corrected
-                        or existing.summary.uncorrectable != new_summary.uncorrectable
-                    )
+                if existing is not None and (
+                    existing.summary.total_codewords != new_summary.total_codewords
+                    or existing.summary.corrected != new_summary.corrected
+                    or existing.summary.uncorrectable != new_summary.uncorrectable
                 ):
                     self.logger.debug(
                         "FEC overwrite: ch=%s ts=%s profile=%s old={total:%s corr:%s uncor:%s} -> new={total:%s corr:%s uncor:%s}",

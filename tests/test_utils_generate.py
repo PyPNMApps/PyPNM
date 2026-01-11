@@ -67,7 +67,9 @@ def test_transaction_id_length_and_hex(monkeypatch: pytest.MonkeyPatch) -> None:
     assert HEX_RE.match(tid_large)
 
 
-def test_transaction_id_deterministic_with_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_transaction_id_deterministic_with_seed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """
     With fixed time and seed, transaction_id must be deterministic; different
     seeds should produce different IDs.

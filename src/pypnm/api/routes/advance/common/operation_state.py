@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -21,7 +20,7 @@ class OperationState(str, Enum):
             The operation ID is not recognized or the state cannot be determined.
     """
 
-    RUNNING   = "running"    # Task is active and samples are being collected
+    RUNNING = "running"  # Task is active and samples are being collected
     COMPLETED = "completed"  # Task reached its full duration and ended
-    STOPPED   = "stopped"    # Task was explicitly stopped before completion
-    UNKNOWN   = "unknown"    # No such operation ID or state is indeterminate
+    STOPPED = "stopped"  # Task was explicitly stopped before completion
+    UNKNOWN = "unknown"  # No such operation ID or state is indeterminate

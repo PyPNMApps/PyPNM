@@ -16,8 +16,8 @@ from pypnm.pnm.parser.CmSpectrumAnalysisSnmp import (
     CmSpectrumAnalysisSnmpModel,
 )
 
-DATA_DIR: Path            = Path(__file__).parent / "files"
-SPECTRUM_SNMP_PATH: Path  = DATA_DIR / "spectrum_analyzer_snmp.bin"
+DATA_DIR: Path = Path(__file__).parent / "files"
+SPECTRUM_SNMP_PATH: Path = DATA_DIR / "spectrum_analyzer_snmp.bin"
 
 
 @pytest.mark.pnm
@@ -43,9 +43,9 @@ def test_cm_spectrum_analysis_snmp_parses_real_fixture_and_is_consistent() -> No
     assert isinstance(model, CmSpectrumAnalysisSnmpModel)
     assert model.total_samples >= 0
 
-    freq: Sequence[float]      = model.frequency
-    amp: Sequence[float]       = model.amplitude
-    total_samples: int         = model.total_samples
+    freq: Sequence[float] = model.frequency
+    amp: Sequence[float] = model.amplitude
+    total_samples: int = model.total_samples
 
     assert len(freq) == len(amp) == total_samples
 
@@ -110,11 +110,11 @@ def test_cm_spectrum_analysis_snmp_decodes_synthetic_single_group_payload() -> N
     - Amplitude scaling from s16 to dBmV (division by AMPLITUDE_SCALE_DBMV)
       is respected.
     """
-    CENTER_FREQ_HZ: int   = 100_000_000
-    FREQ_SPAN_HZ: int     = 4_000_000
-    NUM_BINS: int         = 4
-    BIN_SPACING_HZ: int   = 1_000_000
-    RES_BW_HZ: int        = 100_000
+    CENTER_FREQ_HZ: int = 100_000_000
+    FREQ_SPAN_HZ: int = 4_000_000
+    NUM_BINS: int = 4
+    BIN_SPACING_HZ: int = 1_000_000
+    RES_BW_HZ: int = 100_000
 
     # Simple signed amplitudes in ADC units
     raw_amps: list[int] = [0, 100, -200, 300]
@@ -128,7 +128,7 @@ def test_cm_spectrum_analysis_snmp_decodes_synthetic_single_group_payload() -> N
         RES_BW_HZ,
     )
     amp_bytes = pack(f">{NUM_BINS}h", *raw_amps)
-    payload   = header + amp_bytes
+    payload = header + amp_bytes
 
     parser = CmSpectrumAnalysisSnmp(payload)
     model: CmSpectrumAnalysisSnmpModel = parser.to_model()

@@ -60,14 +60,19 @@ class CmSpectrumAnalysisSnmp:
         while offset + header_len <= stream_len:
             header = byte_stream[offset : offset + header_len]
             try:
-                ch_center_freq, freq_span, num_bins, bin_spacing, res_bw = struct.unpack(
-                    f">{self.HEADER_FIELD_COUNT}I", header)
+                ch_center_freq, freq_span, num_bins, bin_spacing, res_bw = (
+                    struct.unpack(f">{self.HEADER_FIELD_COUNT}I", header)
+                )
             except struct.error as exc:
-                self.logger.warning(f"Failed to unpack amplitude header at offset {offset}: {exc}")
+                self.logger.warning(
+                    f"Failed to unpack amplitude header at offset {offset}: {exc}"
+                )
                 break
 
             if num_bins == 0:
-                self.logger.warning("Encountered spectrum group with zero bins; stopping parse.")
+                self.logger.warning(
+                    "Encountered spectrum group with zero bins; stopping parse."
+                )
                 break
 
             amp_len = num_bins * self.BYTES_PER_AMPLITUDE
@@ -83,12 +88,18 @@ class CmSpectrumAnalysisSnmp:
             try:
                 amplitudes = struct.unpack(f">{num_bins}h", amp_bytes)
             except struct.error as exc:
-                self.logger.warning(f"Failed to unpack amplitudes at offset {offset}: {exc}")
+                self.logger.warning(
+                    f"Failed to unpack amplitudes at offset {offset}: {exc}"
+                )
                 break
 
-            amplitudes_dbmv: list[float] = [a / self.AMPLITUDE_SCALE_DBMV for a in amplitudes]
+            amplitudes_dbmv: list[float] = [
+                a / self.AMPLITUDE_SCALE_DBMV for a in amplitudes
+            ]
             freq_start_hz = float(ch_center_freq - (freq_span // 2))
-            freqs: list[float] = [freq_start_hz + float(i * bin_spacing) for i in range(num_bins)]
+            freqs: list[float] = [
+                freq_start_hz + float(i * bin_spacing) for i in range(num_bins)
+            ]
 
             all_freqs.extend(freqs)
             all_amplitudes.extend(amplitudes_dbmv)
@@ -106,36 +117,42 @@ class CmSpectrumAnalysisSnmp:
         amplitude_bytes = b"".join(amplitude_chunks)
 
         if total_bins_count == 0 or not all_freqs:
-            self.logger.warning("No valid spectrum groups parsed from SNMP AmplitudeData payload.")
-            start_frequency_hz: FrequencyHz     = FrequencyHz(0)
-            end_frequency_hz: FrequencyHz       = FrequencyHz(0)
-            frequency_span_hz: FrequencyHz      = FrequencyHz(0)
-            total_bins_header: int              = 0
-            bin_spacing_header: FrequencyHz     = FrequencyHz(0)
-            resolution_bw_header: FrequencyHz   = FrequencyHz(0)
+            self.logger.warning(
+                "No valid spectrum groups parsed from SNMP AmplitudeData payload."
+            )
+            start_frequency_hz: FrequencyHz = FrequencyHz(0)
+            end_frequency_hz: FrequencyHz = FrequencyHz(0)
+            frequency_span_hz: FrequencyHz = FrequencyHz(0)
+            total_bins_header: int = 0
+            bin_spacing_header: FrequencyHz = FrequencyHz(0)
+            resolution_bw_header: FrequencyHz = FrequencyHz(0)
         else:
-            start_frequency_hz      = FrequencyHz(all_freqs[0])
-            end_frequency_hz        = FrequencyHz(all_freqs[-1])
-            frequency_span_hz       = FrequencyHz(end_frequency_hz - start_frequency_hz)
-            total_bins_header       = first_group_total_bins if first_group_total_bins > 0 else total_bins_count
-            bin_spacing_header      = FrequencyHz(first_group_bin_spacing)
-            resolution_bw_header    = FrequencyHz(first_group_res_bw)
+            start_frequency_hz = FrequencyHz(all_freqs[0])
+            end_frequency_hz = FrequencyHz(all_freqs[-1])
+            frequency_span_hz = FrequencyHz(end_frequency_hz - start_frequency_hz)
+            total_bins_header = (
+                first_group_total_bins
+                if first_group_total_bins > 0
+                else total_bins_count
+            )
+            bin_spacing_header = FrequencyHz(first_group_bin_spacing)
+            resolution_bw_header = FrequencyHz(first_group_res_bw)
 
         spectrum_config = SpecAnalysisSnmpConfigModel(
-            start_frequency         =   start_frequency_hz,
-            end_frequency           =   end_frequency_hz,
-            frequency_span          =   frequency_span_hz,
-            total_bins              =   total_bins_header,
-            bin_spacing             =   bin_spacing_header,
-            resolution_bandwidth    =   resolution_bw_header,
+            start_frequency=start_frequency_hz,
+            end_frequency=end_frequency_hz,
+            frequency_span=frequency_span_hz,
+            total_bins=total_bins_header,
+            bin_spacing=bin_spacing_header,
+            resolution_bandwidth=resolution_bw_header,
         )
 
         model = CmSpectrumAnalysisSnmpModel(
-            spectrum_config         =   spectrum_config,
-            total_samples           =   total_bins_count,
-            frequency               =   all_freqs,
-            amplitude               =   all_amplitudes,
-            amplitude_bytes         =   amplitude_bytes,
+            spectrum_config=spectrum_config,
+            total_samples=total_bins_count,
+            frequency=all_freqs,
+            amplitude=all_amplitudes,
+            amplitude_bytes=amplitude_bytes,
         )
         return model
 

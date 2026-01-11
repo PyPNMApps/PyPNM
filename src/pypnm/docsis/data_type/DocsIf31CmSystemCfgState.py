@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -57,35 +56,61 @@ class DocsIf31CmSystemCfgDiplexState:
         """
 
         fields = {
-            "docsIf31CmSystemCfgStateDiplexerCapability": ("docsIf31CmSystemCfgStateDiplexerCapability", int),
-            "docsIf31CmSystemCfgStateDiplexerCfgBandEdge": ("docsIf31CmSystemCfgStateDiplexerCfgBandEdge", int),
-            "docsIf31CmSystemCfgStateDiplexerDsLowerCapability": ("docsIf31CmSystemCfgStateDiplexerDsLowerCapability", int),
-            "docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge": ("docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge", int),
-            "docsIf31CmSystemCfgStateDiplexerDsUpperCapability": ("docsIf31CmSystemCfgStateDiplexerDsUpperCapability", int),
-            "docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge": ("docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge", int),
+            "docsIf31CmSystemCfgStateDiplexerCapability": (
+                "docsIf31CmSystemCfgStateDiplexerCapability",
+                int,
+            ),
+            "docsIf31CmSystemCfgStateDiplexerCfgBandEdge": (
+                "docsIf31CmSystemCfgStateDiplexerCfgBandEdge",
+                int,
+            ),
+            "docsIf31CmSystemCfgStateDiplexerDsLowerCapability": (
+                "docsIf31CmSystemCfgStateDiplexerDsLowerCapability",
+                int,
+            ),
+            "docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge": (
+                "docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge",
+                int,
+            ),
+            "docsIf31CmSystemCfgStateDiplexerDsUpperCapability": (
+                "docsIf31CmSystemCfgStateDiplexerDsUpperCapability",
+                int,
+            ),
+            "docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge": (
+                "docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge",
+                int,
+            ),
         }
 
         try:
             for attr, (oid_key, transform) in fields.items():
                 try:
-                    result = await self.snmp.get(f"{COMPILED_OIDS[oid_key]}.{self.index}")
+                    result = await self.snmp.get(
+                        f"{COMPILED_OIDS[oid_key]}.{self.index}"
+                    )
                     value_list = Snmp_v2c.get_result_value(result)
 
                     if not value_list:
-                        self.logger.warning(f"Invalid value returned for {oid_key}.{self.index}: {value_list}")
+                        self.logger.warning(
+                            f"Invalid value returned for {oid_key}.{self.index}: {value_list}"
+                        )
                         setattr(self, attr, None)
                         continue
 
                     value = transform(value_list)
                     setattr(self, attr, value)
                 except Exception as e:
-                    self.logger.warning(f"Failed to fetch or transform {attr} ({oid_key}): {e}")
+                    self.logger.warning(
+                        f"Failed to fetch or transform {attr} ({oid_key}): {e}"
+                    )
                     setattr(self, attr, None)
 
             return True
 
         except Exception as e:
-            self.logger.exception(f"Unexpected error during SNMP population, error: {e}")
+            self.logger.exception(
+                f"Unexpected error during SNMP population, error: {e}"
+            )
             return False
 
     def to_dict(self, nested: bool = True) -> dict:
@@ -106,10 +131,16 @@ class DocsIf31CmSystemCfgDiplexState:
         for attr in self.__annotations__:
             value = getattr(self, attr, None)
             if value is None:
-                raise ValueError(f"Attribute '{attr}' is not populated. Please call 'start' first.")
+                raise ValueError(
+                    f"Attribute '{attr}' is not populated. Please call 'start' first."
+                )
             data[attr] = value
 
         if nested:
-            return {data["index"]: {key: value for key, value in data.items() if key != "index"}}
+            return {
+                data["index"]: {
+                    key: value for key, value in data.items() if key != "index"
+                }
+            }
 
         return data

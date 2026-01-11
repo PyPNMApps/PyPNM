@@ -31,6 +31,7 @@ class OperationManager:
         ...
     }
     """
+
     def __init__(self, capture_group_id: GroupId, db_path: Path | None = None) -> None:
         """
         Initialize a new operation manager for a given capture group.
@@ -75,8 +76,8 @@ class OperationManager:
         """
         Atomically write the given data to the DB file.
         """
-        temp = self.db_path.with_suffix('.tmp')
-        with temp.open('w', encoding='utf-8') as f:
+        temp = self.db_path.with_suffix(".tmp")
+        with temp.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         temp.replace(self.db_path)
 
@@ -105,16 +106,15 @@ class OperationManager:
         from pypnm.api.routes.common.classes.file_capture.capture_group import (
             CaptureGroup,
         )
+
         cg = CaptureGroup(group_id=self.capture_group_id)
         if self.capture_group_id not in cg.list_groups():
-            raise ValueError(
-                f"CaptureGroup '{self.capture_group_id}' does not exist"
-            )
+            raise ValueError(f"CaptureGroup '{self.capture_group_id}' does not exist")
 
         db = self._load()
         db[self.operation_id] = {
             "capture_group_id": self.capture_group_id,
-            "created": int(time.time())
+            "created": int(time.time()),
         }
         self._save(db)
         self.logger.info(
@@ -123,7 +123,9 @@ class OperationManager:
         return self.operation_id
 
     @classmethod
-    def get_capture_group(cls, operation_id: OperationId, db_path: Path | None = None) -> GroupId:
+    def get_capture_group(
+        cls, operation_id: OperationId, db_path: Path | None = None
+    ) -> GroupId:
         """
         Retrieve the capture_group_id for a given operation_id.
 

@@ -29,12 +29,10 @@ class MultiAnalysis:
         self._dicts: list[dict[str, Any]] = []
 
     @overload
-    def add(self, analysis: Analysis) -> None:
-        ...
+    def add(self, analysis: Analysis) -> None: ...
 
     @overload
-    def add(self, channel_id: ChannelId, analysis: Analysis) -> None:
-        ...
+    def add(self, channel_id: ChannelId, analysis: Analysis) -> None: ...
 
     def add(self, *args: Any, **kwargs: Any) -> None:
         """

@@ -44,19 +44,19 @@ class CmUsOfdmaPreEq(PnmHeader):
 
     def __init__(self, binary_data: bytes) -> None:
         super().__init__(binary_data)
-        self.logger                          = logging.getLogger(self.__class__.__name__)
-        self._channel_id                     : ChannelId
-        self._mac_address                    : MacAddressStr
-        self._cmts_mac_address               : MacAddressStr
-        self._subcarrier_zero_frequency      : FrequencyHz
-        self._first_active_subcarrier_index  : int
-        self._subcarrier_spacing             : FrequencyHz
-        self._pre_eq_data_length             : int
-        self._pre_eq_coefficient_data        : bytes
-        self._decoded_coefficients           : ComplexSeries
-        self._occupied_channel_bandwidth     : FrequencyHz
-        self._model                          : CmUsOfdmaPreEqModel
-        self._sm_n_format                    : tuple[IntegerBits, FractionalBits]
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._channel_id: ChannelId
+        self._mac_address: MacAddressStr
+        self._cmts_mac_address: MacAddressStr
+        self._subcarrier_zero_frequency: FrequencyHz
+        self._first_active_subcarrier_index: int
+        self._subcarrier_spacing: FrequencyHz
+        self._pre_eq_data_length: int
+        self._pre_eq_coefficient_data: bytes
+        self._decoded_coefficients: ComplexSeries
+        self._occupied_channel_bandwidth: FrequencyHz
+        self._model: CmUsOfdmaPreEqModel
+        self._sm_n_format: tuple[IntegerBits, FractionalBits]
 
         self.__process()
 
@@ -75,23 +75,28 @@ class CmUsOfdmaPreEq(PnmHeader):
         """
         # Validate file type (allow "last update" variant)
         file_type = self.get_pnm_file_type()
-        if (file_type != PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS) and \
-           (file_type != PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE):
-            expected       = PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS.get_pnm_cann()
-            got            = file_type.get_pnm_cann() if file_type is not None else "None"
-            raise ValueError(f"PNM File Stream is not file type: {expected}, Error: {got}")
+        if (file_type != PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS) and (
+            file_type != PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
+        ):
+            expected = PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS.get_pnm_cann()
+            got = file_type.get_pnm_cann() if file_type is not None else "None"
+            raise ValueError(
+                f"PNM File Stream is not file type: {expected}, Error: {got}"
+            )
 
         if file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS:
             self._sm_n_format = (IntegerBits(1), FractionalBits(14))
-            debug_msg = "Using s2.13 format for Upstream Pre-Equalizer Coefficients PNM data."
+            debug_msg = (
+                "Using s2.13 format for Upstream Pre-Equalizer Coefficients PNM data."
+            )
         else:
             self._sm_n_format = (IntegerBits(1), FractionalBits(14))
             debug_msg = "Using s1.14 format for Upstream Pre-Equalizer Coefficients Last Update PNM data."
 
         self.logger.debug(debug_msg)
 
-        header_format = '>B6s6sIHBI'
-        header_size   = calcsize(header_format)
+        header_format = ">B6s6sIHBI"
+        header_size = calcsize(header_format)
         if len(self.pnm_data) < header_size:
             raise ValueError("Insufficient data for CmUsOfdmaPreEq header.")
 
@@ -101,14 +106,16 @@ class CmUsOfdmaPreEq(PnmHeader):
             cmts_mac,
             self._subcarrier_zero_frequency,
             self._first_active_subcarrier_index,
-            subcarrier_spacing_khz ,
+            subcarrier_spacing_khz,
             self._pre_eq_data_length,
         ) = unpack(header_format, self.pnm_data[:header_size])
 
-        self._mac_address                  = MacAddress(cm_mac).to_mac_format(MacAddressFormat.COLON)
-        self._cmts_mac_address             = MacAddress(cmts_mac).to_mac_format(MacAddressFormat.COLON)
-        self._pre_eq_coefficient_data      = self.pnm_data[header_size:]
-        self._subcarrier_spacing           = subcarrier_spacing_khz * KHZ
+        self._mac_address = MacAddress(cm_mac).to_mac_format(MacAddressFormat.COLON)
+        self._cmts_mac_address = MacAddress(cmts_mac).to_mac_format(
+            MacAddressFormat.COLON
+        )
+        self._pre_eq_coefficient_data = self.pnm_data[header_size:]
+        self._subcarrier_spacing = subcarrier_spacing_khz * KHZ
 
         if len(self._pre_eq_coefficient_data) != self._pre_eq_data_length:
             raise ValueError(
@@ -116,25 +123,27 @@ class CmUsOfdmaPreEq(PnmHeader):
             )
 
         # Decode fixed-point complex coefficients → List[complex]
-        decoded:ComplexSeries = self.process_pre_eq_coefficient_data()
+        decoded: ComplexSeries = self.process_pre_eq_coefficient_data()
         if not decoded:
             raise ValueError("No pre-equalization coefficients decoded.")
 
         # Convert to ComplexArray: List[List[float, float]]
-        complex_pairs:ComplexArray    = cast(ComplexArray, [[c.real, c.imag] for c in decoded])
+        complex_pairs: ComplexArray = cast(
+            ComplexArray, [[c.real, c.imag] for c in decoded]
+        )
 
-        self._model                        = CmUsOfdmaPreEqModel(
-            pnm_header                     = self.getPnmHeaderParameterModel(),
-            channel_id                     = self._channel_id,
-            mac_address                    = self._mac_address,
-            subcarrier_zero_frequency      = self._subcarrier_zero_frequency,
-            first_active_subcarrier_index  = int(self._first_active_subcarrier_index),
-            subcarrier_spacing             = self._subcarrier_spacing,
-            occupied_channel_bandwidth     = self._cal_occ_bw(),
-            cmts_mac_address               = self._cmts_mac_address,
-            value_length                   = int(self._pre_eq_data_length),
-            value_unit                     = "[Real, Imaginary]",
-            values                         = complex_pairs,
+        self._model = CmUsOfdmaPreEqModel(
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=self._channel_id,
+            mac_address=self._mac_address,
+            subcarrier_zero_frequency=self._subcarrier_zero_frequency,
+            first_active_subcarrier_index=int(self._first_active_subcarrier_index),
+            subcarrier_spacing=self._subcarrier_spacing,
+            occupied_channel_bandwidth=self._cal_occ_bw(),
+            cmts_mac_address=self._cmts_mac_address,
+            value_length=int(self._pre_eq_data_length),
+            value_unit="[Real, Imaginary]",
+            values=complex_pairs,
         )
 
     def _cal_occ_bw(self) -> FrequencyHz:

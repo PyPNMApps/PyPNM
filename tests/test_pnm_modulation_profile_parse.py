@@ -29,7 +29,9 @@ def test_modprof_parses_and_model_shape(modprof_bytes: bytes) -> None:
     # Header & core fields
     assert mp.num_profiles >= 0
     assert mp.profile_data_length_bytes >= 0
-    assert isinstance(mp.mac_address, str) and len(mp.mac_address) >= 11  # "aa:bb:cc:dd:ee:ff"
+    assert (
+        isinstance(mp.mac_address, str) and len(mp.mac_address) >= 11
+    )  # "aa:bb:cc:dd:ee:ff"
     assert mp.subcarrier_spacing > 0
     assert mp.first_active_subcarrier_index >= 0
     assert mp.subcarrier_zero_frequency >= 0
@@ -60,8 +62,14 @@ def test_profile_schemes_valid_and_decoded(modprof_bytes: bytes) -> None:
                 # Skip schema
                 assert hasattr(sch, "main_modulation_order")
                 assert hasattr(sch, "skip_modulation_order")
-                assert isinstance(sch.main_modulation_order, str) and sch.main_modulation_order
-                assert isinstance(sch.skip_modulation_order, str) and sch.skip_modulation_order
+                assert (
+                    isinstance(sch.main_modulation_order, str)
+                    and sch.main_modulation_order
+                )
+                assert (
+                    isinstance(sch.skip_modulation_order, str)
+                    and sch.skip_modulation_order
+                )
                 assert sch.num_subcarriers >= 0
 
 

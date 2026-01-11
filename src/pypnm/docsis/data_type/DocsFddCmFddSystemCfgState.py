@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -79,7 +78,9 @@ class DocsFddCmFddSystemCfgState:
 
             return True
         except Exception as e:
-            self.logger.exception("Unexpected error during SNMP population, error: %s", e)
+            self.logger.exception(
+                "Unexpected error during SNMP population, error: %s", e
+            )
             return False
 
     def to_dict(self) -> dict:
@@ -100,9 +101,8 @@ class DocsFddCmFddSystemCfgState:
 
         if any(v is None for v in entry.values()):
             missing = [k for k, v in entry.items() if v is None]
-            raise ValueError(f"Attributes not populated (call start() first): {missing}")
+            raise ValueError(
+                f"Attributes not populated (call start() first): {missing}"
+            )
 
-        return {
-            "index": self.index,
-            "entry": entry
-        }
+        return {"index": self.index, "entry": entry}

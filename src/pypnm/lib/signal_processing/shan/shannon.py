@@ -11,8 +11,9 @@ import numpy as np
 from pypnm.lib.types import FloatSeries, SNRdB, SNRln
 from pypnm.pnm.parser.CmDsOfdmModulationProfile import ModulationOrderType
 
-BitsPerSymbol       = int
-BitPerSymToQamMod   = dict[BitsPerSymbol, str]
+BitsPerSymbol = int
+BitPerSymToQamMod = dict[BitsPerSymbol, str]
+
 
 class Shannon:
     QAM_MODULATIONS: ClassVar[BitPerSymToQamMod] = {
@@ -31,7 +32,7 @@ class Shannon:
         13: "qam_8192",
         14: "qam_16384",
         15: "qam_32768",
-        16: "qam_65536"
+        16: "qam_65536",
     }
 
     def __init__(self, snr_db: float) -> None:
@@ -57,7 +58,7 @@ class Shannon:
             raise ValueError(f"Unsupported modulation type: {modulation_name}")
 
         # Reverse Shannon formula: SNR_linear = 2^bits - 1 → SNR_dB = 10 * log10(2^bits - 1)
-        snr_linear = (2 ** bits) - 1
+        snr_linear = (2**bits) - 1
         snr_db = 10 * math.log10(snr_linear)
 
         return cls(snr_db)
@@ -75,7 +76,7 @@ class Shannon:
             raise ValueError(f"Unsupported modulation type: {mod_ord_type.name}")
 
         # Reverse Shannon formula: SNR_linear = 2^bits - 1 → SNR_dB = 10 * log10(2^bits - 1)
-        snr_linear = (2 ** bits) - 1
+        snr_linear = (2**bits) - 1
         snr_db = 10 * math.log10(snr_linear)
 
         return cls(snr_db)
@@ -88,7 +89,7 @@ class Shannon:
         return bits
 
     @staticmethod
-    def bits_from_symbol_count(symbol_count:int) -> BitsPerSymbol:
+    def bits_from_symbol_count(symbol_count: int) -> BitsPerSymbol:
         """
         Convert the number of symbols to bits per symbol using the Shannon formula.
         """
@@ -109,7 +110,7 @@ class Shannon:
         if bits is None:
             raise ValueError(f"Unsupported modulation type: {modulation_name}")
 
-        snr_linear:SNRln = (2 ** bits) - 1
+        snr_linear: SNRln = (2**bits) - 1
         return cast(SNRdB, 10 * math.log10(snr_linear))
 
     @staticmethod
@@ -125,7 +126,7 @@ class Shannon:
         """
         if bits <= 0:
             raise ValueError("Bit value must be positive.")
-        snr_linear = (2 ** bits) - 1
+        snr_linear = (2**bits) - 1
         return cast(SNRdB, 10 * math.log10(snr_linear))
 
     @staticmethod
@@ -144,7 +145,7 @@ class Shannon:
         arr = np.atleast_1d(np.asarray(snr, dtype=float))
 
         # Vectorized computation
-        linear   = 10 ** (arr / 10)
+        linear = 10 ** (arr / 10)
         capacity = np.log2(1 + linear)
 
         # Always round down to the nearest integer
@@ -153,7 +154,7 @@ class Shannon:
         return limits.tolist()
 
     @staticmethod
-    def snr_to_snr_limit(snr_db:list[SNRdB]) -> list[SNRdB]:
+    def snr_to_snr_limit(snr_db: list[SNRdB]) -> list[SNRdB]:
         """
         Take the SNR and Calculate the closest supported modulation limit.
         Returns:
@@ -166,10 +167,9 @@ class Shannon:
         snr_array = np.array(snr_db, dtype=float)
 
         # Calculate Shannon limits for each SNR value
-        limits:list[BitsPerSymbol] = Shannon.snr_to_limit(snr_array)
+        limits: list[BitsPerSymbol] = Shannon.snr_to_limit(snr_array)
 
         # Convert bits back to dB
-        shannon_limits:list[SNRdB] = [Shannon.bits_to_snr(bits) for bits in limits]
+        shannon_limits: list[SNRdB] = [Shannon.bits_to_snr(bits) for bits in limits]
 
         return shannon_limits
-

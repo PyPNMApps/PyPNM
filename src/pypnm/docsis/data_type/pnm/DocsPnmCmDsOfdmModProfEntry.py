@@ -47,16 +47,22 @@ class DocsPnmCmDsOfdmModProfEntry(BaseModel):
                     log.debug("idx=%s %s error=%r", index, sym, e)
                 return None
 
-        file_enable  = cast(bool,  await fetch("docsPnmCmDsOfdmModProfFileEnable",  as_bool))
-        meas_statusi = cast(int,   await fetch("docsPnmCmDsOfdmModProfMeasStatus",  as_int))
-        file_name    = cast(str,   await fetch("docsPnmCmDsOfdmModProfFileName",    as_str))
+        file_enable = cast(
+            bool, await fetch("docsPnmCmDsOfdmModProfFileEnable", as_bool)
+        )
+        meas_statusi = cast(
+            int, await fetch("docsPnmCmDsOfdmModProfMeasStatus", as_int)
+        )
+        file_name = cast(str, await fetch("docsPnmCmDsOfdmModProfFileName", as_str))
 
         missing = {
-            k: v for k, v in dict(
-                file_enable  = file_enable,
-                meas_status  = meas_statusi,
-                file_name    = file_name,
-            ).items() if v is None
+            k: v
+            for k, v in dict(
+                file_enable=file_enable,
+                meas_status=meas_statusi,
+                file_name=file_name,
+            ).items()
+            if v is None
         }
         if missing:
             raise ValueError(
@@ -69,15 +75,17 @@ class DocsPnmCmDsOfdmModProfEntry(BaseModel):
             meas_statuss = str(MeasStatusType.OTHER)
 
         entry = DocsPnmCmDsOfdmModProfFields(
-            docsPnmCmDsOfdmModProfFileEnable  = bool(file_enable),
-            docsPnmCmDsOfdmModProfMeasStatus  = meas_statuss,
-            docsPnmCmDsOfdmModProfFileName    = str(file_name),
+            docsPnmCmDsOfdmModProfFileEnable=bool(file_enable),
+            docsPnmCmDsOfdmModProfMeasStatus=meas_statuss,
+            docsPnmCmDsOfdmModProfFileName=str(file_name),
         )
 
         return cls(index=index, channel_id=index, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsPnmCmDsOfdmModProfEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsPnmCmDsOfdmModProfEntry]:
         if not indices:
             return []
         return [await cls.from_snmp(idx, snmp) for idx in indices]

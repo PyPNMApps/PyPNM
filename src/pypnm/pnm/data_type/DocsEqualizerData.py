@@ -1,4 +1,3 @@
-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025 Maurice Garcia
 
@@ -46,7 +45,9 @@ class DocsEqualizerData:
         try:
             binary_data = bytes.fromhex(hex_data.replace("0x", ""))
             if not (self.MIN_TOTAL_BYTES <= len(binary_data) <= self.MAX_TOTAL_BYTES):
-                self.logger.warning(f"Invalid data size ({len(binary_data)} bytes) for upstream index {us_idx}")
+                self.logger.warning(
+                    f"Invalid data size ({len(binary_data)} bytes) for upstream index {us_idx}"
+                )
                 return False
 
             main_tap = binary_data[0]
@@ -56,13 +57,19 @@ class DocsEqualizerData:
 
             total_taps = num_forward + num_reverse
             if total_taps > self.MAX_TAPS:
-                self.logger.error(f"Exceeded max tap count ({total_taps}) for index {us_idx}")
+                self.logger.error(
+                    f"Exceeded max tap count ({total_taps}) for index {us_idx}"
+                )
                 return False
 
             offset = self.HEADER_SIZE
-            forward_coeffs = self._parse_coefficients(binary_data[offset : offset + num_forward * self.TAP_BYTES])
+            forward_coeffs = self._parse_coefficients(
+                binary_data[offset : offset + num_forward * self.TAP_BYTES]
+            )
             offset += num_forward * self.TAP_BYTES
-            reverse_coeffs = self._parse_coefficients(binary_data[offset : offset + num_reverse * self.TAP_BYTES])
+            reverse_coeffs = self._parse_coefficients(
+                binary_data[offset : offset + num_reverse * self.TAP_BYTES]
+            )
 
             self.equalizer_data[us_idx] = {
                 "main_tap_location": main_tap,
@@ -84,16 +91,24 @@ class DocsEqualizerData:
     def _parse_coefficients(self, data: bytes) -> list[dict[str, float]]:
         coeffs = []
         for i in range(0, len(data), self.COMPLEX_TAP_SIZE):
-            real = int.from_bytes(data[i:i + self.COEFF_BYTES], byteorder='big', signed=True)
-            imag = int.from_bytes(data[i + self.COEFF_BYTES:i + self.COMPLEX_TAP_SIZE], byteorder='big', signed=True)
-            magnitude = math.sqrt(real ** 2 + imag ** 2)
-            power_db = 10 * math.log10(magnitude ** 2) if magnitude > 0 else None
+            real = int.from_bytes(
+                data[i : i + self.COEFF_BYTES], byteorder="big", signed=True
+            )
+            imag = int.from_bytes(
+                data[i + self.COEFF_BYTES : i + self.COMPLEX_TAP_SIZE],
+                byteorder="big",
+                signed=True,
+            )
+            magnitude = math.sqrt(real**2 + imag**2)
+            power_db = 10 * math.log10(magnitude**2) if magnitude > 0 else None
 
             coeff = {
                 "real": real,
                 "imag": imag,
                 "magnitude": round(magnitude, 2),
-                "magnitude_power_dB": round(power_db, 2) if power_db is not None else None
+                "magnitude_power_dB": round(power_db, 2)
+                if power_db is not None
+                else None,
             }
             coeffs.append(coeff)
         return coeffs
@@ -106,4 +121,5 @@ class DocsEqualizerData:
 
     def to_json(self, indent: int = 2) -> str:
         import json
+
         return json.dumps(self.to_dict(), indent=indent)

@@ -23,20 +23,21 @@ class PnmFileType(Enum):
         to_ascii(): Alias for get_pnm_cann (returns ASCII code).
         from_name(name): Class method to lookup an enum by its name.
     """
-    SYMBOL_CAPTURE                                  = "PNN1"
-    OFDM_CHANNEL_ESTIMATE_COEFFICIENT               = "PNN2"
-    DOWNSTREAM_CONSTELLATION_DISPLAY                = "PNN3"
-    RECEIVE_MODULATION_ERROR_RATIO                  = "PNN4"
-    DOWNSTREAM_HISTOGRAM                            = "PNN5"
-    UPSTREAM_PRE_EQUALIZER_COEFFICIENTS             = "PNN6"
+
+    SYMBOL_CAPTURE = "PNN1"
+    OFDM_CHANNEL_ESTIMATE_COEFFICIENT = "PNN2"
+    DOWNSTREAM_CONSTELLATION_DISPLAY = "PNN3"
+    RECEIVE_MODULATION_ERROR_RATIO = "PNN4"
+    DOWNSTREAM_HISTOGRAM = "PNN5"
+    UPSTREAM_PRE_EQUALIZER_COEFFICIENTS = "PNN6"
     UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE = "PNN7"
-    OFDM_FEC_SUMMARY                                = "PNN8"
-    SPECTRUM_ANALYSIS                               = "PNN9"
-    OFDM_MODULATION_PROFILE                         = "PNN10"
-    LATENCY_REPORT                                  = "LLD01"
+    OFDM_FEC_SUMMARY = "PNN8"
+    SPECTRUM_ANALYSIS = "PNN9"
+    OFDM_MODULATION_PROFILE = "PNN10"
+    LATENCY_REPORT = "LLD01"
 
     # (Not in Spec)Internal use for SNMP-based Spectrum Analysis
-    CM_SPECTRUM_ANALYSIS_SNMP_AMP_DATA              = "PXX9"
+    CM_SPECTRUM_ANALYSIS_SNMP_AMP_DATA = "PXX9"
 
     def __init__(self, pnm_cann: str) -> None:
         """
@@ -85,7 +86,9 @@ class PnmFileType(Enum):
             return cls[name]
         except KeyError as exc:
             valid = ", ".join([e.name for e in cls])
-            raise KeyError(f"Invalid PnmFileType name: {name!r}. Valid names: {valid}") from exc
+            raise KeyError(
+                f"Invalid PnmFileType name: {name!r}. Valid names: {valid}"
+            ) from exc
 
     @classmethod
     def from_mmnemonic(cls, tag: str, version: int) -> PnmFileType:
@@ -141,7 +144,9 @@ class PnmFileType(Enum):
         """
         s = code.strip().upper()
         if len(s) < 4:
-            raise KeyError(f"Unknown code: {code!r}. Provide a full tag like 'PNN9' or 'LLD01'.")
+            raise KeyError(
+                f"Unknown code: {code!r}. Provide a full tag like 'PNN9' or 'LLD01'."
+            )
 
         prefix, suffix = s[:3], s[3:]
 
@@ -149,11 +154,13 @@ class PnmFileType(Enum):
         if prefix == "LLD":
             if not suffix.isdigit():
                 raise KeyError(f"Unknown code: {code!r}. 'LLD' suffix must be numeric.")
-            s = f"LLD{int(suffix):02d}"   # e.g., LLD1 -> LLD01
+            s = f"LLD{int(suffix):02d}"  # e.g., LLD1 -> LLD01
 
         elif prefix in ("PNN", "PNM"):
             if not suffix.isdigit():
-                raise KeyError(f"Unknown code: {code!r}. '{prefix}' suffix must be numeric.")
+                raise KeyError(
+                    f"Unknown code: {code!r}. '{prefix}' suffix must be numeric."
+                )
             s = f"{prefix}{int(suffix)}"  # strip any leading zeros
 
         # else: leave as-is and try exact match
@@ -163,7 +170,9 @@ class PnmFileType(Enum):
                 return member
 
         valid_codes = ", ".join(m.value for m in cls)
-        raise KeyError(f"Unknown code: {code!r}. Normalized to {s!r}. Valid codes: {valid_codes}")
+        raise KeyError(
+            f"Unknown code: {code!r}. Normalized to {s!r}. Valid codes: {valid_codes}"
+        )
 
     @classmethod
     def fromPnmHeaderModel(cls, params: PnmHeaderParameters) -> PnmFileType:

@@ -60,24 +60,27 @@ class CmSpectrumAnalysisService(CommonMeasureService):
     - After construction, call :meth:`set_and_go` (via ``CommonMeasureService``) to execute.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         cable_modem: CableModem,
         tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-        tftp_path: str = PnmConfigManager.get_tftp_path(),*,
-        capture_parameters: SpecAnCapturePara,) -> None:
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+        *,
+        capture_parameters: SpecAnCapturePara,
+    ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         pnmCmCtlTest = DocsPnmCmCtlTest.SPECTRUM_ANALYZER
 
         if not self.logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+            formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
 
         if capture_parameters.spectrum_retrieval_type == SpectrumRetrievalType.SNMP:
-            self.logger.info('Selecting: SPECTRUM_ANALYZER_SNMP_AMP_DATA')
+            self.logger.info("Selecting: SPECTRUM_ANALYZER_SNMP_AMP_DATA")
             pnmCmCtlTest = DocsPnmCmCtlTest.SPECTRUM_ANALYZER_SNMP_AMP_DATA
 
         super().__init__(
@@ -85,9 +88,11 @@ class CmSpectrumAnalysisService(CommonMeasureService):
             cable_modem,
             tftp_servers,
             tftp_path,
-            cable_modem.getWriteCommunity(),)
+            cable_modem.getWriteCommunity(),
+        )
 
         self.setSpectrumCaptureParameters(capture_parameters)
+
 
 class OfdmChanSpecAnalyzerService(CommonMeasureService):
     """
@@ -131,6 +136,7 @@ class OfdmChanSpecAnalyzerService(CommonMeasureService):
             cable_modem.getWriteCommunity(),
         )
 
+
 class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
     """
     Downstream OFDM Channel Spectrum Analyzer Orchestrator
@@ -152,19 +158,26 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         Data retrieval mechanism (file-based or SNMP amplitude data).
     """
 
-    def __init__(self, cable_modem: CableModem,
-                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 number_of_averages: int = 2,
-                 spectrum_retrieval_type:SpectrumRetrievalType = SpectrumRetrievalType.FILE,) -> None:
+    def __init__(
+        self,
+        cable_modem: CableModem,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        number_of_averages: int = 2,
+        spectrum_retrieval_type: SpectrumRetrievalType = SpectrumRetrievalType.FILE,
+    ) -> None:
         super().__init__(cable_modem)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._number_of_averages = number_of_averages
         self._spectrum_retrieval_type = spectrum_retrieval_type
         self._pnm_test_type = DocsPnmCmCtlTest.SPECTRUM_ANALYZER
-        self.log_prefix = f"DsOfdmChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
+        self.log_prefix = (
+            f"DsOfdmChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
+        )
         self._tftp_servers = tftp_servers
 
-    async def start(self, capture_per_channel: bool = False) -> list[tuple[ChannelId, MessageResponse]]:
+    async def start(
+        self, capture_per_channel: bool = False
+    ) -> list[tuple[ChannelId, MessageResponse]]:
         """
         Run Spectrum Captures Across All OFDM Channels
 
@@ -200,19 +213,21 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
           capture here; the capture aligns to the *first* and *last* frequencies
           (start/end) as provided by the OFDM channel range.
         """
-        channel_specCapture:list[tuple[ChannelId, SpecAnCapturePara]] = []
-        out:list[tuple[ChannelId, MessageResponse]] = []
+        channel_specCapture: list[tuple[ChannelId, SpecAnCapturePara]] = []
+        out: list[tuple[ChannelId, MessageResponse]] = []
 
         # Compute the bandwidth mapping for all OFDM channels
-        bw_by_channel: OfdmSpectrumBwLut = await self.calculate_channel_spectrum_bandwidth()
+        bw_by_channel: OfdmSpectrumBwLut = (
+            await self.calculate_channel_spectrum_bandwidth()
+        )
 
         # Default capture settings
-        num_bins_per_segment    = 256
-        number_of_averages      = self._number_of_averages
+        num_bins_per_segment = 256
+        number_of_averages = self._number_of_averages
         spectrum_retrieval_type = self._spectrum_retrieval_type
-        inactivity_timeout      = 30
-        noise_bw                = 150
-        segment_freq_span       = 1_000_000
+        inactivity_timeout = 30
+        noise_bw = 150
+        segment_freq_span = 1_000_000
 
         for chan_id, (start_hz, plc_hz, end_hz) in bw_by_channel.items():
             self.logger.info(
@@ -221,15 +236,15 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
             )
 
             capture_parameter = SpecAnCapturePara(
-                inactivity_timeout          = inactivity_timeout,
-                first_segment_center_freq   = FrequencyHz(start_hz),
-                last_segment_center_freq    = FrequencyHz(end_hz),
-                segment_freq_span           = FrequencyHz(segment_freq_span),
-                num_bins_per_segment        = num_bins_per_segment,
-                noise_bw                    = noise_bw,
-                window_function             = WindowFunction.HANN,
-                num_averages                = number_of_averages,
-                spectrum_retrieval_type     = spectrum_retrieval_type,
+                inactivity_timeout=inactivity_timeout,
+                first_segment_center_freq=FrequencyHz(start_hz),
+                last_segment_center_freq=FrequencyHz(end_hz),
+                segment_freq_span=FrequencyHz(segment_freq_span),
+                num_bins_per_segment=num_bins_per_segment,
+                noise_bw=noise_bw,
+                window_function=WindowFunction.HANN,
+                num_averages=number_of_averages,
+                spectrum_retrieval_type=spectrum_retrieval_type,
             )
 
             self.logger.info(
@@ -240,7 +255,9 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
             channel_specCapture.append((chan_id, capture_parameter))
 
         for chan_id, capture_parameter in channel_specCapture:
-            service = OfdmChanSpecAnalyzerService(self._cm, tftp_servers=self._tftp_servers)
+            service = OfdmChanSpecAnalyzerService(
+                self._cm, tftp_servers=self._tftp_servers
+            )
             service.setSpectrumCaptureParameters(capture_parameter)
             out.append((chan_id, await service.set_and_go()))
             await self.updatePnmMeasurementStatistics(chan_id)
@@ -268,37 +285,58 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         """
         out: CommonChannelSpectumBwLut = {}
 
-        channels: list[DocsIf31CmDsOfdmChanChannelEntry] = await self._cm.getDocsIf31CmDsOfdmChanEntry()
+        channels: list[
+            DocsIf31CmDsOfdmChanChannelEntry
+        ] = await self._cm.getDocsIf31CmDsOfdmChanEntry()
         if not channels:
-            self.logger.warning("No downstream OFDM channels returned from cable modem.")
+            self.logger.warning(
+                "No downstream OFDM channels returned from cable modem."
+            )
             return out
 
         for channel in channels:
             entry = channel.entry
 
-            zero_freq: FrequencyHz      = cast(FrequencyHz, entry.docsIf31CmDsOfdmChanSubcarrierZeroFreq)
-            first_active: SubcarrierIdx = cast(SubcarrierIdx, entry.docsIf31CmDsOfdmChanFirstActiveSubcarrierNum)
-            last_active: SubcarrierIdx  = cast(SubcarrierIdx, entry.docsIf31CmDsOfdmChanLastActiveSubcarrierNum)
-            sub_spacing: FrequencyHz    = cast(FrequencyHz, entry.docsIf31CmDsOfdmChanSubcarrierSpacing)
-            plc_freq: FrequencyHz       = cast(FrequencyHz, entry.docsIf31CmDsOfdmChanPlcFreq)
-            chan_id: ChannelId          = cast(ChannelId, entry.docsIf31CmDsOfdmChanChannelId)
+            zero_freq: FrequencyHz = cast(
+                FrequencyHz, entry.docsIf31CmDsOfdmChanSubcarrierZeroFreq
+            )
+            first_active: SubcarrierIdx = cast(
+                SubcarrierIdx, entry.docsIf31CmDsOfdmChanFirstActiveSubcarrierNum
+            )
+            last_active: SubcarrierIdx = cast(
+                SubcarrierIdx, entry.docsIf31CmDsOfdmChanLastActiveSubcarrierNum
+            )
+            sub_spacing: FrequencyHz = cast(
+                FrequencyHz, entry.docsIf31CmDsOfdmChanSubcarrierSpacing
+            )
+            plc_freq: FrequencyHz = cast(FrequencyHz, entry.docsIf31CmDsOfdmChanPlcFreq)
+            chan_id: ChannelId = cast(ChannelId, entry.docsIf31CmDsOfdmChanChannelId)
 
-            if (chan_id is None or zero_freq is None or
-                first_active is None or last_active is None or
-                sub_spacing is None or plc_freq is None ):
-
+            if (
+                chan_id is None
+                or zero_freq is None
+                or first_active is None
+                or last_active is None
+                or sub_spacing is None
+                or plc_freq is None
+            ):
                 self.logger.info(
                     "Skipping channel with missing data: "
                     f"id={chan_id}, zero_freq={zero_freq}, first_active={first_active}, "
-                    f"last_active={last_active}, spacing={sub_spacing}, plc_freq={plc_freq}")
+                    f"last_active={last_active}, spacing={sub_spacing}, plc_freq={plc_freq}"
+                )
 
                 continue
 
             # For now, starting at zero_freq as per current implementation
-            start_freq  = zero_freq + (first_active * sub_spacing)
-            end_freq    = zero_freq + ((last_active + 1) * sub_spacing)
+            start_freq = zero_freq + (first_active * sub_spacing)
+            end_freq = zero_freq + ((last_active + 1) * sub_spacing)
 
-            out[chan_id] = (FrequencyHz(start_freq), FrequencyHz(plc_freq), FrequencyHz(end_freq))
+            out[chan_id] = (
+                FrequencyHz(start_freq),
+                FrequencyHz(plc_freq),
+                FrequencyHz(end_freq),
+            )
 
             self.logger.info(
                 "Computed OFDM channel frequencies: "
@@ -324,7 +362,12 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
           :class:`DsScQamChannelSpectrumAnalyzer`. The OFDM flow typically
           uses per-channel tuples directly.
         """
-        return (FrequencyHz(0), FrequencyHz(0), FrequencyHz(0))  # Placeholder implementation
+        return (
+            FrequencyHz(0),
+            FrequencyHz(0),
+            FrequencyHz(0),
+        )  # Placeholder implementation
+
 
 class ScQamChanSpecAnalyzerService(CommonMeasureService):
     """
@@ -373,7 +416,9 @@ class ScQamChanSpecAnalyzerService(CommonMeasureService):
             cable_modem,
             tftp_servers,
             tftp_path,
-            cable_modem.getWriteCommunity(),)
+            cable_modem.getWriteCommunity(),
+        )
+
 
 class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
     """
@@ -397,20 +442,27 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         Data retrieval mechanism for captures.
     """
 
-    def __init__(self, cable_modem: CableModem,
-                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 number_of_averages: int = 1,
-                 spectrum_retrieval_type:SpectrumRetrievalType = SpectrumRetrievalType.FILE,) -> None:
+    def __init__(
+        self,
+        cable_modem: CableModem,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        number_of_averages: int = 1,
+        spectrum_retrieval_type: SpectrumRetrievalType = SpectrumRetrievalType.FILE,
+    ) -> None:
         super().__init__(cable_modem)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._number_of_averages = number_of_averages
         self._spectrum_retrieval_type = spectrum_retrieval_type
         self._tftp_servers = tftp_servers
 
-        self.log_prefix = f"DsScQamChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
+        self.log_prefix = (
+            f"DsScQamChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
+        )
         self._test_mode = False
 
-    async def start(self, capture_per_channel: bool = False) -> list[tuple[ChannelId, MessageResponse]]:
+    async def start(
+        self, capture_per_channel: bool = False
+    ) -> list[tuple[ChannelId, MessageResponse]]:
         """
         Run Spectrum Captures Across All SC-QAM Channels
 
@@ -442,7 +494,9 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         channel_spec_capture: list[tuple[ChannelId, SpecAnCapturePara]] = []
         out: list[tuple[ChannelId, MessageResponse]] = []
 
-        bw_by_channel: ScQamSpectrumBwLut = await self.calculate_channel_spectrum_bandwidth()
+        bw_by_channel: ScQamSpectrumBwLut = (
+            await self.calculate_channel_spectrum_bandwidth()
+        )
 
         num_bins_per_segment = 256
         number_of_averages = self._number_of_averages
@@ -451,28 +505,33 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         noise_bw = 150
         segment_freq_span = 1_000_000
 
-        for count, (chan_id, (start_hz, _center_hz, end_hz)) in enumerate(bw_by_channel.items()):
-
+        for count, (chan_id, (start_hz, _center_hz, end_hz)) in enumerate(
+            bw_by_channel.items()
+        ):
             if self._test_mode and count > 1:
-                self.logger.warning("Test mode active: processing only first 2 channels.")
+                self.logger.warning(
+                    "Test mode active: processing only first 2 channels."
+                )
                 break
 
             capture_parameter = SpecAnCapturePara(
-                inactivity_timeout        = inactivity_timeout,
-                first_segment_center_freq = FrequencyHz(start_hz),
-                last_segment_center_freq  = FrequencyHz(end_hz),
-                segment_freq_span         = FrequencyHz(segment_freq_span),
-                num_bins_per_segment      = num_bins_per_segment,
-                noise_bw                  = noise_bw,
-                window_function           = WindowFunction.HANN,
-                num_averages              = number_of_averages,
-                spectrum_retrieval_type   = spectrum_retrieval_type,
+                inactivity_timeout=inactivity_timeout,
+                first_segment_center_freq=FrequencyHz(start_hz),
+                last_segment_center_freq=FrequencyHz(end_hz),
+                segment_freq_span=FrequencyHz(segment_freq_span),
+                num_bins_per_segment=num_bins_per_segment,
+                noise_bw=noise_bw,
+                window_function=WindowFunction.HANN,
+                num_averages=number_of_averages,
+                spectrum_retrieval_type=spectrum_retrieval_type,
             )
 
             channel_spec_capture.append((chan_id, capture_parameter))
 
         for chan_id, capture_parameter in channel_spec_capture:
-            service = ScQamChanSpecAnalyzerService(self._cm, tftp_servers=self._tftp_servers)
+            service = ScQamChanSpecAnalyzerService(
+                self._cm, tftp_servers=self._tftp_servers
+            )
             service.setSpectrumCaptureParameters(capture_parameter)
             out.append((chan_id, await service.set_and_go()))
             await self.updatePnmMeasurementStatistics(chan_id)
@@ -502,14 +561,22 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         """
         out: CommonChannelSpectumBwLut = {}
 
-        channels: list[DocsIfDownstreamChannelEntry] = await self._cm.getDocsIfDownstreamChannel()
+        channels: list[
+            DocsIfDownstreamChannelEntry
+        ] = await self._cm.getDocsIfDownstreamChannel()
         if not channels:
-            self.logger.warning("No downstream SC-QAM channels returned from cable modem.")
+            self.logger.warning(
+                "No downstream SC-QAM channels returned from cable modem."
+            )
             return out
 
         for channel in channels:
-            cfreq: FrequencyHz = cast(FrequencyHz, channel.entry.docsIfDownChannelFrequency)
-            cwidth: FrequencyHz = cast(FrequencyHz, channel.entry.docsIfDownChannelWidth)
+            cfreq: FrequencyHz = cast(
+                FrequencyHz, channel.entry.docsIfDownChannelFrequency
+            )
+            cwidth: FrequencyHz = cast(
+                FrequencyHz, channel.entry.docsIfDownChannelWidth
+            )
             chan_id: ChannelId = cast(ChannelId, channel.entry.docsIfDownChannelId)
 
             if cfreq is None or cwidth is None or chan_id is None:
@@ -527,7 +594,11 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
 
             self.logger.info(
                 "Calculate SC-QAM Spectrum Settings: Mac: %s - Channel-Settings: Ch=%s, Start=%s, Center=%s, End=%s",
-                self._cm.get_mac_address, chan_id, start, cfreq, end,
+                self._cm.get_mac_address,
+                chan_id,
+                start,
+                cfreq,
+                end,
             )
 
             out[chan_id] = (start, cfreq, end)
@@ -555,9 +626,13 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
           captures you typically prefer explicit first/last frequencies.
         - Logs incremental accumulation for traceability.
         """
-        channels: CommonChannelSpectumBwLut = await self.calculate_channel_spectrum_bandwidth()
+        channels: CommonChannelSpectumBwLut = (
+            await self.calculate_channel_spectrum_bandwidth()
+        )
         if not channels:
-            self.logger.warning("SC-QAM: no channels available to compute overall bandwidth.")
+            self.logger.warning(
+                "SC-QAM: no channels available to compute overall bandwidth."
+            )
             return (FrequencyHz(0), FrequencyHz(0), FrequencyHz(0))
 
         # Initialize using the first entry
@@ -577,14 +652,23 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
 
             self.logger.debug(
                 "SC-QAM accumulate: ch=%s, start=%d, end=%d → global=(%d, %d)",
-                channel_id, s, e, start_hz_global, end_hz_global
+                channel_id,
+                s,
+                e,
+                start_hz_global,
+                end_hz_global,
             )
 
-        center_hz_global: FrequencyHz = FrequencyHz((start_hz_global + end_hz_global) // 2)
+        center_hz_global: FrequencyHz = FrequencyHz(
+            (start_hz_global + end_hz_global) // 2
+        )
 
         self.logger.info(
             "SC-QAM overall bandwidth: start=%d Hz, end=%d Hz (width=%d Hz); nominal center=%d Hz",
-            start_hz_global, end_hz_global, end_hz_global - start_hz_global, center_hz_global
+            start_hz_global,
+            end_hz_global,
+            end_hz_global - start_hz_global,
+            center_hz_global,
         )
 
         return (start_hz_global, center_hz_global, end_hz_global)

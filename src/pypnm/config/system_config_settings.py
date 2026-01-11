@@ -35,41 +35,42 @@ from pypnm.lib.types import (
 
 class SystemConfigSettings:
     """Provides dynamically reloaded system configuration via class properties."""
-    _cfg        = ConfigManager()
-    _logger     = logging.getLogger("SystemConfigSettings")
 
-    _DEFAULT_IP_ADDRESS: InetAddressStr      = cast(InetAddressStr, "192.168.0.100")
-    _DEFAULT_SNMP_RETRIES: int              = 5
-    _DEFAULT_SNMP_TIMEOUT: int              = 2
-    _DEFAULT_FILE_RETRIEVAL_RETRIES: int    = 5
-    _DEFAULT_HTTP_PORT: int                 = 80
-    _DEFAULT_HTTPS_PORT: int                = 443
-    _DEFAULT_TFTP_PORT: int                 = 69
-    _DEFAULT_FTP_PORT: int                  = 21
-    _DEFAULT_SFTP_PORT: int                 = 22
-    _DEFAULT_SCP_PORT: int                  = 22
-    _DEFAULT_LOG_LEVEL: str                 = "INFO"
-    _DEFAULT_LOG_DIR: str                   = "logs"
-    _DEFAULT_LOG_FILENAME: str              = "pypnm.log"
-    _DEFAULT_SNMP_READ_COMMUNITY: str       = "public"
-    _DEFAULT_SNMP_WRITE_COMMUNITY: str      = ""
-    _DEFAULT_PNM_DIR: str                   = ".data/pnm"
-    _DEFAULT_CSV_DIR: str                   = ".data/csv"
-    _DEFAULT_JSON_DIR: str                  = ".data/json"
-    _DEFAULT_XLSX_DIR: str                  = ".data/xlsx"
-    _DEFAULT_PNG_DIR: str                   = ".data/png"
-    _DEFAULT_ARCHIVE_DIR: str               = ".data/archive"
-    _DEFAULT_MSG_RSP_DIR: str               = ".data/msg_rsp"
-    _DEFAULT_DB_BACKEND: DatabaseBackend    = DatabaseBackend.SQLITE
-    _DEFAULT_SQLITE_DB_PATH: DatabasePath   = DEFAULT_SQLITE_DB_PATH
-    _DEFAULT_POSTGRES_DSN: DatabaseDsn      = DEFAULT_POSTGRES_DSN
-    _POSTGRES_DSN_ENV_VAR: str              = POSTGRES_DSN_ENV_VAR
-    _DB_BACKEND_ENV_VAR: str               = "PYPNM_DB_BACKEND"
+    _cfg = ConfigManager()
+    _logger = logging.getLogger("SystemConfigSettings")
 
-    _ENCRYPTED_TOKEN_PREFIX: str            = "ENC["
+    _DEFAULT_IP_ADDRESS: InetAddressStr = cast(InetAddressStr, "192.168.0.100")
+    _DEFAULT_SNMP_RETRIES: int = 5
+    _DEFAULT_SNMP_TIMEOUT: int = 2
+    _DEFAULT_FILE_RETRIEVAL_RETRIES: int = 5
+    _DEFAULT_HTTP_PORT: int = 80
+    _DEFAULT_HTTPS_PORT: int = 443
+    _DEFAULT_TFTP_PORT: int = 69
+    _DEFAULT_FTP_PORT: int = 21
+    _DEFAULT_SFTP_PORT: int = 22
+    _DEFAULT_SCP_PORT: int = 22
+    _DEFAULT_LOG_LEVEL: str = "INFO"
+    _DEFAULT_LOG_DIR: str = "logs"
+    _DEFAULT_LOG_FILENAME: str = "pypnm.log"
+    _DEFAULT_SNMP_READ_COMMUNITY: str = "public"
+    _DEFAULT_SNMP_WRITE_COMMUNITY: str = ""
+    _DEFAULT_PNM_DIR: str = ".data/pnm"
+    _DEFAULT_CSV_DIR: str = ".data/csv"
+    _DEFAULT_JSON_DIR: str = ".data/json"
+    _DEFAULT_XLSX_DIR: str = ".data/xlsx"
+    _DEFAULT_PNG_DIR: str = ".data/png"
+    _DEFAULT_ARCHIVE_DIR: str = ".data/archive"
+    _DEFAULT_MSG_RSP_DIR: str = ".data/msg_rsp"
+    _DEFAULT_DB_BACKEND: DatabaseBackend = DatabaseBackend.SQLITE
+    _DEFAULT_SQLITE_DB_PATH: DatabasePath = DEFAULT_SQLITE_DB_PATH
+    _DEFAULT_POSTGRES_DSN: DatabaseDsn = DEFAULT_POSTGRES_DSN
+    _POSTGRES_DSN_ENV_VAR: str = POSTGRES_DSN_ENV_VAR
+    _DB_BACKEND_ENV_VAR: str = "PYPNM_DB_BACKEND"
 
-    _PRIMARY_RETRIEVAL_METHOD_KEY: str      = "retrieval_method"
-    _LEGACY_RETRIEVAL_METHOD_KEY: str       = "retrival_method"
+    _ENCRYPTED_TOKEN_PREFIX: str = "ENC["
+
+    _PRIMARY_RETRIEVAL_METHOD_KEY: str = "retrieval_method"
+    _LEGACY_RETRIEVAL_METHOD_KEY: str = "retrival_method"
 
     @classmethod
     def _config_path(cls, *path: str) -> str:
@@ -106,7 +107,9 @@ class SystemConfigSettings:
         return str(value)
 
     @classmethod
-    def _peek_str_fallback(cls, primary: tuple[str, ...], legacy: tuple[str, ...]) -> str:
+    def _peek_str_fallback(
+        cls, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> str:
         value = cls._cfg.get(*primary)
         if value is not None:
             if isinstance(value, str):
@@ -157,8 +160,12 @@ class SystemConfigSettings:
         return cls._maybe_decrypt(password, *method_path, "password")
 
     @classmethod
-    def _get_password_value_fallback(cls, require: bool, primary: tuple[str, ...], legacy: tuple[str, ...]) -> str:
-        password_enc = cls._peek_str_fallback(primary + ("password_enc",), legacy + ("password_enc",))
+    def _get_password_value_fallback(
+        cls, require: bool, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> str:
+        password_enc = cls._peek_str_fallback(
+            primary + ("password_enc",), legacy + ("password_enc",)
+        )
         if password_enc.strip() != "":
             decrypted = cls._maybe_decrypt(password_enc, *(primary + ("password_enc",)))
             if decrypted != "":
@@ -166,7 +173,9 @@ class SystemConfigSettings:
             if require:
                 return ""
 
-        password = cls._peek_str_fallback(primary + ("password",), legacy + ("password",))
+        password = cls._peek_str_fallback(
+            primary + ("password",), legacy + ("password",)
+        )
         if password.strip() == "":
             if require:
                 cls._logger.error(
@@ -210,7 +219,9 @@ class SystemConfigSettings:
         return value
 
     @classmethod
-    def _get_str_fallback(cls, default: str, primary: tuple[str, ...], legacy: tuple[str, ...]) -> str:
+    def _get_str_fallback(
+        cls, default: str, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> str:
         value = cls._cfg.get(*primary)
         if value is not None:
             if isinstance(value, str) and value != "":
@@ -288,7 +299,9 @@ class SystemConfigSettings:
         return value
 
     @classmethod
-    def _get_str_fallback_allow_empty(cls, default: str, primary: tuple[str, ...], legacy: tuple[str, ...]) -> str:
+    def _get_str_fallback_allow_empty(
+        cls, default: str, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> str:
         value = cls._cfg.get(*primary)
         if value is not None:
             if isinstance(value, str):
@@ -338,7 +351,9 @@ class SystemConfigSettings:
             return default
 
     @classmethod
-    def _get_int_fallback(cls, default: int, primary: tuple[str, ...], legacy: tuple[str, ...]) -> int:
+    def _get_int_fallback(
+        cls, default: int, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> int:
         value = cls._cfg.get(*primary)
         if value is not None:
             try:
@@ -399,7 +414,9 @@ class SystemConfigSettings:
         return default
 
     @classmethod
-    def _get_bool_fallback(cls, default: bool, primary: tuple[str, ...], legacy: tuple[str, ...]) -> bool:
+    def _get_bool_fallback(
+        cls, default: bool, primary: tuple[str, ...], legacy: tuple[str, ...]
+    ) -> bool:
         value = cls._cfg.get(*primary)
         if isinstance(value, bool):
             return value
@@ -515,7 +532,9 @@ class SystemConfigSettings:
     def default_ip_address(cls) -> InetAddressStr:
         return cast(
             InetAddressStr,
-            cls._get_str(cls._DEFAULT_IP_ADDRESS, "FastApiRequestDefault", "ip_address"),
+            cls._get_str(
+                cls._DEFAULT_IP_ADDRESS, "FastApiRequestDefault", "ip_address"
+            ),
         )
 
     # SNMP v2 settings
@@ -525,9 +544,9 @@ class SystemConfigSettings:
 
     @classmethod
     def snmp_retries(cls) -> int:
-        return cls._get_int(cls._DEFAULT_SNMP_RETRIES, "SNMP", "version", "2c", "retries")
-
-
+        return cls._get_int(
+            cls._DEFAULT_SNMP_RETRIES, "SNMP", "version", "2c", "retries"
+        )
 
     @classmethod
     def snmp_read_community(cls) -> SnmpReadCommunity:
@@ -559,7 +578,13 @@ class SystemConfigSettings:
                 return cast(SnmpReadCommunity, coerced)
         return cast(
             SnmpReadCommunity,
-            cls._get_str(cls._DEFAULT_SNMP_READ_COMMUNITY, "SNMP", "version", "2c", "read_community"),
+            cls._get_str(
+                cls._DEFAULT_SNMP_READ_COMMUNITY,
+                "SNMP",
+                "version",
+                "2c",
+                "read_community",
+            ),
         )
 
     @classmethod
@@ -579,7 +604,13 @@ class SystemConfigSettings:
                 return cast(SnmpWriteCommunity, coerced)
         return cast(
             SnmpWriteCommunity,
-            cls._get_str(cls._DEFAULT_SNMP_WRITE_COMMUNITY, "SNMP", "version", "2c", "write_community"),
+            cls._get_str(
+                cls._DEFAULT_SNMP_WRITE_COMMUNITY,
+                "SNMP",
+                "version",
+                "2c",
+                "write_community",
+            ),
         )
 
     # SNMP v3 settings
@@ -660,7 +691,9 @@ class SystemConfigSettings:
 
     @classmethod
     def bulk_http_port(cls) -> int:
-        return cls._get_int(cls._DEFAULT_HTTP_PORT, "PnmBulkDataTransfer", "http", "port")
+        return cls._get_int(
+            cls._DEFAULT_HTTP_PORT, "PnmBulkDataTransfer", "http", "port"
+        )
 
     @classmethod
     def bulk_https_base_url(cls) -> str:
@@ -668,7 +701,9 @@ class SystemConfigSettings:
 
     @classmethod
     def bulk_https_port(cls) -> int:
-        return cls._get_int(cls._DEFAULT_HTTPS_PORT, "PnmBulkDataTransfer", "https", "port")
+        return cls._get_int(
+            cls._DEFAULT_HTTPS_PORT, "PnmBulkDataTransfer", "https", "port"
+        )
 
     # PNM file retrieval/storage settings
     @classmethod
@@ -725,82 +760,214 @@ class SystemConfigSettings:
 
     @classmethod
     def file_retrieval_retries(cls) -> int:
-        return cls._get_int(cls._DEFAULT_FILE_RETRIEVAL_RETRIES, "PnmFileRetrieval", "retries")
+        return cls._get_int(
+            cls._DEFAULT_FILE_RETRIEVAL_RETRIES, "PnmFileRetrieval", "retries"
+        )
 
     @classmethod
     def retrieval_method(cls) -> str:
         primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "method")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "method")
+        legacy = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "method")
 
         return cls._get_str_fallback("", primary, legacy)
 
     # Local method
     @classmethod
     def local_src_dir(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "local", "src_dir")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "local", "src_dir")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "local",
+            "src_dir",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "local",
+            "src_dir",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     # TFTP method
     @classmethod
     def tftp_host(cls) -> InetAddressStr:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "host")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "host")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "host",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "host",
+        )
         return InetAddressStr(cls._get_str_fallback("", primary, legacy))
 
     @classmethod
     def tftp_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_TFTP_PORT, primary, legacy)
 
     @classmethod
     def tftp_timeout(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "timeout")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "timeout")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "timeout",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "timeout",
+        )
         return cls._get_int_fallback(cls._DEFAULT_SNMP_TIMEOUT, primary, legacy)
 
     @classmethod
     def tftp_remote_dir(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "remote_dir")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "tftp", "remote_dir")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "remote_dir",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "tftp",
+            "remote_dir",
+        )
         return cls._get_str_fallback_allow_empty("", primary, legacy)
 
     # FTP method
     @classmethod
     def ftp_host(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "host")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "host")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "host",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "host",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def ftp_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_FTP_PORT, primary, legacy)
 
     @classmethod
     def ftp_use_tls(cls) -> bool:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "tls")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "tls")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "tls",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "tls",
+        )
         return cls._get_bool_fallback(False, primary, legacy)
 
     @classmethod
     def ftp_timeout(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "timeout")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "timeout")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "timeout",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "timeout",
+        )
         return cls._get_int_fallback(cls._DEFAULT_SNMP_TIMEOUT, primary, legacy)
 
     @classmethod
     def ftp_user(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "user")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "user")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "user",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "user",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def ftp_password(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+        )
         return cls._get_password_value_fallback(
             True,
             primary,
@@ -809,38 +976,110 @@ class SystemConfigSettings:
 
     @classmethod
     def ftp_remote_dir(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "remote_dir")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "ftp", "remote_dir")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "remote_dir",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "ftp",
+            "remote_dir",
+        )
         return cls._get_str_fallback_allow_empty("", primary, legacy)
 
     # SCP method
     @classmethod
     def scp_host(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "host")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "host")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "host",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "host",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def scp_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_SCP_PORT, primary, legacy)
 
     @classmethod
     def scp_user(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "user")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "user")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "user",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "user",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def scp_password(cls) -> str:
-        private_key_path_primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "private_key_path")
-        private_key_path_legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "private_key_path")
-        private_key_path         = cls._peek_str_fallback(private_key_path_primary, private_key_path_legacy).strip()
-        require                  = private_key_path == ""
+        private_key_path_primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "private_key_path",
+        )
+        private_key_path_legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "private_key_path",
+        )
+        private_key_path = cls._peek_str_fallback(
+            private_key_path_primary, private_key_path_legacy
+        ).strip()
+        require = private_key_path == ""
 
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+        )
 
         return cls._get_password_value_fallback(
             require,
@@ -850,44 +1089,128 @@ class SystemConfigSettings:
 
     @classmethod
     def scp_private_key_path(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "private_key_path")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "private_key_path")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "private_key_path",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "private_key_path",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def scp_remote_dir(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "scp", "remote_dir")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "scp", "remote_dir")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "remote_dir",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "scp",
+            "remote_dir",
+        )
         return cls._get_str_fallback_allow_empty("", primary, legacy)
 
     # SFTP method
     @classmethod
     def sftp_host(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "host")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "host")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "host",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "host",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def sftp_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_SFTP_PORT, primary, legacy)
 
     @classmethod
     def sftp_user(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "user")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "user")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "user",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "user",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def sftp_password(cls) -> str:
-        private_key_path_primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "private_key_path")
-        private_key_path_legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "private_key_path")
-        private_key_path         = cls._peek_str_fallback(private_key_path_primary, private_key_path_legacy).strip()
-        require                  = private_key_path == ""
+        private_key_path_primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "private_key_path",
+        )
+        private_key_path_legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "private_key_path",
+        )
+        private_key_path = cls._peek_str_fallback(
+            private_key_path_primary, private_key_path_legacy
+        ).strip()
+        require = private_key_path == ""
 
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+        )
 
         return cls._get_password_value_fallback(
             require,
@@ -897,40 +1220,112 @@ class SystemConfigSettings:
 
     @classmethod
     def sftp_private_key_path(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "private_key_path")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "private_key_path")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "private_key_path",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "private_key_path",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def sftp_remote_dir(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "remote_dir")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "sftp", "remote_dir")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "remote_dir",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "sftp",
+            "remote_dir",
+        )
         return cls._get_str_fallback_allow_empty("", primary, legacy)
 
     # HTTP method
     @classmethod
     def http_base_url(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "http", "base_url")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "http", "base_url")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "http",
+            "base_url",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "http",
+            "base_url",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def http_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "http", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "http", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "http",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "http",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_HTTP_PORT, primary, legacy)
 
     # HTTPS method
     @classmethod
     def https_base_url(cls) -> str:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "https", "base_url")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "https", "base_url")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "https",
+            "base_url",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "https",
+            "base_url",
+        )
         return cls._get_str_fallback("", primary, legacy)
 
     @classmethod
     def https_port(cls) -> int:
-        primary = ("PnmFileRetrieval", cls._PRIMARY_RETRIEVAL_METHOD_KEY, "methods", "https", "port")
-        legacy  = ("PnmFileRetrieval", cls._LEGACY_RETRIEVAL_METHOD_KEY, "methods", "https", "port")
+        primary = (
+            "PnmFileRetrieval",
+            cls._PRIMARY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "https",
+            "port",
+        )
+        legacy = (
+            "PnmFileRetrieval",
+            cls._LEGACY_RETRIEVAL_METHOD_KEY,
+            "methods",
+            "https",
+            "port",
+        )
         return cls._get_int_fallback(cls._DEFAULT_HTTPS_PORT, primary, legacy)
 
     # Logging

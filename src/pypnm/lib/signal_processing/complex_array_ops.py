@@ -80,7 +80,9 @@ class ComplexArrayOps:
         """
         a = np.asarray(x, dtype=np.float64)
         if a.ndim != 2 or a.shape[1] != 2:
-            raise ValueError(f"{name} must be a sequence of (real, imag) pairs; got shape {a.shape}")
+            raise ValueError(
+                f"{name} must be a sequence of (real, imag) pairs; got shape {a.shape}"
+            )
         if a.shape[0] < 1:
             raise ValueError(f"{name} must have at least 1 pair; got {a.shape[0]}")
 
@@ -198,7 +200,9 @@ class ComplexArrayOps:
         z = self._z
         return z.real * z.real + z.imag * z.imag
 
-    def power_db(self, *, eps: float = float(np.finfo(np.float64).tiny)) -> ArrayLikeF64:
+    def power_db(
+        self, *, eps: float = float(np.finfo(np.float64).tiny)
+    ) -> ArrayLikeF64:
         """
         Power per subcarrier in dB.
 
@@ -344,7 +348,9 @@ class ComplexArrayOps:
         obj._z = np.asarray(gain, dtype=np.complex128) * self._z
         return obj
 
-    def normalize_rms(self, *, target: float = 1.0, mask: ArrayLikeF64 | None = None) -> ComplexArrayOps:
+    def normalize_rms(
+        self, *, target: float = 1.0, mask: ArrayLikeF64 | None = None
+    ) -> ComplexArrayOps:
         """
         Scale the vector so that RMS magnitude equals `target`.
 

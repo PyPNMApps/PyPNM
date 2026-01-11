@@ -32,38 +32,51 @@ class SnmpFastApiRouter(ABC):
     - get_analysis_logic
     """
 
-    def __init__(self, prefix: str, tags: list[str|Enum], base_endpoint: str) -> None:
+    def __init__(self, prefix: str, tags: list[str | Enum], base_endpoint: str) -> None:
         self.router = APIRouter(prefix=prefix, tags=tags)
         self.logger = logging.getLogger(f"{self.__class__.__name__}.{base_endpoint}")
         self._base_endpoint = base_endpoint.strip("/")
         self._add_routes()
 
     def _add_routes(self) -> None:
-        @self.router.post(f"/{self._base_endpoint}/getMeasurement",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            f"/{self._base_endpoint}/getMeasurement",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_measurement(request: BaseDeviceConnectRequest) -> SnmpResponse:
             try:
                 return await self.get_measurement_logic(request)
             except HTTPException:
                 raise
             except Exception as e:
-                self.logger.exception(f"[getMeasurement] Error for MAC {request.cable_modem.mac_address}")
-                raise HTTPException(status_code=500, detail=f"Measurement retrieval failed: {str(e)}") from e
+                self.logger.exception(
+                    f"[getMeasurement] Error for MAC {request.cable_modem.mac_address}"
+                )
+                raise HTTPException(
+                    status_code=500, detail=f"Measurement retrieval failed: {str(e)}"
+                ) from e
 
-        @self.router.post(f"/{self._base_endpoint}/getAnalysis",
-                          response_model=SnmpAnalysisResponse)
+        @self.router.post(
+            f"/{self._base_endpoint}/getAnalysis", response_model=SnmpAnalysisResponse
+        )
         async def get_analysis(request: SnmpAnalysisRequest) -> SnmpAnalysisResponse:
             try:
                 return await self.get_analysis_logic(request)
             except HTTPException:
                 raise
             except Exception as e:
-                self.logger.exception(f"[getPlot] Error for MAC {request.cable_modem.mac_address}")
-                raise HTTPException(status_code=500, detail=f"Plot retrieval failed: {str(e)}") from e
+                self.logger.exception(
+                    f"[getPlot] Error for MAC {request.cable_modem.mac_address}"
+                )
+                raise HTTPException(
+                    status_code=500, detail=f"Plot retrieval failed: {str(e)}"
+                ) from e
 
     @abstractmethod
-    async def get_measurement_logic(self, request: BaseDeviceConnectRequest) -> SnmpResponse:
+    async def get_measurement_logic(
+        self, request: BaseDeviceConnectRequest
+    ) -> SnmpResponse:
         """Subclasses must implement this to provide measurement data.
 
         Example:
@@ -81,7 +94,9 @@ class SnmpFastApiRouter(ABC):
         pass
 
     @abstractmethod
-    async def get_analysis_logic(self, request: SnmpAnalysisRequest) -> SnmpAnalysisResponse:
+    async def get_analysis_logic(
+        self, request: SnmpAnalysisRequest
+    ) -> SnmpAnalysisResponse:
         """Subclasses must implement this to provide plotting data.
 
         Example:

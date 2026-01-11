@@ -18,14 +18,18 @@ try:
 except ImportError:
     OctetString = None
 
+
 class MacAddressFormat(Enum):
-    FLAT    = auto()    # e.g., '001a2b3c4d5e'
-    CISCO   = auto()    # e.g., '001a.2b3c.4d5e'
-    COLON   = auto()    # e.g., '00:1a:2b:3c:4d:5e'
-    HYPHEN  = auto()    # e.g., '00-1a-2b-3c-4d-5e'
+    FLAT = auto()  # e.g., '001a2b3c4d5e'
+    CISCO = auto()  # e.g., '001a.2b3c.4d5e'
+    COLON = auto()  # e.g., '00:1a:2b:3c:4d:5e'
+    HYPHEN = auto()  # e.g., '00-1a-2b-3c-4d-5e'
+
 
 class MacAddress:
-    def __init__(self, mac_address: MacAddressStr | str | bytes | bytearray | OctetString) -> None: # type: ignore
+    def __init__(
+        self, mac_address: MacAddressStr | str | bytes | bytearray | OctetString
+    ) -> None:  # type: ignore
         """
         Initialize a MacAddress object.
 
@@ -44,7 +48,7 @@ class MacAddress:
 
         if isinstance(mac_address, (bytes, bytearray)):
             # Convert bytes to hex string
-            mac_address = ''.join(f"{b:02x}" for b in mac_address)
+            mac_address = "".join(f"{b:02x}" for b in mac_address)
 
         if isinstance(mac_address, str):
             # Remove 0x prefix if present
@@ -56,11 +60,15 @@ class MacAddress:
 
             # Validate length and hex characters
             if not re.fullmatch(r"[0-9a-fA-F]{12}", mac_address):
-                raise ValueError(f"Invalid MAC address: {mac_address}. It should contain exactly 12 hexadecimal characters.")
+                raise ValueError(
+                    f"Invalid MAC address: {mac_address}. It should contain exactly 12 hexadecimal characters."
+                )
 
             self._mac = mac_address.lower()
         else:
-            raise TypeError(f"Unsupported type for mac_address: {type(mac_address).__name__} -> value: {mac_address}")
+            raise TypeError(
+                f"Unsupported type for mac_address: {type(mac_address).__name__} -> value: {mac_address}"
+            )
 
     def is_equal(self, other: MacAddress) -> bool:
         """
@@ -94,7 +102,9 @@ class MacAddress:
         Returns:
             str: The MAC address as XX:XX:XX:XX:XX:XX.
         """
-        return ':'.join(self.mac_address[i:i+2] for i in range(0, len(self.mac_address), 2))
+        return ":".join(
+            self.mac_address[i : i + 2] for i in range(0, len(self.mac_address), 2)
+        )
 
     def is_multicast(self) -> bool:
         """
@@ -105,7 +115,9 @@ class MacAddress:
         """
         return int(self.mac_address[0:2], 16) & 1 == 1
 
-    def to_mac_format(self, fmt: MacAddressFormat = MacAddressFormat.FLAT) -> MacAddressStr:
+    def to_mac_format(
+        self, fmt: MacAddressFormat = MacAddressFormat.FLAT
+    ) -> MacAddressStr:
         """
         Convert the MAC address to a specific string format.
 
@@ -123,10 +135,14 @@ class MacAddress:
             return cast(MacAddressStr, hex_str)
 
         elif fmt == MacAddressFormat.COLON:
-            return  cast(MacAddressStr, ':'.join(hex_str[i:i+2] for i in range(0, 12, 2)))
+            return cast(
+                MacAddressStr, ":".join(hex_str[i : i + 2] for i in range(0, 12, 2))
+            )
 
         elif fmt == MacAddressFormat.HYPHEN:
-            return cast(MacAddressStr, '-'.join(hex_str[i:i+2] for i in range(0, 12, 2)))
+            return cast(
+                MacAddressStr, "-".join(hex_str[i : i + 2] for i in range(0, 12, 2))
+            )
 
         elif fmt == MacAddressFormat.CISCO:
             return cast(MacAddressStr, f"{hex_str[:4]}.{hex_str[4:8]}.{hex_str[8:]}")
@@ -159,7 +175,7 @@ class MacAddress:
         return isinstance(other, MacAddress) and self._mac == other._mac
 
     @staticmethod
-    def is_valid(mac_address: str | bytes | bytearray | OctetString) -> bool: # type: ignore
+    def is_valid(mac_address: str | bytes | bytearray | OctetString) -> bool:  # type: ignore
         """
         Static method to validate a MAC address.
 
@@ -199,7 +215,9 @@ class MacAddress:
             If mac_bytes is not exactly 6 bytes long.
         """
         if len(mac_bytes) != 6:
-            raise ValueError(f"MAC address must be exactly 6 bytes, got {len(mac_bytes)} bytes.")
+            raise ValueError(
+                f"MAC address must be exactly 6 bytes, got {len(mac_bytes)} bytes."
+            )
         return cls(bytes(mac_bytes))
 
     def to_bytes(self) -> bytes:
@@ -214,4 +232,4 @@ class MacAddress:
         bytes
             6-byte MAC address suitable for writing into binary PNM payloads.
         """
-        return bytes(int(self._mac[i:i+2], 16) for i in range(0, 12, 2))
+        return bytes(int(self._mac[i : i + 2], 16) for i in range(0, 12, 2))

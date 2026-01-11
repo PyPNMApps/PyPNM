@@ -149,7 +149,7 @@ def test_validation_errors() -> None:
     with pytest.raises(ValueError):
         GroupDelay(H_pairs, df_hz=None, freq_hz=None)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
-        GroupDelay(H_pairs, df_hz=df, freq_hz=f)       # both given
+        GroupDelay(H_pairs, df_hz=df, freq_hz=f)  # both given
 
     # freq vector length mismatch
     with pytest.raises(ValueError):

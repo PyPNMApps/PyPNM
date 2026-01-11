@@ -136,7 +136,9 @@ class InetGenerate:
                 ip_address = ipaddress.IPv4Address(ip_bytes)
                 return str(ip_address)
             except ValueError:
-                raise ValueError(f"Invalid HEX string for IPv4: {inet_hex_str}") from None
+                raise ValueError(
+                    f"Invalid HEX string for IPv4: {inet_hex_str}"
+                ) from None
         elif len(inet_hex_str) == 32:  # IPv6 address
             try:
                 # Convert HEX string to bytes and then to an IPv6 address
@@ -144,6 +146,10 @@ class InetGenerate:
                 ip_address = ipaddress.IPv6Address(ip_bytes)
                 return str(ip_address)
             except ValueError:
-                raise ValueError(f"Invalid HEX string for IPv6: {inet_hex_str}") from None
+                raise ValueError(
+                    f"Invalid HEX string for IPv6: {inet_hex_str}"
+                ) from None
         else:
-            raise ValueError("HEX string must represent either a valid IPv4 (8 hex characters) or IPv6 (32 hex characters) address.")
+            raise ValueError(
+                "HEX string must represent either a valid IPv4 (8 hex characters) or IPv6 (32 hex characters) address."
+            )

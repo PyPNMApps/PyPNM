@@ -8,8 +8,8 @@ from enum import Enum
 
 class PnmFileRetrievalMethod(Enum):
     LOCAL = "local"
-    TFTP  = "tftp"
-    FTP   = "ftp"
-    SFTP  = "sftp"
-    HTTP  = "http"
+    TFTP = "tftp"
+    FTP = "ftp"
+    SFTP = "sftp"
+    HTTP = "http"
     HTTPS = "https"

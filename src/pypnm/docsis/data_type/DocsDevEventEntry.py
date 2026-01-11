@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -12,7 +11,6 @@ from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class DocsDevEventEntry:
-
     index: int
     docsDevEvFirstTime: bytes = None
     docsDevEvLastTime: bytes = None
@@ -48,24 +46,32 @@ class DocsDevEventEntry:
         try:
             for attr, (oid_key, transform) in fields.items():
                 try:
-                    result = await self.snmp.get(f"{COMPILED_OIDS[oid_key]}.{self.index}")
+                    result = await self.snmp.get(
+                        f"{COMPILED_OIDS[oid_key]}.{self.index}"
+                    )
                     value_result = Snmp_v2c.get_result_value(result)
 
                     if isinstance(value_result, str) and value_result.startswith("0x"):
                         value_result = unhexlify(value_result[2:])
 
                     if not value_result:
-                        self.logger.warning(f"Invalid value returned for {oid_key}.{self.index}: {value_result}")
+                        self.logger.warning(
+                            f"Invalid value returned for {oid_key}.{self.index}: {value_result}"
+                        )
                         setattr(self, attr, None)
                         continue
 
                     setattr(self, attr, transform(value_result))
                 except Exception as e:
-                    self.logger.warning(f"Failed to fetch or transform {attr} ({oid_key}): {e}")
+                    self.logger.warning(
+                        f"Failed to fetch or transform {attr} ({oid_key}): {e}"
+                    )
                     setattr(self, attr, None)
 
         except Exception as e:
-            self.logger.exception(f"Unexpected error during SNMP population, error: {e}")
+            self.logger.exception(
+                f"Unexpected error during SNMP population, error: {e}"
+            )
             return False
 
         return True
@@ -87,7 +93,9 @@ class DocsDevEventEntry:
         for attr in self.__annotations__:
             value = getattr(self, attr, None)
             if value is None:
-                raise ValueError(f"Attribute '{attr}' is not populated. Please call 'start' first.")
+                raise ValueError(
+                    f"Attribute '{attr}' is not populated. Please call 'start' first."
+                )
             data[attr] = value
 
         if nested:

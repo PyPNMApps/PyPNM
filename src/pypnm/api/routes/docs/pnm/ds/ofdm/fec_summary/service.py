@@ -27,14 +27,20 @@ class CmDsOfdmFecSummaryService(CommonMeasureService):
         tftp_path (str, optional): The path on the TFTP server where test results are stored. Defaults to "".
         snmp_write_community (str, optional): The SNMP write community string. Defaults to "private".
     """
-    def __init__(self, cable_modem: CableModem,
-                 fec_summary_type: FecSummaryType,
-                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 tftp_path: str = PnmConfigManager.get_tftp_path()) -> None:
-        super().__init__(DocsPnmCmCtlTest.DS_OFDM_CODEWORD_ERROR_RATE,
-                        cable_modem,
-                        tftp_servers,
-                        tftp_path,
-                        cable_modem.getWriteCommunity(),
-                        fec_summary_type=fec_summary_type)
+
+    def __init__(
+        self,
+        cable_modem: CableModem,
+        fec_summary_type: FecSummaryType,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+    ) -> None:
+        super().__init__(
+            DocsPnmCmCtlTest.DS_OFDM_CODEWORD_ERROR_RATE,
+            cable_modem,
+            tftp_servers,
+            tftp_path,
+            cable_modem.getWriteCommunity(),
+            fec_summary_type=fec_summary_type,
+        )
         self.logger = logging.getLogger(self.__class__.__name__)

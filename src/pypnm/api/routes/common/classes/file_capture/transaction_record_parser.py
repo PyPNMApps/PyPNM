@@ -21,13 +21,16 @@ class TransactionRecordParser:
     """
 
     def __init__(self, transaction_id: TransactionId) -> None:
-        self.transaction_id:TransactionId = transaction_id
+        self.transaction_id: TransactionId = transaction_id
 
         # TODO: Refactor to use PnmFileTransaction internally, this is causing circular imports
         from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
             PnmFileTransaction,
         )
-        self.record: dict[str, Any] | None = PnmFileTransaction().get_record(transaction_id)
+
+        self.record: dict[str, Any] | None = PnmFileTransaction().get_record(
+            transaction_id
+        )
 
         if not self.record:
             raise ValueError(f"No record found for transaction ID: {transaction_id}")
@@ -45,15 +48,19 @@ class TransactionRecordParser:
         return self.record.get("filename")
 
     def get_device_details(self) -> dict[str, Any] | None:
-        return self.record.get("device_details", {}).get("system_description", {}) if self.record else None
+        return (
+            self.record.get("device_details", {}).get("system_description", {})
+            if self.record
+            else None
+        )
 
     def get_device_model(self) -> str | None:
         device_details = self.get_device_details()
         return device_details.get("MODEL") if device_details else None
 
-    '''
+    """
         System Descriptor
-    '''
+    """
 
     def get_device_vendor(self) -> str | None:
         device_details = self.get_device_details()
@@ -84,12 +91,12 @@ class TransactionRecordParser:
         sdm = SystemDescriptor.load_from_dict(sys_dict).to_model()
 
         return TransactionRecordModel(
-            transaction_id  =   self.transaction_id,
-            timestamp       =   self.get_timestamp(),
-            mac_address     =   self.get_mac_address() or MacAddressStr(MacAddress.null()),
-            pnm_test_type   =   self.get_test_type() or "",
-            filename        =   self.get_filename(),
-            device_details  =   DeviceDetailsModel(system_description=sdm),
+            transaction_id=self.transaction_id,
+            timestamp=self.get_timestamp(),
+            mac_address=self.get_mac_address() or MacAddressStr(MacAddress.null()),
+            pnm_test_type=self.get_test_type() or "",
+            filename=self.get_filename(),
+            device_details=DeviceDetailsModel(system_description=sdm),
         )
 
     @classmethod

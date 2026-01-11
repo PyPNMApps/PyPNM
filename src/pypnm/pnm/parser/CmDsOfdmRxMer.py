@@ -36,16 +36,16 @@ class CmDsOfdmRxMer(PnmHeader):
     def __init__(self, binary_data: bytes) -> None:
         super().__init__(binary_data)
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._rxmer_model:CmDsOfdmRxMerModel
+        self._rxmer_model: CmDsOfdmRxMerModel
 
-        self._channel_id: ChannelId                     = INVALID_CHANNEL_ID
-        self._mac_address: MacAddressStr                = MacAddress.null()
-        self._subcarrier_zero_frequency: FrequencyHz    = INVALID_SUB_CARRIER_ZERO_FREQ
-        self._first_active_subcarrier_index: int        = 0
-        self._subcarrier_spacing: FrequencyHz           = ZERO_FREQUENCY
-        self._rxmer_data_length: int                    = 0
+        self._channel_id: ChannelId = INVALID_CHANNEL_ID
+        self._mac_address: MacAddressStr = MacAddress.null()
+        self._subcarrier_zero_frequency: FrequencyHz = INVALID_SUB_CARRIER_ZERO_FREQ
+        self._first_active_subcarrier_index: int = 0
+        self._subcarrier_spacing: FrequencyHz = ZERO_FREQUENCY
+        self._rxmer_data_length: int = 0
         self._rxmer_data: bytes
-        self._rx_mer_float_data: FloatSeries      = []
+        self._rx_mer_float_data: FloatSeries = []
 
         self._process()
 
@@ -60,21 +60,25 @@ class CmDsOfdmRxMer(PnmHeader):
             )
 
         try:
-            rxmer_data_format = '!B6sIHBI'  # channel_id, mac(6), zero_freq, active_idx, spacing(kHz), data_len
-            head_len:int = struct.calcsize(rxmer_data_format)
+            rxmer_data_format = "!B6sIHBI"  # channel_id, mac(6), zero_freq, active_idx, spacing(kHz), data_len
+            head_len: int = struct.calcsize(rxmer_data_format)
 
             if len(self.pnm_data) < head_len:
                 raise ValueError("Binary data too short to contain RxMER header.")
 
             unpacked_data = struct.unpack(rxmer_data_format, self.pnm_data[:head_len])
 
-            self._channel_id                     = unpacked_data[0]
-            self._mac_address                    = MacAddress(unpacked_data[1]).to_mac_format(MacAddressFormat.COLON)
-            self._subcarrier_zero_frequency      = unpacked_data[2]
-            self._first_active_subcarrier_index  = unpacked_data[3]
-            self._subcarrier_spacing             = unpacked_data[4] * KHZ
-            self._rxmer_data_length              = unpacked_data[5]
-            self._rxmer_data                     = self.pnm_data[head_len:head_len + self._rxmer_data_length]
+            self._channel_id = unpacked_data[0]
+            self._mac_address = MacAddress(unpacked_data[1]).to_mac_format(
+                MacAddressFormat.COLON
+            )
+            self._subcarrier_zero_frequency = unpacked_data[2]
+            self._first_active_subcarrier_index = unpacked_data[3]
+            self._subcarrier_spacing = unpacked_data[4] * KHZ
+            self._rxmer_data_length = unpacked_data[5]
+            self._rxmer_data = self.pnm_data[
+                head_len : head_len + self._rxmer_data_length
+            ]
 
             if len(self._rxmer_data) < self._rxmer_data_length:
                 raise ValueError(
@@ -95,17 +99,19 @@ class CmDsOfdmRxMer(PnmHeader):
         values = self.get_rxmer_values()
 
         model = CmDsOfdmRxMerModel(
-            pnm_header                      = self.getPnmHeaderParameterModel(),
-            channel_id                      = self._channel_id,
-            mac_address                     = self._mac_address,
-            subcarrier_zero_frequency       = self._subcarrier_zero_frequency,
-            first_active_subcarrier_index   = self._first_active_subcarrier_index,
-            subcarrier_spacing              = self._subcarrier_spacing,
-            data_length                     = self._rxmer_data_length,
-            occupied_channel_bandwidth      = FrequencyHz(self._rxmer_data_length * self._subcarrier_spacing),
-            values                          = values,
-            signal_statistics               = SignalStatistics(values).compute(),
-            modulation_statistics           = ShannonSeries(values).to_dict(),
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=self._channel_id,
+            mac_address=self._mac_address,
+            subcarrier_zero_frequency=self._subcarrier_zero_frequency,
+            first_active_subcarrier_index=self._first_active_subcarrier_index,
+            subcarrier_spacing=self._subcarrier_spacing,
+            data_length=self._rxmer_data_length,
+            occupied_channel_bandwidth=FrequencyHz(
+                self._rxmer_data_length * self._subcarrier_spacing
+            ),
+            values=values,
+            signal_statistics=SignalStatistics(values).compute(),
+            modulation_statistics=ShannonSeries(values).to_dict(),
         )
 
         return model
@@ -120,7 +126,9 @@ class CmDsOfdmRxMer(PnmHeader):
             return []
 
         # quarter-dB -> clamp to [0.0, 63.5]
-        self._rx_mer_float_data = [min(max(byte / 4.0, 0.0), 63.5) for byte in self._rxmer_data]
+        self._rx_mer_float_data = [
+            min(max(byte / 4.0, 0.0), 63.5) for byte in self._rxmer_data
+        ]
         self.logger.debug(f"Decoded {len(self._rx_mer_float_data)} RxMER float values.")
         return self._rx_mer_float_data
 
@@ -134,7 +142,7 @@ class CmDsOfdmRxMer(PnmHeader):
             return []
 
         start = f_zero + spacing * first_idx
-        return cast(FrequencySeriesHz,[start + i * spacing for i in range(n)])
+        return cast(FrequencySeriesHz, [start + i * spacing for i in range(n)])
 
     def to_model(self) -> CmDsOfdmRxMerModel:
         return self._rxmer_model

@@ -29,7 +29,7 @@ def test_db_overlay_and_residuals_behave_as_expected() -> None:
       2) Residual ripple: check RMS and P2P against residuals of OLS.
     """
     # Synthesize y_db = a + b*x + sinusoidal ripple
-    x_mhz = np.linspace(100.0, 130.0, 241)              # 100..130 MHz
+    x_mhz = np.linspace(100.0, 130.0, 241)  # 100..130 MHz
     x_hz: FrequencyHz = cast(FrequencyHz, (x_mhz * 1e6).tolist())
 
     a = -20.0

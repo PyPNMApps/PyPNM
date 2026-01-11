@@ -18,8 +18,8 @@ def _parse_header_size(byte_array: bytes) -> int:
     """
     Determine header size in bytes based on PNM format.
     """
-    special = struct.unpack('<B', byte_array[3:4])[0]
-    fmt = '<3sBBB' if special == 8 else '!3sBBBI'
+    special = struct.unpack("<B", byte_array[3:4])[0]
+    fmt = "<3sBBB" if special == 8 else "!3sBBBI"
     return struct.calcsize(fmt)
 
 
@@ -33,14 +33,11 @@ class PnmMacInjector(PnmHeader):
         modified_bytes (bytes): Content after MAC injection.
         backup (bool): Whether to backup original file on save.
     """
-    HISTOGRAM_OFFSET_DELTA = 0  # No extra offset for histogram type
-    DEFAULT_OFFSET_DELTA = 1    # One byte past header for most types
 
-    def __init__(
-        self,
-        file_path: str | Path,
-        backup: bool = True
-    ) -> None:
+    HISTOGRAM_OFFSET_DELTA = 0  # No extra offset for histogram type
+    DEFAULT_OFFSET_DELTA = 1  # One byte past header for most types
+
+    def __init__(self, file_path: str | Path, backup: bool = True) -> None:
         # Load raw bytes and parse header
         self.file_path = Path(file_path)
         self.raw_bytes = self.file_path.read_bytes()
@@ -65,7 +62,7 @@ class PnmMacInjector(PnmHeader):
             ValueError: If mac format invalid or file too small.
         """
         # Convert MAC string to 6 bytes
-        hexstr = mac.replace(':', '').replace('-', '')
+        hexstr = mac.replace(":", "").replace("-", "")
         if len(hexstr) != 12:
             raise ValueError(f"Invalid MAC string: {mac}")
         mac_bytes = binascii.unhexlify(hexstr)
@@ -91,7 +88,7 @@ class PnmMacInjector(PnmHeader):
 
         # Inject MAC
         self.modified_bytes = (
-            self.raw_bytes[:offset] + mac_bytes + self.raw_bytes[offset+6:]
+            self.raw_bytes[:offset] + mac_bytes + self.raw_bytes[offset + 6 :]
         )
         self.logger.debug(f"MAC {mac} injected at offset {offset}")
 
@@ -111,7 +108,7 @@ class PnmMacInjector(PnmHeader):
 
         dest = Path(out_path) if out_path else self.file_path
         if self.backup:
-            bak = dest.with_suffix(dest.suffix + '.bak')
+            bak = dest.with_suffix(dest.suffix + ".bak")
             dest.replace(bak)
             self.logger.debug(f"Backup created: {bak}")
 

@@ -25,11 +25,14 @@ class MagnitudeSummaryMetrics(BaseModel):
       p2p_ripple_db    : peak-to-peak of residuals in dB (R_pp)
       fitted_line_db   : best-fit ŷ values in dB aligned to x
     """
-    slope_db_per_mhz: float     = Field(..., description="Slope m in dB/MHz")
-    mean_db: float              = Field(..., description="Mean amplitude A_mean in dB")
-    rms_ripple_db: float        = Field(..., description="RMS ripple R_rms in dB")
-    p2p_ripple_db: float        = Field(..., description="Peak-to-peak ripple R_pp in dB")
-    fitted_line_db: FloatSeries = Field(..., description="Best-fit ŷ (dB) for each subcarrier")
+
+    slope_db_per_mhz: float = Field(..., description="Slope m in dB/MHz")
+    mean_db: float = Field(..., description="Mean amplitude A_mean in dB")
+    rms_ripple_db: float = Field(..., description="RMS ripple R_rms in dB")
+    p2p_ripple_db: float = Field(..., description="Peak-to-peak ripple R_pp in dB")
+    fitted_line_db: FloatSeries = Field(
+        ..., description="Best-fit ŷ (dB) for each subcarrier"
+    )
 
 
 def _to_mhz(freq_hz: FrequencyHz) -> FloatSeries:
@@ -37,8 +40,10 @@ def _to_mhz(freq_hz: FrequencyHz) -> FloatSeries:
     return (arr / 1e6).tolist()
 
 
-def compute_magnitude_summary(freq_hz: FrequencyHz,
-                              coeffs_complex: ComplexArray,) -> MagnitudeSummaryMetrics:
+def compute_magnitude_summary(
+    freq_hz: FrequencyHz,
+    coeffs_complex: ComplexArray,
+) -> MagnitudeSummaryMetrics:
     """
     Compute DOCSIS D.4.3 magnitude summary metrics for channel estimate coefficients.
 
@@ -60,7 +65,9 @@ def compute_magnitude_summary(freq_hz: FrequencyHz,
       MagnitudeSummaryMetrics
     """
     if len(freq_hz) != len(coeffs_complex):
-        raise ValueError(f"Length mismatch: freq={len(freq_hz)} vs coeffs={len(coeffs_complex)}")
+        raise ValueError(
+            f"Length mismatch: freq={len(freq_hz)} vs coeffs={len(coeffs_complex)}"
+        )
 
     # X in MHz
     x_mhz = np.asarray(_to_mhz(freq_hz), dtype=float)
@@ -80,8 +87,9 @@ def compute_magnitude_summary(freq_hz: FrequencyHz,
     mean_db = float(np.mean(y_db)) if y_db.size else 0.0
 
     return MagnitudeSummaryMetrics(
-        slope_db_per_mhz  = b_hat,
-        mean_db           = mean_db,
-        rms_ripple_db     = rms,
-        p2p_ripple_db     = p2p,
-        fitted_line_db    = cast(FloatSeries, y_hat.tolist()),)
+        slope_db_per_mhz=b_hat,
+        mean_db=mean_db,
+        rms_ripple_db=rms,
+        p2p_ripple_db=p2p,
+        fitted_line_db=cast(FloatSeries, y_hat.tolist()),
+    )

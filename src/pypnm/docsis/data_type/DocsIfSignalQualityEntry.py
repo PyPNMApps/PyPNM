@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -27,7 +26,8 @@ class DocsIfSignalQuality:
         - docsIfSigQExtUncorrectables (int)
         - docsIf3SignalQualityExtRxMER (float, in dB)
     """
-    index:int
+
+    index: int
     docsIfSigQUnerroreds: int
     docsIfSigQCorrecteds: int
     docsIfSigQUncorrectables: int
@@ -49,6 +49,7 @@ class DocsIfSignalQuality:
         Returns:
             bool: True if all SNMP queries completed (even if some values are missing), False otherwise if a critical error occurred.
         """
+
         def safe_float_div10(value: str) -> float | None:
             try:
                 return float(value) / 10.0
@@ -63,30 +64,41 @@ class DocsIfSignalQuality:
             "docsIfSigQExtUnerroreds": ("docsIfSigQExtUnerroreds", int),
             "docsIfSigQExtCorrecteds": ("docsIfSigQExtCorrecteds", int),
             "docsIfSigQExtUncorrectables": ("docsIfSigQExtUncorrectables", int),
-            "docsIf3SignalQualityExtRxMER": ("docsIf3SignalQualityExtRxMER", safe_float_div10),
+            "docsIf3SignalQualityExtRxMER": (
+                "docsIf3SignalQualityExtRxMER",
+                safe_float_div10,
+            ),
         }
 
         try:
             for attr, (oid_key, transform) in fields.items():
                 try:
-                    result = await self.snmp.get(f"{COMPILED_OIDS[oid_key]}.{self.index}")
+                    result = await self.snmp.get(
+                        f"{COMPILED_OIDS[oid_key]}.{self.index}"
+                    )
                     value_list = Snmp_v2c.get_result_value(result)
 
                     if not value_list or not value_list:
-                        self.logger.warning(f"Invalid value returned for {oid_key}.{self.index}: {value_list}")
+                        self.logger.warning(
+                            f"Invalid value returned for {oid_key}.{self.index}: {value_list}"
+                        )
                         setattr(self, attr, None)
                         continue
 
                     value = transform(value_list)
                     setattr(self, attr, value)
                 except Exception as e:
-                    self.logger.warning(f"Failed to fetch or transform {attr} ({oid_key}): {e}")
+                    self.logger.warning(
+                        f"Failed to fetch or transform {attr} ({oid_key}): {e}"
+                    )
                     setattr(self, attr, None)
 
             return True
 
         except Exception as e:
-            self.logger.exception(f"Unexpected error during SNMP population, error: {e}")
+            self.logger.exception(
+                f"Unexpected error during SNMP population, error: {e}"
+            )
             return False
 
     def to_dict(self, nested: bool = False) -> dict:
@@ -107,10 +119,16 @@ class DocsIfSignalQuality:
         for attr in self.__annotations__:
             value = getattr(self, attr, None)
             if value is None:
-                raise ValueError(f"Attribute '{attr}' is not populated. Please call 'start' first.")
+                raise ValueError(
+                    f"Attribute '{attr}' is not populated. Please call 'start' first."
+                )
             data[attr] = value
 
         if nested:
-            return {data["index"]: {key: value for key, value in data.items() if key != "index"}}
+            return {
+                data["index"]: {
+                    key: value for key, value in data.items() if key != "index"
+                }
+            }
 
         return data

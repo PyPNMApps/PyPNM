@@ -77,7 +77,7 @@ class CodeWordLutGenerator:
         n_q = len(q_levels)
         m = len(self.hard_decision)
 
-        rectangular = (n_i * n_q == m)
+        rectangular = n_i * n_q == m
 
         if rectangular:
             # Rectangular mapping with Gray per axis
@@ -96,7 +96,7 @@ class CodeWordLutGenerator:
             lut: CodeWordLut = {}
             if self.axis_order == "IQ":
                 # I bits are MSBs
-                for (i, Q0) in sorted(self.hard_decision, key=lambda t: (t[0], t[1])):
+                for i, Q0 in sorted(self.hard_decision, key=lambda t: (t[0], t[1])):
                     ii = i_index_of[i]
                     qi = q_index_of[Q0]
                     gi = self._gray(ii)
@@ -106,7 +106,7 @@ class CodeWordLutGenerator:
                     lut[cw] = (i, Q)
             else:
                 # Q bits are MSBs
-                for (i, Q0) in sorted(self.hard_decision, key=lambda t: (t[1], t[0])):
+                for i, Q0 in sorted(self.hard_decision, key=lambda t: (t[1], t[0])):
                     ii = i_index_of[i]
                     qi = q_index_of[Q0]
                     gi = self._gray(ii)

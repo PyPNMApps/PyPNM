@@ -22,7 +22,7 @@ def test_reflect_mode_preserves_length_and_edges() -> None:
     # idx1 uses [1,2,3] -> 2
     # idx2 uses [2,3,4] -> 3
     # idx3 uses [3,4,3] -> 10/3
-    expect = [5/3, 2.0, 3.0, 10/3]
+    expect = [5 / 3, 2.0, 3.0, 10 / 3]
     assert np.allclose(y, expect, atol=1e-12)
 
 
@@ -36,10 +36,11 @@ def test_same_mode_matches_mask_normalized_convolve_when_all_finite() -> None:
     mask = np.ones_like(x_arr, dtype=float)
 
     num = np.convolve(x_arr, kernel, mode="same")
-    den = np.convolve(mask,  kernel, mode="same")
+    den = np.convolve(mask, kernel, mode="same")
     ref = np.divide(num, den, out=np.zeros_like(num), where=den > 0)
 
     assert np.allclose(y, ref, atol=1e-12)
+
 
 def test_nan_masking_excludes_non_finite_samples() -> None:
     x = [1.0, float("nan"), 3.0, float("inf"), 5.0]

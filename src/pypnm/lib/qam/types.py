@@ -41,23 +41,23 @@ __all__ = [
 class QamModulation(IntEnum):
     """Enumeration of supported QAM modulation orders."""
 
-    UNKNOWN     = 0
-    QAM_2       = 2
-    QAM_4       = 4
-    QAM_8       = 8
-    QAM_16      = 16
-    QAM_32      = 32
-    QAM_64      = 64
-    QAM_128     = 128
-    QAM_256     = 256
-    QAM_512     = 512
-    QAM_1024    = 1024
-    QAM_2048    = 2048
-    QAM_4096    = 4096
-    QAM_8192    = 8192
-    QAM_16384   = 16384
-    QAM_32768   = 32768
-    QAM_65536   = 65536
+    UNKNOWN = 0
+    QAM_2 = 2
+    QAM_4 = 4
+    QAM_8 = 8
+    QAM_16 = 16
+    QAM_32 = 32
+    QAM_64 = 64
+    QAM_128 = 128
+    QAM_256 = 256
+    QAM_512 = 512
+    QAM_1024 = 1024
+    QAM_2048 = 2048
+    QAM_4096 = 4096
+    QAM_8192 = 8192
+    QAM_16384 = 16384
+    QAM_32768 = 32768
+    QAM_65536 = 65536
 
     @classmethod
     def from_value(cls, value: int) -> QamModulation:
@@ -68,7 +68,9 @@ class QamModulation(IntEnum):
             return cls.UNKNOWN
 
     @classmethod
-    def from_DsOfdmModulationType(cls, mod_type: DsOfdmModulationType | int | str) -> QamModulation:
+    def from_DsOfdmModulationType(
+        cls, mod_type: DsOfdmModulationType | int | str
+    ) -> QamModulation:
         """
         Map a DsOfdmModulationType (enum/int/string) to a QamModulation.
 
@@ -100,16 +102,16 @@ class QamModulation(IntEnum):
         if isinstance(name, str):
             key = name.lower()
             name_map = {
-                "qpsk":     cls.QAM_4,
-                "qam16":    cls.QAM_16,
-                "qam64":    cls.QAM_64,
-                "qam128":   cls.QAM_128,
-                "qam256":   cls.QAM_256,
-                "qam512":   cls.QAM_512,
-                "qam1024":  cls.QAM_1024,
-                "qam2048":  cls.QAM_2048,
-                "qam4096":  cls.QAM_4096,
-                "qam8192":  cls.QAM_8192,
+                "qpsk": cls.QAM_4,
+                "qam16": cls.QAM_16,
+                "qam64": cls.QAM_64,
+                "qam128": cls.QAM_128,
+                "qam256": cls.QAM_256,
+                "qam512": cls.QAM_512,
+                "qam1024": cls.QAM_1024,
+                "qam2048": cls.QAM_2048,
+                "qam4096": cls.QAM_4096,
+                "qam8192": cls.QAM_8192,
                 "qam16384": cls.QAM_16384,
                 "qam32768": cls.QAM_32768,
                 "qam65536": cls.QAM_65536,

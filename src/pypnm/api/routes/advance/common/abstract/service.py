@@ -12,6 +12,7 @@ from pypnm.lib.types import GroupId, OperationId
 
 T = TypeVar("T", bound=AbstractCaptureService)
 
+
 class AbstractService:
     """
     Base router class managing the lifecycle of capture service instances.
@@ -25,7 +26,8 @@ class AbstractService:
         _service_store (Dict[str, AbstractCaptureService]):
             Registry mapping operation IDs to service instances.
     """
-    #Maintain singleton mapping of operation_id to service instances
+
+    # Maintain singleton mapping of operation_id to service instances
     __SERVICE_STORE: dict[OperationId, AbstractCaptureService] = {}
 
     def __init__(self) -> None:
@@ -35,7 +37,9 @@ class AbstractService:
         self._service_store: dict[OperationId, AbstractCaptureService] = {}
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def updateServiceStore(self, operation_id: OperationId, service: AbstractCaptureService) -> None:
+    async def updateServiceStore(
+        self, operation_id: OperationId, service: AbstractCaptureService
+    ) -> None:
         """
         Update the internal service registry with a new or modified service instance.
 
@@ -48,7 +52,9 @@ class AbstractService:
         """
         self.__SERVICE_STORE[operation_id] = service
 
-    async def loadService(self, service_cls: type[T], *args: Any, **kwargs: Any) -> tuple[GroupId, OperationId]:  # noqa: ANN401
+    async def loadService(
+        self, service_cls: type[T], *args: Any, **kwargs: Any
+    ) -> tuple[GroupId, OperationId]:  # noqa: ANN401
         """
         Instantiate, start, and register a capture service.
 
@@ -90,7 +96,9 @@ class AbstractService:
         try:
             return self._service_store[operation_id]
         except KeyError as err:
-            raise KeyError(f"No service loaded for operation_id '{operation_id}'") from err
+            raise KeyError(
+                f"No service loaded for operation_id '{operation_id}'"
+            ) from err
 
     def getActiveServices(self) -> dict[OperationId, AbstractCaptureService]:
         """
@@ -99,13 +107,18 @@ class AbstractService:
         Returns:
             Dict[OperationId, AbstractCaptureService]: Mapping of operation IDs to service instances.
         """
-        self.logger.info(f'Retrieving active services. Current store: {self._service_store.keys()}')
+        self.logger.info(
+            f"Retrieving active services. Current store: {self._service_store.keys()}"
+        )
 
         active_services: dict[OperationId, AbstractCaptureService] = {}
 
         for operation_id in self._service_store:
             self.logger.info(f"Active service: operation_id={operation_id}")
-            if self._service_store[operation_id].status()["state"] == OperationState.RUNNING:
+            if (
+                self._service_store[operation_id].status()["state"]
+                == OperationState.RUNNING
+            ):
                 self.logger.info(f"Service {operation_id} is running")
                 active_services[operation_id] = self._service_store[operation_id]
 

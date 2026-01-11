@@ -45,15 +45,36 @@ class NumericScaler:
 
     # SI exponents in steps of 3
     _SI_EXP_BY_PREFIX = {
-        "y": -24, "z": -21, "a": -18, "f": -15, "p": -12, "n": -9,
-        "µ": -6, "u": -6, "m": -3, "": 0, "k": 3, "K": 3, "M": 6, "G": 9, "T": 12, "P": 15
+        "y": -24,
+        "z": -21,
+        "a": -18,
+        "f": -15,
+        "p": -12,
+        "n": -9,
+        "µ": -6,
+        "u": -6,
+        "m": -3,
+        "": 0,
+        "k": 3,
+        "K": 3,
+        "M": 6,
+        "G": 9,
+        "T": 12,
+        "P": 15,
     }
     _SI_SYNONYMS = {
-        "thousand": "k", "kilo": "k",
-        "meg": "M", "mega": "M", "million": "M",
-        "giga": "G", "billion": "G",
-        "tera": "T", "trillion": "T",
-        "micro": "µ", "micros": "µ", "u": "µ",
+        "thousand": "k",
+        "kilo": "k",
+        "meg": "M",
+        "mega": "M",
+        "million": "M",
+        "giga": "G",
+        "billion": "G",
+        "tera": "T",
+        "trillion": "T",
+        "micro": "µ",
+        "micros": "µ",
+        "u": "µ",
     }
 
     # Binary (powers of 1024)
@@ -64,7 +85,9 @@ class NumericScaler:
         Args:
             default_system: 'si' or 'binary'
         """
-        self.default_system = "binary" if default_system.lower().startswith("bin") else "si"
+        self.default_system = (
+            "binary" if default_system.lower().startswith("bin") else "si"
+        )
 
     # ----------------- core helpers -----------------
     @staticmethod
@@ -142,7 +165,9 @@ class NumericScaler:
             "factor": factor if factor else 1.0,
             "style": "prefix",
             "label": self._exp_to_prefix(exp, sys),
-            "power_label": self._power_label(exp if sys == "si" else 0) if sys == "si" else None,
+            "power_label": self._power_label(exp if sys == "si" else 0)
+            if sys == "si"
+            else None,
         }
         return arr, meta
 
@@ -184,7 +209,9 @@ class NumericScaler:
             "factor": (f_factor / (t_factor or 1.0)),
             "style": "prefix",
             "label": tp,
-            "power_label": self._power_label(texp) if (sys == "si" and tp != "") else ("" if sys == "si" else None),
+            "power_label": self._power_label(texp)
+            if (sys == "si" and tp != "")
+            else ("" if sys == "si" else None),
         }
         return arr, meta
 
@@ -212,7 +239,15 @@ class NumericScaler:
 
         arr = self._to_1d(values)
         if arr.size == 0:
-            return arr, {"system": sys, "prefix": "", "exp": 0, "factor": 1.0, "style": "prefix", "label": "", "power_label": ""}
+            return arr, {
+                "system": sys,
+                "prefix": "",
+                "exp": 0,
+                "factor": 1.0,
+                "style": "prefix",
+                "label": "",
+                "power_label": "",
+            }
 
         mag = np.nanmax(np.abs(arr)) if strategy == "max" else np.nanmedian(np.abs(arr))
         if mag == 0 or not np.isfinite(mag):
@@ -223,13 +258,13 @@ class NumericScaler:
                 exp = int(np.floor(np.log2(mag)))
                 exp = int(np.floor(exp / 10) * 10)
                 exp = np.clip(exp, 0, 40)  # "", Ki, Mi, Gi, Ti
-                factor = 2.0 ** exp
+                factor = 2.0**exp
             else:
                 # base 10, step by 3 (…, k=1e3, M=1e6, G=1e9, …)
                 exp = int(np.floor(np.log10(mag)))
                 exp = int(np.floor(exp / 3) * 3)
                 exp = int(np.clip(exp, -24, 15))
-                factor = 10.0 ** exp
+                factor = 10.0**exp
 
             # If after scaling the max is still outside target_range, nudge exp
             scaled_peak = mag / factor
@@ -243,7 +278,7 @@ class NumericScaler:
                 elif scaled_peak > target_range[1]:
                     exp = min(exp + 10, 40)
 
-        factor = 2.0 ** exp if sys == "binary" else 10.0 ** exp
+        factor = 2.0**exp if sys == "binary" else 10.0**exp
 
         scaled = arr / factor
         meta = {
@@ -253,7 +288,9 @@ class NumericScaler:
             "factor": factor,
             "style": "prefix",
             "label": self._exp_to_prefix(exp, sys),
-            "power_label": self._power_label(exp) if sys == "si" and exp != 0 else ("" if sys == "si" else None),
+            "power_label": self._power_label(exp)
+            if sys == "si" and exp != 0
+            else ("" if sys == "si" else None),
         }
         return scaled, meta
 
@@ -286,4 +323,3 @@ class NumericScaler:
             lab = meta.get("label") or ""
             suffix = (lab + (f" {unit}" if unit else "")).strip()
         return f"{base}" + (f" ({suffix})" if suffix else "")
-

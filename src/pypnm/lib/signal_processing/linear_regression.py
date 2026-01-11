@@ -15,11 +15,12 @@ __all__: Final = ["LinearRegression1D", "LinearRegression1DResult"]
 
 class LinearRegression1DResult(BaseModel):
     """Typed result payload for a 1D linear regression fit."""
-    slope: float        = Field(..., description="Fitted slope m in y = m*x + b")
-    intercept: float    = Field(..., description="Fitted intercept b in y = m*x + b")
-    r2: float           = Field(..., description="Coefficient of determination on training data")
-    rmse: float         = Field(..., description="Root Mean Squared Error on training data")
-    n: int              = Field(..., description="Number of samples used after filtering")
+
+    slope: float = Field(..., description="Fitted slope m in y = m*x + b")
+    intercept: float = Field(..., description="Fitted intercept b in y = m*x + b")
+    r2: float = Field(..., description="Coefficient of determination on training data")
+    rmse: float = Field(..., description="Root Mean Squared Error on training data")
+    n: int = Field(..., description="Number of samples used after filtering")
 
 
 class LinearRegression1D:
@@ -113,7 +114,12 @@ class LinearRegression1D:
     def to_model(self) -> LinearRegression1DResult:
         """Return a typed result model."""
         return LinearRegression1DResult(
-            slope=self.slope, intercept=self.intercept, r2=self.r2, rmse=self.rmse, n=self.n)
+            slope=self.slope,
+            intercept=self.intercept,
+            r2=self.r2,
+            rmse=self.rmse,
+            n=self.n,
+        )
 
     def to_dict(self) -> dict[str, float]:
         """Return a dictionary representation via `to_model().model_dump()`."""
@@ -140,7 +146,9 @@ class LinearRegression1D:
         """Return `(slope, intercept)`."""
         return self.slope, self.intercept
 
-    def regression_line(self, y_axis_only: bool = True) -> NDArrayF64 | tuple[NDArrayF64, NDArrayF64]:
+    def regression_line(
+        self, y_axis_only: bool = True
+    ) -> NDArrayF64 | tuple[NDArrayF64, NDArrayF64]:
         """
         Return the fitted regression line.
 
@@ -164,7 +172,10 @@ class LinearRegression1D:
         """
         x0 = float(self.x.min())
         x1 = float(self.x.max())
-        return (x0, self.slope * x0 + self.intercept), (x1, self.slope * x1 + self.intercept)
+        return (x0, self.slope * x0 + self.intercept), (
+            x1,
+            self.slope * x1 + self.intercept,
+        )
 
     def __repr__(self) -> str:
         return (

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -53,7 +52,9 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
         try:
             profile_idx_list = await self._get_profile_id_indexes()
             self.channel_id = await self._get_channel_id()
-            self.logger.info(f"Number of profiles: {profile_idx_list} for OFDM index: {self.index} - ChannelID: {self.channel_id}")
+            self.logger.info(
+                f"Number of profiles: {profile_idx_list} for OFDM index: {self.index} - ChannelID: {self.channel_id}"
+            )
             self.profile_stats = {}
 
             for profile_index in profile_idx_list:
@@ -70,7 +71,9 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
                         else:
                             profile_data[attr] = transform(value_list)
                 except Exception as e:
-                    self.logger.warning(f"Failed to fetch data for profile {profile_index}: {e}")
+                    self.logger.warning(
+                        f"Failed to fetch data for profile {profile_index}: {e}"
+                    )
                     # Fill remaining fields with None
                     for attr in fields:
                         if attr not in profile_data:
@@ -81,7 +84,9 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
             return True
 
         except Exception as e:
-            self.logger.exception(f"Unexpected error during SNMP population, error: {e}")
+            self.logger.exception(
+                f"Unexpected error during SNMP population, error: {e}"
+            )
             return False
 
     def to_dict(self, nested: bool = True) -> dict:
@@ -107,9 +112,8 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
         return {
             "index": self.index,
             "channel_id": self.channel_id,  # ← correct key
-            "profiles": self.profile_stats
+            "profiles": self.profile_stats,
         }
-
 
     async def _get_profile_id_indexes(self) -> list[int]:
         """
@@ -118,7 +122,9 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
         Returns:
             List[int]: A list of profile ID indices.
         """
-        result = await self.snmp.walk(f'{COMPILED_OIDS["docsIf31CmDsOfdmProfileStatsTotalCodewords"]}.{self.index}')
+        result = await self.snmp.walk(
+            f"{COMPILED_OIDS['docsIf31CmDsOfdmProfileStatsTotalCodewords']}.{self.index}"
+        )
 
         profile_indices = set()
         for oid_str in result:
@@ -130,6 +136,8 @@ class DocsIf31CmDsOfdmProfileStatsEntry:
         return sorted(profile_indices)
 
     async def _get_channel_id(self) -> int:
-        result = await self.snmp.get(f'{COMPILED_OIDS["docsIf31CmDsOfdmChanChannelId"]}.{self.index}')
+        result = await self.snmp.get(
+            f"{COMPILED_OIDS['docsIf31CmDsOfdmChanChannelId']}.{self.index}"
+        )
         self.channel_id = int(Snmp_v2c.get_result_value(result))
         return self.channel_id

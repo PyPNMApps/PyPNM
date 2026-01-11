@@ -7,4 +7,3 @@ __all__ = ["__version__"]
 
 # MAJOR.MINOR.MAINTENANCE.BUILD
 __version__: str = "1.0.20.0"
-

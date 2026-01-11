@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -18,6 +17,7 @@ class PnmConfigManager:
     _write_community = SystemConfigSettings.snmp_write_community()
     _tftp_path = SystemConfigSettings.tftp_remote_dir()
     _pnm_dir = SystemConfigSettings.pnm_dir()
+
     @classmethod
     def reload(cls) -> None:
         """
@@ -29,12 +29,13 @@ class PnmConfigManager:
         cls._write_community = SystemConfigSettings.snmp_write_community()
         cls._tftp_path = SystemConfigSettings.tftp_remote_dir()
         cls._pnm_dir = SystemConfigSettings.pnm_dir()
+
     @staticmethod
     def get_save_dir() -> str:
-        '''
+        """
         Returns:
             Directory of the saved PNM capture files
-        '''
+        """
         PnmConfigManager.reload()
         return PnmConfigManager._pnm_dir
 

@@ -13,9 +13,10 @@ from pypnm.lib.types import TimeStamp, TransactionId
 
 
 class TimeUnit(Enum):
-    SECONDS      = "s"
+    SECONDS = "s"
     MILLISECONDS = "ms"
-    NANOSECONDS  = "ns"
+    NANOSECONDS = "ns"
+
 
 class Utils:
     """
@@ -54,7 +55,7 @@ class Utils:
             raw_value: str = str(base_value)
 
         digest_full: str = hashlib.sha256(raw_value.encode("utf-8")).hexdigest()
-        max_length: int  = len(digest_full)
+        max_length: int = len(digest_full)
 
         effective_length: int = length
         if effective_length <= 0 or effective_length > max_length:
@@ -65,7 +66,6 @@ class Utils:
 
 
 class Generate:
-
     @staticmethod
     def time_stamp(unit: TimeUnit = TimeUnit.SECONDS) -> TimeStamp:
         """
@@ -88,10 +88,10 @@ class Generate:
         and truncated to ``length`` hex characters.
         """
         base_value: int = Generate.time_stamp(unit=TimeUnit.NANOSECONDS)
-        raw_value: str  = f"{base_value}:{seed}" if seed is not None else str(base_value)
+        raw_value: str = f"{base_value}:{seed}" if seed is not None else str(base_value)
 
         digest_full: str = hashlib.sha256(raw_value.encode("utf-8")).hexdigest()
-        max_length: int  = len(digest_full)
+        max_length: int = len(digest_full)
 
         effective_length: int = length
         if effective_length <= 0 or effective_length > max_length:
@@ -101,7 +101,9 @@ class Generate:
         return TransactionId(truncated)
 
     @staticmethod
-    def group_id(count: int, seed: int | None = None, length: int = 24) -> list[TransactionId]:
+    def group_id(
+        count: int, seed: int | None = None, length: int = 24
+    ) -> list[TransactionId]:
         """
         Generate A Group Of Related Transaction Identifiers.
 

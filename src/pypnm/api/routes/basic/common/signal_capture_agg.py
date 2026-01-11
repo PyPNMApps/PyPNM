@@ -34,13 +34,21 @@ class SignalCaptureAggregator:
         Custom logger name. Defaults to class name.
     """
 
-    __slots__ = ("logger", "_points", "_grid_x", "_grid_y", "_reconstructed",
-                 "_reducer", "_fill_value")
+    __slots__ = (
+        "logger",
+        "_points",
+        "_grid_x",
+        "_grid_y",
+        "_reconstructed",
+        "_reducer",
+        "_fill_value",
+    )
 
     def __init__(
         self,
         *,
-        reducer: Literal["mean", "max", "min", "sum"] | Callable[[NDArrayF64], float] = "mean",
+        reducer: Literal["mean", "max", "min", "sum"]
+        | Callable[[NDArrayF64], float] = "mean",
         fill_value: float = 0.0,
         logger_name: str | None = None,
     ) -> None:
@@ -75,11 +83,18 @@ class SignalCaptureAggregator:
         bucket = self._points.setdefault(xf, [])
 
         if bucket:
-            self.logger.debug("Adding additional sample at x=%s (existing %d)", xf, len(bucket))
+            self.logger.debug(
+                "Adding additional sample at x=%s (existing %d)", xf, len(bucket)
+            )
 
         bucket.append(yf)
 
-        self.logger.debug("Added point (%g, %g) to aggregator (total points: %d)", xf, yf, len(self._points))
+        self.logger.debug(
+            "Added point (%g, %g) to aggregator (total points: %d)",
+            xf,
+            yf,
+            len(self._points),
+        )
 
         self._reconstructed = False  # invalidates any prior grid
 
@@ -173,7 +188,11 @@ class SignalCaptureAggregator:
                 # For now, log and skip to keep grid strict.
                 self.logger.debug(
                     "Point x=%g did not fit grid (idx_float=%.3f, idx=%d, snap=%g, tol=%g)",
-                    x_val, idx_float, idx, grid_x[idx] if 0 <= idx < n_bins else float("nan"), tol
+                    x_val,
+                    idx_float,
+                    idx,
+                    grid_x[idx] if 0 <= idx < n_bins else float("nan"),
+                    tol,
                 )
 
         # Reduce each bin
@@ -183,7 +202,9 @@ class SignalCaptureAggregator:
 
         self._grid_x, self._grid_y = grid_x, grid_y
         self._reconstructed = True
-        self.logger.info("Reconstruction complete: %d bins (step=%g, tol=%g)", n_bins, step, tol)
+        self.logger.info(
+            "Reconstruction complete: %d bins (step=%g, tol=%g)", n_bins, step, tol
+        )
         return grid_x, grid_y
 
     def get_series(self) -> tuple[NDArrayF64, NDArrayF64]:
@@ -192,7 +213,11 @@ class SignalCaptureAggregator:
         - If reconstruct() has been called: returns (grid_x, grid_y).
         - Else: returns raw sorted points (unique x), y reduced per x using the configured reducer.
         """
-        if self._reconstructed and self._grid_x is not None and self._grid_y is not None:
+        if (
+            self._reconstructed
+            and self._grid_x is not None
+            and self._grid_y is not None
+        ):
             return self._grid_x, self._grid_y
 
         if not self._points:
@@ -221,15 +246,15 @@ class SignalCaptureAggregator:
     # --------------------------------------------------------------------- #
     @staticmethod
     def _resolve_reducer(
-        reducer: Literal["mean", "max", "min", "sum"] | Callable[[NDArrayF64], float]
+        reducer: Literal["mean", "max", "min", "sum"] | Callable[[NDArrayF64], float],
     ) -> Callable[[NDArrayF64], float]:
         if callable(reducer):
             return reducer
         table: dict[str, Callable[[NDArrayF64], float]] = {
             "mean": lambda a: float(np.mean(a)) if a.size else 0.0,
-            "max":  lambda a: float(np.max(a)) if a.size else 0.0,
-            "min":  lambda a: float(np.min(a)) if a.size else 0.0,
-            "sum":  lambda a: float(np.sum(a)) if a.size else 0.0,
+            "max": lambda a: float(np.max(a)) if a.size else 0.0,
+            "min": lambda a: float(np.min(a)) if a.size else 0.0,
+            "sum": lambda a: float(np.sum(a)) if a.size else 0.0,
         }
         try:
             return table[reducer]

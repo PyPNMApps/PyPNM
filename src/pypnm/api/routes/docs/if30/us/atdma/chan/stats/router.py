@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -28,15 +27,18 @@ class UsScQamChannelRouter:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.router = APIRouter(
             prefix="/docs/if30/us/atdma/chan",
-            tags=["DOCSIS 3.0 Upstream ATDMA Channel Statistics"])
+            tags=["DOCSIS 3.0 Upstream ATDMA Channel Statistics"],
+        )
 
         self._add_routes()
 
     def _add_routes(self) -> None:
-        @self.router.post("/stats",
-                          summary="Get DOCSIS 3.0 Upstream ATDMA Channel Stats",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/stats",
+            summary="Get DOCSIS 3.0 Upstream ATDMA Channel Stats",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_us_scqam_upstream_channels(request: SnmpRequest) -> SnmpResponse:
             """
             **DOCSIS 3.0 Upstream ATDMA Channel Stats**
@@ -54,30 +56,38 @@ class UsScQamChannelRouter:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            self.logger.info(f"Retrieving DOCSIS 3.0 ATDMA upstream channel stats for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Retrieving DOCSIS 3.0 ATDMA upstream channel stats for MAC: {mac}, IP: {ip}"
+            )
 
             # Pre-check cable modem connectivity and status
-            status, msg = await CableModemServicePreCheck(mac_address=mac, ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_atdma_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac,
+                ip_address=ip,
+                snmp_config=request.cable_modem.snmp,
+                validate_atdma_exist=True,
+            ).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            service = UsScQamChannelService(mac_address=mac,
-                                            ip_address=ip,
-                                            snmp_config=request.cable_modem.snmp)
+            service = UsScQamChannelService(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            )
             data = await service.get_upstream_entries()
 
             return SnmpResponse(
-                mac_address =   mac,
-                status      =   ServiceStatusCode.SUCCESS,
-                message     =   "Successfully retrieved upstream ATDMA channel statistics",
-                results     =   data)
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="Successfully retrieved upstream ATDMA channel statistics",
+                results=data,
+            )
 
-        @self.router.post("/preEqualization",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/preEqualization",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_us_scqam_pre_equalizations(request: SnmpRequest) -> SnmpResponse:
             """
             **DOCSIS 3.0 Upstream Pre-Equalization Coefficients**
@@ -96,24 +106,32 @@ class UsScQamChannelRouter:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            self.logger.info(f"Retrieving DOCSIS 3.0 ATDMA upstream pre-equalization for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Retrieving DOCSIS 3.0 ATDMA upstream pre-equalization for MAC: {mac}, IP: {ip}"
+            )
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac, ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_atdma_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac,
+                ip_address=ip,
+                snmp_config=request.cable_modem.snmp,
+                validate_atdma_exist=True,
+            ).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            service = UsScQamChannelService(mac_address=mac,
-                                            ip_address=ip,
-                                            snmp_config=request.cable_modem.snmp)
+            service = UsScQamChannelService(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            )
             data = await service.get_upstream_pre_equalizations()
 
-            return SnmpResponse(mac_address =   mac,
-                                status      =   ServiceStatusCode.SUCCESS,
-                                message     =   "Successfully retrieved upstream pre-equalization coefficients",
-                                results     =   data)
+            return SnmpResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="Successfully retrieved upstream pre-equalization coefficients",
+                results=data,
+            )
+
 
 # Required for dynamic auto-registration
 router = UsScQamChannelRouter().router

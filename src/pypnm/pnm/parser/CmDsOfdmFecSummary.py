@@ -69,7 +69,9 @@ class CmDsOfdmFecSummary(PnmHeader):
         """
         return FEC_SUMMARY_TYPE_STEP_SECONDS.get(int(self._summary_type))
 
-    def __check_timestamp_sequence(self, profile_id: int, ts: list[int], step: int) -> None:
+    def __check_timestamp_sequence(
+        self, profile_id: int, ts: list[int], step: int
+    ) -> None:
         """
         Validate that timestamps are strictly monotonic with the expected cadence.
 
@@ -101,7 +103,12 @@ class CmDsOfdmFecSummary(PnmHeader):
                     self.logger.error(
                         "Timestamp cadence violation (profile=%d, idx=%d): "
                         "prev=%d curr=%d delta=%d expected_step=%d",
-                        int(profile_id), i, prev_t, curr_t, delta, step,
+                        int(profile_id),
+                        i,
+                        prev_t,
+                        curr_t,
+                        delta,
+                        step,
                     )
 
         if errors:
@@ -128,14 +135,20 @@ class CmDsOfdmFecSummary(PnmHeader):
             expected = PnmFileType.OFDM_FEC_SUMMARY.get_pnm_cann()
             file_type = self.get_pnm_file_type()
             got = file_type.get_pnm_cann() if file_type is not None else "None"
-            raise ValueError(f"PNM file stream is not OFDM FEC Summary type: expected {expected}, got {got}")
+            raise ValueError(
+                f"PNM file stream is not OFDM FEC Summary type: expected {expected}, got {got}"
+            )
 
         mv = memoryview(self.pnm_data)
 
         if len(mv) < SUMMARY_HDR.size:
-            raise ValueError(f"Insufficient data for FEC summary header: need {SUMMARY_HDR.size}, have {len(mv)}")
+            raise ValueError(
+                f"Insufficient data for FEC summary header: need {SUMMARY_HDR.size}, have {len(mv)}"
+            )
 
-        channel_id, mac_raw, summary_type, num_profiles = SUMMARY_HDR.unpack(mv[:SUMMARY_HDR.size])
+        channel_id, mac_raw, summary_type, num_profiles = SUMMARY_HDR.unpack(
+            mv[: SUMMARY_HDR.size]
+        )
 
         self._channel_id = channel_id
         self._mac_address = MacAddress(mac_raw).mac_address
@@ -149,11 +162,16 @@ class CmDsOfdmFecSummary(PnmHeader):
             if len(mv) < pos + PROFILE_HDR.size:
                 self.logger.error(
                     "Truncated profile header at index %d (pos=%d, need=%d, have=%d)",
-                    profile_index, pos, PROFILE_HDR.size, len(mv) - pos,
+                    profile_index,
+                    pos,
+                    PROFILE_HDR.size,
+                    len(mv) - pos,
                 )
                 break
 
-            profile_id, number_of_sets = PROFILE_HDR.unpack(mv[pos:pos + PROFILE_HDR.size])
+            profile_id, number_of_sets = PROFILE_HDR.unpack(
+                mv[pos : pos + PROFILE_HDR.size]
+            )
             pos += PROFILE_HDR.size
 
             remaining = len(mv) - pos
@@ -162,12 +180,16 @@ class CmDsOfdmFecSummary(PnmHeader):
             if number_of_sets > max_sets:
                 self.logger.warning(
                     "Profile %d: truncating sets from %d to %d (remaining=%d bytes, record=%d bytes)",
-                    int(profile_id), int(requested_sets), int(max_sets), int(remaining), int(SET_REC.size),
+                    int(profile_id),
+                    int(requested_sets),
+                    int(max_sets),
+                    int(remaining),
+                    int(SET_REC.size),
                 )
                 number_of_sets = max_sets
 
             set_bytes_len = number_of_sets * SET_REC.size
-            sets_slice = mv[pos:pos + set_bytes_len]
+            sets_slice = mv[pos : pos + set_bytes_len]
 
             ts: list[TimeStamp] = []
             tc: CodeWordArray = []
@@ -176,7 +198,7 @@ class CmDsOfdmFecSummary(PnmHeader):
 
             for rec_idx in range(number_of_sets):
                 off = rec_idx * SET_REC.size
-                rec = sets_slice[off:off + SET_REC.size]
+                rec = sets_slice[off : off + SET_REC.size]
                 timestamp, total, corrected, uncorrectable = SET_REC.unpack(rec)
 
                 ts.append(timestamp)
@@ -188,7 +210,9 @@ class CmDsOfdmFecSummary(PnmHeader):
 
             step = self.__expected_ts_step()
             if step is not None:
-                self.__check_timestamp_sequence(int(profile_id), cast(list[int], ts), int(step))
+                self.__check_timestamp_sequence(
+                    int(profile_id), cast(list[int], ts), int(step)
+                )
             else:
                 self.logger.warning(
                     "Skipping cadence validation for summary_type=%d ('%s'), profile=%d",
@@ -198,30 +222,35 @@ class CmDsOfdmFecSummary(PnmHeader):
                 )
 
             cwe_model = OfdmFecSumCodeWordEntryModel(
-                timestamp       = cast(list[TimeStamp], ts),
-                total_codewords = cast(CodeWordArray, tc),
-                corrected       = cast(CodeWordArray, cc),
-                uncorrectable   = cast(CodeWordArray, uc),
+                timestamp=cast(list[TimeStamp], ts),
+                total_codewords=cast(CodeWordArray, tc),
+                corrected=cast(CodeWordArray, cc),
+                uncorrectable=cast(CodeWordArray, uc),
             )
 
             profile_entry = OfdmFecSumDataModel(
-                profile_id       = ProfileId(profile_id),
-                number_of_sets   = int(number_of_sets),
-                codeword_entries = cwe_model,
+                profile_id=ProfileId(profile_id),
+                number_of_sets=int(number_of_sets),
+                codeword_entries=cwe_model,
             )
             profile_entries.append(profile_entry)
 
         if len(profile_entries) != self._num_profiles:
             self.logger.debug(
                 "Parsed %d profile(s), header declared %d",
-                len(profile_entries), self._num_profiles,
+                len(profile_entries),
+                self._num_profiles,
             )
 
         first_timestamp: CaptureTime | None = None
         if profile_entries and profile_entries[0].codeword_entries.timestamp:
-            first_timestamp = cast(CaptureTime, profile_entries[0].codeword_entries.timestamp[0])
+            first_timestamp = cast(
+                CaptureTime, profile_entries[0].codeword_entries.timestamp[0]
+            )
 
-        if first_timestamp is not None and not self.override_capture_time(first_timestamp):
+        if first_timestamp is not None and not self.override_capture_time(
+            first_timestamp
+        ):
             self.logger.error(
                 "Unable to update CaptureTime from %s -> %s",
                 self._capture_time,
@@ -229,12 +258,12 @@ class CmDsOfdmFecSummary(PnmHeader):
             )
 
         self._model = CmDsOfdmFecSummaryModel(
-            pnm_header      = self.getPnmHeaderParameterModel(),
-            channel_id      = self._channel_id,
-            mac_address     = self._mac_address,
-            summary_type    = self._summary_type,
-            num_profiles    = self._num_profiles,
-            fec_summary_data= profile_entries,
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=self._channel_id,
+            mac_address=self._mac_address,
+            summary_type=self._summary_type,
+            num_profiles=self._num_profiles,
+            fec_summary_data=profile_entries,
         )
 
     def to_model(self) -> CmDsOfdmFecSummaryModel:

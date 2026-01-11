@@ -25,7 +25,8 @@ class CmDsConstDispMeas(PnmHeader):
     Parses and processes Downstream Constellation Display Measurement (CmDsConstDispMeas) data.
     Inherits from PnmHeader to handle binary SNMP-based CM measurement data.
     """
-    CONST_DISPLAY_DATA_COMPLEX_LENGTH:int = 4
+
+    CONST_DISPLAY_DATA_COMPLEX_LENGTH: int = 4
 
     def __init__(self, binary_data: bytes) -> None:
         """
@@ -68,32 +69,40 @@ class CmDsConstDispMeas(PnmHeader):
         if self.get_pnm_file_type() != PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:
             cann = PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY.get_pnm_cann()
             current_type = self.get_pnm_file_type()
-            error_cann = current_type.get_pnm_cann() if current_type is not None else "Unknown"
-            raise ValueError(f"PNM File Stream is not RxMER file type: {cann}, Error: {error_cann}")
+            error_cann = (
+                current_type.get_pnm_cann() if current_type is not None else "Unknown"
+            )
+            raise ValueError(
+                f"PNM File Stream is not RxMER file type: {cann}, Error: {error_cann}"
+            )
 
-        const_disp_meas_format = '>B6sIHHBI'
+        const_disp_meas_format = ">B6sIHHBI"
         const_disp_meas_size = calcsize(const_disp_meas_format)
-        unpacked_data = unpack(const_disp_meas_format, self.pnm_data[:const_disp_meas_size])
+        unpacked_data = unpack(
+            const_disp_meas_format, self.pnm_data[:const_disp_meas_size]
+        )
 
-        self._channel_id                 = ChannelId(unpacked_data[0])
-        self._mac_address                = MacAddress(unpacked_data[1]).to_mac_format(MacAddressFormat.COLON)
-        self._subcarrier_zero_frequency  = FrequencyHz(unpacked_data[2])
-        self._actual_modulation_order    = unpacked_data[3]
-        self._num_sample_symbols         = unpacked_data[4]
-        self._subcarrier_spacing         = FrequencyHz(unpacked_data[5] * KHZ)
-        self._display_data_length        = unpacked_data[6]
+        self._channel_id = ChannelId(unpacked_data[0])
+        self._mac_address = MacAddress(unpacked_data[1]).to_mac_format(
+            MacAddressFormat.COLON
+        )
+        self._subcarrier_zero_frequency = FrequencyHz(unpacked_data[2])
+        self._actual_modulation_order = unpacked_data[3]
+        self._num_sample_symbols = unpacked_data[4]
+        self._subcarrier_spacing = FrequencyHz(unpacked_data[5] * KHZ)
+        self._display_data_length = unpacked_data[6]
         self._constellation_display_data = self.pnm_data[const_disp_meas_size:]
 
         self._model = CmDsConstDispMeasModel(
-            pnm_header                      =   self.getPnmHeaderParameterModel(),
-            channel_id                      =   self._channel_id,
-            mac_address                     =   self._mac_address,
-            subcarrier_zero_frequency       =   self._subcarrier_zero_frequency,
-            subcarrier_spacing              =   self._subcarrier_spacing,
-            actual_modulation_order         =   self._actual_modulation_order,
-            num_sample_symbols              =   self._num_sample_symbols,
-            sample_length                   =   self._display_data_length,
-            samples                         =   self._process_constellation_display_data(),
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=self._channel_id,
+            mac_address=self._mac_address,
+            subcarrier_zero_frequency=self._subcarrier_zero_frequency,
+            subcarrier_spacing=self._subcarrier_spacing,
+            actual_modulation_order=self._actual_modulation_order,
+            num_sample_symbols=self._num_sample_symbols,
+            sample_length=self._display_data_length,
+            samples=self._process_constellation_display_data(),
         )
 
     def _process_constellation_display_data(self) -> ComplexArray:
@@ -106,11 +115,14 @@ class CmDsConstDispMeas(PnmHeader):
             List of [i, q] float pairs.
         """
         offset = 0
-        raw:bytes = self._constellation_display_data
+        raw: bytes = self._constellation_display_data
         decode_list = []
 
         while offset + self.CONST_DISPLAY_DATA_COMPLEX_LENGTH <= len(raw):
-            decoded = FixedPointDecoder.decode_complex_data(raw[offset:offset + 4], cast(tuple[IntegerBits, FractionalBits], (2, 13)))
+            decoded = FixedPointDecoder.decode_complex_data(
+                raw[offset : offset + 4],
+                cast(tuple[IntegerBits, FractionalBits], (2, 13)),
+            )
 
             decode_list.extend([[float(pt.real), float(pt.imag)] for pt in decoded])
 
@@ -128,7 +140,7 @@ class CmDsConstDispMeas(PnmHeader):
         """
         return self.to_model().model_dump()
 
-    def to_json(self, indent:int=2) -> str:
+    def to_json(self, indent: int = 2) -> str:
         """
         Serializes the parsed measurement data to a JSON string.
 

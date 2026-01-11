@@ -13,7 +13,9 @@ class MovingAverage:
     Class for calculating a moving average of a list of numerical values.
     """
 
-    def __init__(self, data: FloatSeries | None = None, exclude_value: float | None = None) -> None:
+    def __init__(
+        self, data: FloatSeries | None = None, exclude_value: float | None = None
+    ) -> None:
         """
         Initialize the MovingAverage object.
 
@@ -73,7 +75,7 @@ class MovingAverage:
             if self.exclude_value_set and entry == self.exclude_value:
                 continue
 
-            window_data = list(self.entries)[max(0, i - window + 1): i + 1]
+            window_data = list(self.entries)[max(0, i - window + 1) : i + 1]
             average = self._calculate_window_average(window_data)
             average_list.append(average)
 

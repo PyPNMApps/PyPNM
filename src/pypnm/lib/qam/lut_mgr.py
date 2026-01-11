@@ -190,7 +190,9 @@ class QamLutManager:
         entry = self.qam_lut.get(key)
         return cast(QamScale, entry["scale_factor"])
 
-    def scale_soft_decisions(self, qam_mod: QamModulation, soft: SoftDecisionArray) -> SoftDecisionArray:
+    def scale_soft_decisions(
+        self, qam_mod: QamModulation, soft: SoftDecisionArray
+    ) -> SoftDecisionArray:
         """
         Scale soft-decision points using the LUT's scale_factor.
 
@@ -206,7 +208,9 @@ class QamLutManager:
         scale = (1.0 / raw_scale) if raw_scale > 1.0 else raw_scale
         a = np.asarray(soft, dtype=np.float64)
         if a.ndim != 2 or a.shape[1] != 2:
-            raise ValueError(f"soft must be a sequence of (I, Q) pairs; got shape {a.shape}")
+            raise ValueError(
+                f"soft must be a sequence of (I, Q) pairs; got shape {a.shape}"
+            )
         a = a * scale
         return [(float(re), float(im)) for re, im in a]
 
@@ -319,22 +323,22 @@ class QamLutManager:
         unique_clusters = int(len(np.unique(grid, axis=0)))
 
         mapping = {
-            2:      QamModulation.QAM_2,
-            4:      QamModulation.QAM_4,
-            8:      QamModulation.QAM_8,
-            16:     QamModulation.QAM_16,
-            32:     QamModulation.QAM_32,
-            64:     QamModulation.QAM_64,
-            128:    QamModulation.QAM_128,
-            256:    QamModulation.QAM_256,
-            512:    QamModulation.QAM_512,
-            1024:   QamModulation.QAM_1024,
-            2048:   QamModulation.QAM_2048,
-            4096:   QamModulation.QAM_4096,
-            8192:   QamModulation.QAM_8192,
-            16384:  QamModulation.QAM_16384,
-            32768:  QamModulation.QAM_32768,
-            65536:  QamModulation.QAM_65536,
+            2: QamModulation.QAM_2,
+            4: QamModulation.QAM_4,
+            8: QamModulation.QAM_8,
+            16: QamModulation.QAM_16,
+            32: QamModulation.QAM_32,
+            64: QamModulation.QAM_64,
+            128: QamModulation.QAM_128,
+            256: QamModulation.QAM_256,
+            512: QamModulation.QAM_512,
+            1024: QamModulation.QAM_1024,
+            2048: QamModulation.QAM_2048,
+            4096: QamModulation.QAM_4096,
+            8192: QamModulation.QAM_8192,
+            16384: QamModulation.QAM_16384,
+            32768: QamModulation.QAM_32768,
+            65536: QamModulation.QAM_65536,
         }
 
         closest_order, est_mod = min(
@@ -383,7 +387,9 @@ class QamLutManager:
         return max(1, max_key.bit_length())
 
     @staticmethod
-    def _lookup_symbol(lut: dict[int, tuple[float, float]], cw: int) -> tuple[float, float]:
+    def _lookup_symbol(
+        lut: dict[int, tuple[float, float]], cw: int
+    ) -> tuple[float, float]:
         """
         Resolve a codeword to its (I, Q) symbol tuple.
 

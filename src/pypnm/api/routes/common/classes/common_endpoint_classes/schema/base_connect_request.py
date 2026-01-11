@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -19,9 +18,14 @@ class CableModemOnlyConfig(BaseModel):
     """
     Encapsulates core cable modem fields without extra PNM metadata.
     """
-    mac_address: MacAddressStr = Field(default=SCSC.default_mac_address(),description="MAC address of the cable modem")
-    ip_address: InetAddressStr = Field(default=SCSC.default_ip_address(), description="IP address of the cable modem")
-    snmp: SNMPConfig = Field(...,description="SNMP configuration block")
+
+    mac_address: MacAddressStr = Field(
+        default=SCSC.default_mac_address(), description="MAC address of the cable modem"
+    )
+    ip_address: InetAddressStr = Field(
+        default=SCSC.default_ip_address(), description="IP address of the cable modem"
+    )
+    snmp: SNMPConfig = Field(..., description="SNMP configuration block")
 
     @field_validator("mac_address", mode="before")
     def _normalize_mac(cls, v: str) -> str:
@@ -37,8 +41,10 @@ class CableModemOnlyConfig(BaseModel):
         except ValueError:
             raise ValueError(f"Invalid IP address {v!r}") from None
 
+
 class BaseDeviceConnectRequest(BaseModel):
     """
     Request model using nested cable_modem with only SNMP (no TFTP or extended PNM parameters).
     """
+
     cable_modem: CableModemOnlyConfig

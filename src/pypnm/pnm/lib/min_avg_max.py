@@ -18,9 +18,11 @@ from pypnm.pnm.lib.signal_statistics import SignalStatistics, SignalStatisticsMo
 # ---------------------------------------------------------------------
 # Type aliases for clarity and consistency
 # ---------------------------------------------------------------------
-AmplitudeMatrix = TwoDFloatSeries     # List[List[float]] — multiple captures (rows × subcarriers)
-AmplitudeVector = FloatSeries         # List[float] — one per-subcarrier statistic
-PrecisionInt = int                    # Rounding precision
+AmplitudeMatrix = (
+    TwoDFloatSeries  # List[List[float]] — multiple captures (rows × subcarriers)
+)
+AmplitudeVector = FloatSeries  # List[float] — one per-subcarrier statistic
+PrecisionInt = int  # Rounding precision
 
 
 # ---------------------------------------------------------------------
@@ -28,20 +30,32 @@ PrecisionInt = int                    # Rounding precision
 # ---------------------------------------------------------------------
 class MinAvgMaxSignalStatisticsModel(BaseModel):
     """Aggregate statistics across per-index minima, averages, and maxima."""
-    min: SignalStatisticsModel = Field(..., description="Aggregate stats over per-index minima")
-    avg: SignalStatisticsModel = Field(..., description="Aggregate stats over per-index averages")
-    max: SignalStatisticsModel = Field(..., description="Aggregate stats over per-index maxima")
+
+    min: SignalStatisticsModel = Field(
+        ..., description="Aggregate stats over per-index minima"
+    )
+    avg: SignalStatisticsModel = Field(
+        ..., description="Aggregate stats over per-index averages"
+    )
+    max: SignalStatisticsModel = Field(
+        ..., description="Aggregate stats over per-index maxima"
+    )
 
 
 class MinAvgMaxModel(BaseModel):
     """
     Pydantic model representing per-index minimum, average, and maximum arrays with metadata.
     """
+
     min: AmplitudeVector = Field(..., description="Per-index minimum values")
     avg: AmplitudeVector = Field(..., description="Per-index average values")
     max: AmplitudeVector = Field(..., description="Per-index maximum values")
-    precision: PrecisionInt = Field(..., ge=0, description="Rounding precision (decimal places)")
-    signal_statistics: MinAvgMaxSignalStatisticsModel = Field(..., description="Aggregate stats of min/avg/max arrays")
+    precision: PrecisionInt = Field(
+        ..., ge=0, description="Rounding precision (decimal places)"
+    )
+    signal_statistics: MinAvgMaxSignalStatisticsModel = Field(
+        ..., description="Aggregate stats of min/avg/max arrays"
+    )
 
 
 # ---------------------------------------------------------------------
@@ -72,7 +86,8 @@ class MinAvgMax:
 
         if arr.ndim != 2 or arr.shape[0] == 0 or arr.shape[1] == 0:
             raise ValueError(
-                "`amplitude` must be a 2D array (M×N) with consistent subcarrier count")
+                "`amplitude` must be a 2D array (M×N) with consistent subcarrier count"
+            )
 
         self.precision: PrecisionInt = precision
 

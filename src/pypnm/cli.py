@@ -16,7 +16,6 @@ except Exception:
 
 
 def main() -> None:
-
     HOST_DEFAULT = "127.0.0.1"
     PORT_DEFAULT = 8000
 
@@ -32,11 +31,24 @@ def main() -> None:
         help="Show PyPNM version and exit.",
     )
 
-    parser.add_argument("--host", default=HOST_DEFAULT, help=f"Host to bind (default: {HOST_DEFAULT})")
-    parser.add_argument("--port", default=PORT_DEFAULT, type=int, help=f"Port to bind (default: {PORT_DEFAULT})")
-    parser.add_argument("--ssl", action="store_true", help="Enable HTTPS (requires cert and key)")
-    parser.add_argument("--cert", default="./certs/cert.pem", help="Path to SSL certificate")
-    parser.add_argument("--key", default="./certs/key.pem", help="Path to SSL private key")
+    parser.add_argument(
+        "--host", default=HOST_DEFAULT, help=f"Host to bind (default: {HOST_DEFAULT})"
+    )
+    parser.add_argument(
+        "--port",
+        default=PORT_DEFAULT,
+        type=int,
+        help=f"Port to bind (default: {PORT_DEFAULT})",
+    )
+    parser.add_argument(
+        "--ssl", action="store_true", help="Enable HTTPS (requires cert and key)"
+    )
+    parser.add_argument(
+        "--cert", default="./certs/cert.pem", help="Path to SSL certificate"
+    )
+    parser.add_argument(
+        "--key", default="./certs/key.pem", help="Path to SSL private key"
+    )
 
     parser.add_argument(
         "--log-level",
@@ -113,7 +125,9 @@ def main() -> None:
     if args.reload:
         # In dev reload mode, multiple workers are not supported by Uvicorn.
         if args.workers != 1:
-            print("[WARN] --workers is ignored when --reload is enabled; using workers=1 for dev reload.")
+            print(
+                "[WARN] --workers is ignored when --reload is enabled; using workers=1 for dev reload."
+            )
             uvicorn_args["workers"] = 1
 
         # default to watching 'src' if user didn't pass any reload dirs

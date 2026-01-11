@@ -28,16 +28,16 @@ class PyPnmSystemLog:
         """
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self.router = APIRouter(
-            prefix = "/pypnm/system/log",
-            tags   = ["PyPNM System Log"],
+            prefix="/pypnm/system/log",
+            tags=["PyPNM System Log"],
         )
         self.router.add_api_route(
-            path          = "/download",
-            endpoint      = self.get_pypnm_log,
-            methods       = ["GET"],
-            summary       = "Download PyPNM System Log File",
-            response_model= None,
-            responses     = FAST_API_RESPONSE,
+            path="/download",
+            endpoint=self.get_pypnm_log,
+            methods=["GET"],
+            summary="Download PyPNM System Log File",
+            response_model=None,
+            responses=FAST_API_RESPONSE,
         )
 
     async def get_pypnm_log(self) -> FileResponse:
@@ -50,30 +50,30 @@ class PyPnmSystemLog:
 
         [API Guide - PyPNM System Log](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/pypnm/system/download-log.md)
         """
-        log_dir      = SystemConfigSettings.log_dir()
+        log_dir = SystemConfigSettings.log_dir()
         log_filename = SystemConfigSettings.log_filename()
-        log_path     = Path(log_dir) / log_filename
+        log_path = Path(log_dir) / log_filename
 
         if not log_path.is_file():
             self.logger.error("System log file not found at '%s'", log_path)
             raise HTTPException(
-                status_code = 404,
-                detail      = f"Log file not found at: {log_path}",
+                status_code=404,
+                detail=f"Log file not found at: {log_path}",
             )
 
         try:
             return FileResponse(
-                path      = str(log_path),
-                filename  = log_filename,
-                media_type= "text/plain",
+                path=str(log_path),
+                filename=log_filename,
+                media_type="text/plain",
             )
         except Exception as exc:
             self.logger.error(
                 "Failed to stream system log file '%s': %s", log_path, exc
             )
             raise HTTPException(
-                status_code = 500,
-                detail      = f"Failed to retrieve log: {exc}",
+                status_code=500,
+                detail=f"Failed to retrieve log: {exc}",
             ) from exc
 
 

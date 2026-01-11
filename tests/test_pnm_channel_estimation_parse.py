@@ -43,7 +43,9 @@ def test_ce_parses_and_model_shape(ce_bytes: bytes) -> None:
     assert MAC_RE.match(ce_model.mac_address)
 
     # Subcarrier metadata sane
-    assert isinstance(ce_model.subcarrier_spacing, int) and ce_model.subcarrier_spacing > 0
+    assert (
+        isinstance(ce_model.subcarrier_spacing, int) and ce_model.subcarrier_spacing > 0
+    )
     assert isinstance(ce_model.first_active_subcarrier_index, int)
     assert ce_model.first_active_subcarrier_index >= 0
 
@@ -59,7 +61,9 @@ def test_ce_parses_and_model_shape(ce_bytes: bytes) -> None:
     assert ce_model.value_units == "complex"
 
     # OBW equals (#points) * spacing
-    assert ce_model.occupied_channel_bandwidth == num_points * ce_model.subcarrier_spacing
+    assert (
+        ce_model.occupied_channel_bandwidth == num_points * ce_model.subcarrier_spacing
+    )
 
 
 @pytest.mark.pnm
@@ -80,9 +84,13 @@ def test_ce_coeff_rounding_and_raw_access(ce_bytes: bytes) -> None:
     assert len(raw) == len(rounded)
 
     # ---- Static typing assertions (validate overloads) ----
-    assert_type(parser.get_coefficients("rounded"), ComplexArray)   # Literal["rounded"] → ComplexArray
-    assert_type(parser.get_coefficients("raw"), ComplexSeries)      # Literal["raw"] → ComplexSeries
-    assert_type(parser.get_coefficients(), ComplexArray)            # default → ComplexArray
+    assert_type(
+        parser.get_coefficients("rounded"), ComplexArray
+    )  # Literal["rounded"] → ComplexArray
+    assert_type(
+        parser.get_coefficients("raw"), ComplexSeries
+    )  # Literal["raw"] → ComplexSeries
+    assert_type(parser.get_coefficients(), ComplexArray)  # default → ComplexArray
 
 
 @pytest.mark.pnm

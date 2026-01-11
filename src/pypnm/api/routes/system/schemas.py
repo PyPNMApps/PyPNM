@@ -23,6 +23,8 @@ class SysRequest(BaseDeviceConnectRequest):
 
     Inherits from BaseDeviceConnectRequest to include connection parameters.
     """
+
+
 class SysDescrResponse(SnmpResponse):
     """
     Response model for SNMP `sysDescr` query.
@@ -30,10 +32,10 @@ class SysDescrResponse(SnmpResponse):
     The `results` field is a dictionary containing the `sysDescr` key with OID→description map.
     """
 
+
 class SysUpTimeResponse(SnmpResponse):
     """
     Response model for SNMP `sysUpTime` query.
 
     The `results` field is a dictionary containing the `uptime` key with a human-readable string.
     """
-

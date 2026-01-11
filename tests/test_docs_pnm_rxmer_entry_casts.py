@@ -37,23 +37,26 @@ async def test_from_snmp_scaling_and_types(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(Snmp_v2c, "get_result_value", staticmethod(lambda x: x))
 
     idx = 7
-    fake = _FakeSnmp(idx, {
-        "docsPnmCmDsOfdmRxMerFileEnable": 1,
-        "docsPnmCmDsOfdmRxMerMeasStatus": 4,                     # -> "sample_ready"
-        "docsPnmCmDsOfdmRxMerFileName": "ds_ofdm_rxmer.bin",
-        "docsPnmCmDsOfdmRxMerPercentile": 2,                     # -> 0.02
-        "docsPnmCmDsOfdmRxMerMean": 3323,                        # -> 33.23
-        "docsPnmCmDsOfdmRxMerStdDev": 631,                       # -> 6.31
-        "docsPnmCmDsOfdmRxMerThrVal": 92,                        # -> 0.92
-        "docsPnmCmDsOfdmRxMerThrHighestFreq": 314_800_000,       # -> 314800000
-    })
+    fake = _FakeSnmp(
+        idx,
+        {
+            "docsPnmCmDsOfdmRxMerFileEnable": 1,
+            "docsPnmCmDsOfdmRxMerMeasStatus": 4,  # -> "sample_ready"
+            "docsPnmCmDsOfdmRxMerFileName": "ds_ofdm_rxmer.bin",
+            "docsPnmCmDsOfdmRxMerPercentile": 2,  # -> 0.02
+            "docsPnmCmDsOfdmRxMerMean": 3323,  # -> 33.23
+            "docsPnmCmDsOfdmRxMerStdDev": 631,  # -> 6.31
+            "docsPnmCmDsOfdmRxMerThrVal": 92,  # -> 0.92
+            "docsPnmCmDsOfdmRxMerThrHighestFreq": 314_800_000,  # -> 314800000
+        },
+    )
 
     e = await DocsPnmCmDsOfdmRxMerEntry.from_snmp(idx, fake)  # type: ignore[arg-type]
     assert e.index == idx and e.channel_id == idx
     f: DocsPnmCmDsOfdmRxMerFields = e.entry
 
     assert f.docsPnmCmDsOfdmRxMerFileEnable is True
-    assert f.docsPnmCmDsOfdmRxMerMeasStatus == "sample_ready"   # string name now
+    assert f.docsPnmCmDsOfdmRxMerMeasStatus == "sample_ready"  # string name now
     assert f.docsPnmCmDsOfdmRxMerFileName == "ds_ofdm_rxmer.bin"
 
     assert f.docsPnmCmDsOfdmRxMerPercentile == pytest.approx(0.02, abs=0.0)
@@ -66,7 +69,9 @@ async def test_from_snmp_scaling_and_types(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 @pytest.mark.asyncio
-async def test_from_snmp_missing_required_fields_raise(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_from_snmp_missing_required_fields_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """
     Since the entry class enforces non-optional fields, missing any of them should raise ValueError.
     Here we omit several fields and verify the error message lists them.
@@ -75,17 +80,20 @@ async def test_from_snmp_missing_required_fields_raise(monkeypatch: pytest.Monke
 
     idx = 1
     # Missing file_name + all float fields → should raise
-    fake = _FakeSnmp(idx, {
-        "docsPnmCmDsOfdmRxMerFileEnable": 0,
-        "docsPnmCmDsOfdmRxMerMeasStatus": 3,            # "busy"
-        # "docsPnmCmDsOfdmRxMerFileName": ... MISSING ...
-        # float-ish fields MISSING:
-        # "docsPnmCmDsOfdmRxMerPercentile"
-        # "docsPnmCmDsOfdmRxMerMean"
-        # "docsPnmCmDsOfdmRxMerStdDev"
-        # "docsPnmCmDsOfdmRxMerThrVal"
-        "docsPnmCmDsOfdmRxMerThrHighestFreq": 100_000_000,
-    })
+    fake = _FakeSnmp(
+        idx,
+        {
+            "docsPnmCmDsOfdmRxMerFileEnable": 0,
+            "docsPnmCmDsOfdmRxMerMeasStatus": 3,  # "busy"
+            # "docsPnmCmDsOfdmRxMerFileName": ... MISSING ...
+            # float-ish fields MISSING:
+            # "docsPnmCmDsOfdmRxMerPercentile"
+            # "docsPnmCmDsOfdmRxMerMean"
+            # "docsPnmCmDsOfdmRxMerStdDev"
+            # "docsPnmCmDsOfdmRxMerThrVal"
+            "docsPnmCmDsOfdmRxMerThrHighestFreq": 100_000_000,
+        },
+    )
 
     with pytest.raises(ValueError) as exc:
         await DocsPnmCmDsOfdmRxMerEntry.from_snmp(idx, fake)  # type: ignore[arg-type]
@@ -102,16 +110,19 @@ async def test_get_empty_indices_returns_empty_list() -> None:
     assert out == []
 
 
-@pytest.mark.parametrize("code, expected", [
-    (1, "other"),
-    (2, "inactive"),
-    (3, "busy"),
-    (4, "sample_ready"),
-    (5, "error"),
-    (6, "resource_unavailable"),
-    (7, "sample_truncated"),
-    (8, "interface_modification"),
-])
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        (1, "other"),
+        (2, "inactive"),
+        (3, "busy"),
+        (4, "sample_ready"),
+        (5, "error"),
+        (6, "resource_unavailable"),
+        (7, "sample_truncated"),
+        (8, "interface_modification"),
+    ],
+)
 def test_status_enum_string_names(code: int, expected: str) -> None:
     # Sanity-check the enum-to-string behavior used by the entry class
     assert str(MeasStatusType(code)) == expected
@@ -126,16 +137,19 @@ async def test_debug_toggle_does_not_break(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(Snmp_v2c, "get_result_value", staticmethod(lambda x: x))
 
     idx = 2
-    fake = _FakeSnmp(idx, {
-        "docsPnmCmDsOfdmRxMerFileEnable": 1,
-        "docsPnmCmDsOfdmRxMerMeasStatus": 2,                     # "inactive"
-        "docsPnmCmDsOfdmRxMerFileName": "foo.bin",
-        "docsPnmCmDsOfdmRxMerPercentile": 10,                    # -> 0.10
-        "docsPnmCmDsOfdmRxMerMean": 1234,                        # -> 12.34
-        "docsPnmCmDsOfdmRxMerStdDev": 5,                         # -> 0.05
-        "docsPnmCmDsOfdmRxMerThrVal": 200,                       # -> 2.00
-        "docsPnmCmDsOfdmRxMerThrHighestFreq": 765_000_000,
-    })
+    fake = _FakeSnmp(
+        idx,
+        {
+            "docsPnmCmDsOfdmRxMerFileEnable": 1,
+            "docsPnmCmDsOfdmRxMerMeasStatus": 2,  # "inactive"
+            "docsPnmCmDsOfdmRxMerFileName": "foo.bin",
+            "docsPnmCmDsOfdmRxMerPercentile": 10,  # -> 0.10
+            "docsPnmCmDsOfdmRxMerMean": 1234,  # -> 12.34
+            "docsPnmCmDsOfdmRxMerStdDev": 5,  # -> 0.05
+            "docsPnmCmDsOfdmRxMerThrVal": 200,  # -> 2.00
+            "docsPnmCmDsOfdmRxMerThrHighestFreq": 765_000_000,
+        },
+    )
 
     # flip DEBUG on for the class during this test
     prev = DocsPnmCmDsOfdmRxMerEntry.DEBUG

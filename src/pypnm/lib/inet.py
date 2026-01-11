@@ -25,7 +25,9 @@ class Inet:
         Raises:
             ValueError: If the IP address is invalid.
         """
-        if not InetGenerate.get_inet_version(inet):  # Assuming it returns version or raises
+        if not InetGenerate.get_inet_version(
+            inet
+        ):  # Assuming it returns version or raises
             raise ValueError(f"Invalid IP address: {inet}")
         self._inet = inet
 

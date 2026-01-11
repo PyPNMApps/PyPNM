@@ -28,14 +28,29 @@ class GroupDelayResult(BaseModel):
     params : dict
         Parameters used for computation (e.g., df_hz, f0_hz, unwrap, edge_order, smooth_win).
     """
+
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
-    freq_hz: ArrayLikeF64        = Field(default_factory=list, description="Frequency axis (Hz) per bin.")
-    group_delay_s: ArrayLikeF64  = Field(default_factory=list, description="Group delay per bin (seconds).")
-    group_delay_us: ArrayLikeF64 = Field(default_factory=list, description="Group delay per bin (microseconds).")
-    valid_mask: list[bool]       = Field(default_factory=list, description="True where output is valid (active bins & finite H).")
-    mean_group_delay_us: float   = Field(default=np.nan, description="Mean group delay over valid bins (microseconds).")
-    params: dict                 = Field(default_factory=dict, description="Computation parameters (df_hz, f0_hz, unwrap, edge_order, smooth_win).")
+    freq_hz: ArrayLikeF64 = Field(
+        default_factory=list, description="Frequency axis (Hz) per bin."
+    )
+    group_delay_s: ArrayLikeF64 = Field(
+        default_factory=list, description="Group delay per bin (seconds)."
+    )
+    group_delay_us: ArrayLikeF64 = Field(
+        default_factory=list, description="Group delay per bin (microseconds)."
+    )
+    valid_mask: list[bool] = Field(
+        default_factory=list,
+        description="True where output is valid (active bins & finite H).",
+    )
+    mean_group_delay_us: float = Field(
+        default=np.nan, description="Mean group delay over valid bins (microseconds)."
+    )
+    params: dict = Field(
+        default_factory=dict,
+        description="Computation parameters (df_hz, f0_hz, unwrap, edge_order, smooth_win).",
+    )
 
 
 class GroupDelay:
@@ -86,23 +101,30 @@ class GroupDelay:
     """
 
     __slots__ = (
-        "_H",               "_freq_hz",     "_df_hz",
-        "_f0_hz",           "_unwrap",      "_edge_order",
-        "_smooth_win",      "_active_mask", "phase_rad",
-        "group_delay_s",    "group_delay_us"
+        "_H",
+        "_freq_hz",
+        "_df_hz",
+        "_f0_hz",
+        "_unwrap",
+        "_edge_order",
+        "_smooth_win",
+        "_active_mask",
+        "phase_rad",
+        "group_delay_s",
+        "group_delay_us",
     )
 
     def __init__(
         self,
         H: ComplexArray,
         *,
-        freq_hz: ArrayLikeF64 | None     = None,
-        df_hz: Number | None             = None,
-        f0_hz: float                        = 0.0,
+        freq_hz: ArrayLikeF64 | None = None,
+        df_hz: Number | None = None,
+        f0_hz: float = 0.0,
         active_mask: ArrayLikeF64 | None = None,
-        unwrap: bool                        = True,
-        edge_order: int                     = 2,
-        smooth_win: int | None           = None,
+        unwrap: bool = True,
+        edge_order: int = 2,
+        smooth_win: int | None = None,
     ) -> None:
         """
         Initialize a GroupDelay computation.
@@ -131,14 +153,16 @@ class GroupDelay:
         ValueError
             On dimensionality/length mismatches, invalid frequency inputs, or invalid smoothing window.
         """
-        self._H = self._as_complex_array(H, name="H")  # convert once; canonical complex128 vector
+        self._H = self._as_complex_array(
+            H, name="H"
+        )  # convert once; canonical complex128 vector
         n = self._H.size
-        self._freq_hz, self._df_hz  = self._resolve_freq_inputs(freq_hz, df_hz, n)
-        self._f0_hz                 = float(f0_hz)
-        self._active_mask           = self._resolve_mask(active_mask, n)
-        self._unwrap                = bool(unwrap)
-        self._edge_order            = 2 if edge_order not in (1, 2) else edge_order
-        self._smooth_win            = self._validate_smooth_win(smooth_win)
+        self._freq_hz, self._df_hz = self._resolve_freq_inputs(freq_hz, df_hz, n)
+        self._f0_hz = float(f0_hz)
+        self._active_mask = self._resolve_mask(active_mask, n)
+        self._unwrap = bool(unwrap)
+        self._edge_order = 2 if edge_order not in (1, 2) else edge_order
+        self._smooth_win = self._validate_smooth_win(smooth_win)
 
         # Outputs
         self.phase_rad: np.ndarray
@@ -192,13 +216,14 @@ class GroupDelay:
             raise ValueError("df_hz must be finite and non-zero.")
         return cls(
             Hhat,
-            df_hz       =   df_hz,
-            f0_hz       =   f0_hz,
-            freq_hz     =   None,
-            active_mask =   active_mask,
-            unwrap      =   unwrap,
-            edge_order  =   edge_order,
-            smooth_win  =   smooth_win,)
+            df_hz=df_hz,
+            f0_hz=f0_hz,
+            freq_hz=None,
+            active_mask=active_mask,
+            unwrap=unwrap,
+            edge_order=edge_order,
+            smooth_win=smooth_win,
+        )
 
     def to_result(self) -> GroupDelayResult:
         """
@@ -218,17 +243,18 @@ class GroupDelay:
         mean_us = float(np.nanmean(gd_us[mask])) if mask.any() else float("nan")
 
         return GroupDelayResult(
-            freq_hz             =   f.tolist(),
-            group_delay_s       =   gd_s.tolist(),
-            group_delay_us      =   gd_us.tolist(),
-            valid_mask          =   mask.tolist(),
-            mean_group_delay_us =   mean_us,
+            freq_hz=f.tolist(),
+            group_delay_s=gd_s.tolist(),
+            group_delay_us=gd_us.tolist(),
+            valid_mask=mask.tolist(),
+            mean_group_delay_us=mean_us,
             params=dict(
-                df_hz       =   (None if self._df_hz is None else float(self._df_hz)),
-                f0_hz       =   (None if self._freq_hz is not None else float(self._f0_hz)),
-                unwrap      =   self._unwrap,
-                edge_order  =   self._edge_order,
-                smooth_win  =   self._smooth_win,),
+                df_hz=(None if self._df_hz is None else float(self._df_hz)),
+                f0_hz=(None if self._freq_hz is not None else float(self._f0_hz)),
+                unwrap=self._unwrap,
+                edge_order=self._edge_order,
+                smooth_win=self._smooth_win,
+            ),
         )
 
     def to_tuple(self) -> tuple[np.ndarray, np.ndarray]:
@@ -293,9 +319,13 @@ class GroupDelay:
 
         # Gradient dφ/df (rad/Hz) using either explicit freq or constant spacing
         if self._freq_hz is not None:
-            dphi_df = np.gradient(self.phase_rad, self._freq_hz, edge_order=self._edge_order)
+            dphi_df = np.gradient(
+                self.phase_rad, self._freq_hz, edge_order=self._edge_order
+            )
         else:
-            dphi_df = np.gradient(self.phase_rad, float(self._df_hz), edge_order=self._edge_order)
+            dphi_df = np.gradient(
+                self.phase_rad, float(self._df_hz), edge_order=self._edge_order
+            )
 
         # τ_g(f) = -(1 / 2π) * dφ/df   [seconds]
         tau_s = -(1.0 / (2.0 * np.pi)) * dphi_df
@@ -344,7 +374,9 @@ class GroupDelay:
         """
         a = np.asarray(x, dtype=np.float64)
         if a.ndim != 2 or a.shape[1] != 2:
-            raise ValueError(f"{name} must be a sequence of (real, imag) pairs; got shape {a.shape}")
+            raise ValueError(
+                f"{name} must be a sequence of (real, imag) pairs; got shape {a.shape}"
+            )
         if a.shape[0] < 2:
             raise ValueError(f"{name} must have at least 2 points; got {a.shape[0]}")
 
@@ -502,7 +534,9 @@ class GroupDelay:
             if not np.all(np.isfinite(f)):
                 raise ValueError("freq_hz contains non-finite values.")
             if np.any(np.diff(f) == 0.0):
-                raise ValueError("freq_hz must be strictly monotonic (no duplicate frequencies).")
+                raise ValueError(
+                    "freq_hz must be strictly monotonic (no duplicate frequencies)."
+                )
             return f, None
         # constant spacing
         try:

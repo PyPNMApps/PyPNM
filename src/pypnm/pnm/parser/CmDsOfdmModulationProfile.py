@@ -21,48 +21,68 @@ if TYPE_CHECKING:
 
 
 class ModulationOrderType(IntEnum):
-    zero_bit_loaded   = 0
-    continuous_pilot  = 1
-    qpsk              = 2
-    reserved_3        = 3
-    qam_16            = 4
-    reserved_5        = 5
-    qam_64            = 6
-    qam_128           = 7
-    qam_256           = 8
-    qam_512           = 9
-    qam_1024          = 10
-    qam_2048          = 11
-    qam_4096          = 12
-    qam_8192          = 13
-    qam_16384         = 14
-    exclusion         = 16
-    plc               = 20
+    zero_bit_loaded = 0
+    continuous_pilot = 1
+    qpsk = 2
+    reserved_3 = 3
+    qam_16 = 4
+    reserved_5 = 5
+    qam_64 = 6
+    qam_128 = 7
+    qam_256 = 8
+    qam_512 = 9
+    qam_1024 = 10
+    qam_2048 = 11
+    qam_4096 = 12
+    qam_8192 = 13
+    qam_16384 = 14
+    exclusion = 16
+    plc = 20
+
 
 class RangeModulationProfileSchemaModel(BaseModel):
     """Schema 0: contiguous range of subcarriers at a single modulation order."""
+
     model_config = ConfigDict(use_enum_values=True, extra="ignore")
-    schema_type: Literal[0]           = Field(0, description="0 = range modulation")
-    modulation_order: str             = Field(..., description="Modulation-Order-Type for this range")
-    num_subcarriers: int              = Field(..., ge=0, description="Number of subcarriers in the range")
+    schema_type: Literal[0] = Field(0, description="0 = range modulation")
+    modulation_order: str = Field(
+        ..., description="Modulation-Order-Type for this range"
+    )
+    num_subcarriers: int = Field(
+        ..., ge=0, description="Number of subcarriers in the range"
+    )
+
 
 class SkipModulationProfileSchemaModel(BaseModel):
     """Schema 1: alternating/skip pattern (main vs skip modulation)."""
+
     model_config = ConfigDict(use_enum_values=True, extra="ignore")
-    schema_type: Literal[1]           = Field(1, description="1 = skip modulation")
-    main_modulation_order: str        = Field(..., description="Main (kept) subcarrier Modulation-Order-Type")
-    skip_modulation_order: str        = Field(..., description="Skipped subcarrier Modulation-Order-Type")
-    num_subcarriers: int              = Field(..., ge=0, description="Number of affected subcarriers")
+    schema_type: Literal[1] = Field(1, description="1 = skip modulation")
+    main_modulation_order: str = Field(
+        ..., description="Main (kept) subcarrier Modulation-Order-Type"
+    )
+    skip_modulation_order: str = Field(
+        ..., description="Skipped subcarrier Modulation-Order-Type"
+    )
+    num_subcarriers: int = Field(
+        ..., ge=0, description="Number of affected subcarriers"
+    )
+
 
 SchemeModel = Annotated[
     RangeModulationProfileSchemaModel | SkipModulationProfileSchemaModel,
-    Field(discriminator="schema_type")]
+    Field(discriminator="schema_type"),
+]
+
 
 class ModulationProfileModel(BaseModel):
     """One OFDM modulation profile (profile_id + list of scheme chunks)."""
+
     model_config = ConfigDict(extra="ignore")
-    profile_id: ProfileId       = Field(..., ge=0, description="Profile identifier")
-    schemes: list[SchemeModel]  = Field(default_factory=list, description="Schema chunks composing the profile")
+    profile_id: ProfileId = Field(..., ge=0, description="Profile identifier")
+    schemes: list[SchemeModel] = Field(
+        default_factory=list, description="Schema chunks composing the profile"
+    )
 
 
 class CmDsOfdmModulationProfile(PnmHeader):
@@ -78,8 +98,9 @@ class CmDsOfdmModulationProfile(PnmHeader):
     >>> model = parser.to_model()
     >>> print(model.model_dump_json(indent=2))
     """
-    RANGE_MODULATION: int   = 0
-    SKIP_MODULATION: int    = 1
+
+    RANGE_MODULATION: int = 0
+    SKIP_MODULATION: int = 1
 
     def __init__(self, binary_data: bytes) -> None:
         super().__init__(binary_data)
@@ -115,7 +136,7 @@ class CmDsOfdmModulationProfile(PnmHeader):
                 subcarrier_zero_frequency,
                 first_active_subcarrier_index,
                 subcarrier_spacing_khz,
-                profile_data_length_bytes
+                profile_data_length_bytes,
             ) = unpack(header_fmt, self.pnm_data[:header_sz])
 
         except Exception as e:
@@ -132,15 +153,15 @@ class CmDsOfdmModulationProfile(PnmHeader):
         )
 
         self._model = CmDsOfdmModulationProfileModel(
-            pnm_header                      =   self.getPnmHeaderParameterModel(),
-            channel_id                      =   channel_id,
-            mac_address                     =   mac_address,
-            subcarrier_zero_frequency       =   subcarrier_zero_frequency,
-            first_active_subcarrier_index   =   first_active_subcarrier_index,
-            subcarrier_spacing              =   subcarrier_spacing_hz,
-            num_profiles                    =   num_profiles,
-            profile_data_length_bytes       =   profile_data_length_bytes,
-            profiles                        =   profiles,
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=channel_id,
+            mac_address=mac_address,
+            subcarrier_zero_frequency=subcarrier_zero_frequency,
+            first_active_subcarrier_index=first_active_subcarrier_index,
+            subcarrier_spacing=subcarrier_spacing_hz,
+            num_profiles=num_profiles,
+            profile_data_length_bytes=profile_data_length_bytes,
+            profiles=profiles,
         )
 
     def _parse_profiles(self, blob: bytes) -> list[ModulationProfileModel]:
@@ -162,15 +183,19 @@ class CmDsOfdmModulationProfile(PnmHeader):
             try:
                 hdr_fmt = ">BH"
                 hdr_sz = calcsize(hdr_fmt)
-                profile_id, length = unpack(hdr_fmt, blob[offset:offset + hdr_sz])
+                profile_id, length = unpack(hdr_fmt, blob[offset : offset + hdr_sz])
                 start = offset + hdr_sz
                 end = start + length
                 if end > len(blob):
-                    raise ValueError(f"Profile payload overruns buffer (offset={offset}, length={length})")
+                    raise ValueError(
+                        f"Profile payload overruns buffer (offset={offset}, length={length})"
+                    )
                 payload = blob[start:end]
                 offset = end
             except Exception as e:
-                raise ValueError(f"Failed to read profile header at offset {offset}: {e}") from e
+                raise ValueError(
+                    f"Failed to read profile header at offset {offset}: {e}"
+                ) from e
 
             # Decode payload
             pos = 0
@@ -184,45 +209,56 @@ class CmDsOfdmModulationProfile(PnmHeader):
                     if scheme_type == 0:
                         fmt = ">BH"
                         size = calcsize(fmt)
-                        mod_val, num_sc = unpack(fmt, payload[pos:pos + size])
+                        mod_val, num_sc = unpack(fmt, payload[pos : pos + size])
                         pos += size
                         schemes.append(
                             RangeModulationProfileSchemaModel(
-                                schema_type         =   0,
-                                modulation_order    =   ModulationOrderType(mod_val).name,
-                                num_subcarriers     =   num_sc,
+                                schema_type=0,
+                                modulation_order=ModulationOrderType(mod_val).name,
+                                num_subcarriers=num_sc,
                             )
                         )
 
                     elif scheme_type == 1:
                         fmt = ">BBH"
                         size = calcsize(fmt)
-                        main_val, skip_val, num_sc = unpack(fmt, payload[pos:pos + size])
+                        main_val, skip_val, num_sc = unpack(
+                            fmt, payload[pos : pos + size]
+                        )
                         pos += size
                         schemes.append(
                             SkipModulationProfileSchemaModel(
-                                schema_type             =   1,
-                                main_modulation_order   =   ModulationOrderType(main_val).name,
-                                skip_modulation_order   =   ModulationOrderType(skip_val).name,
-                                num_subcarriers         =   num_sc,
+                                schema_type=1,
+                                main_modulation_order=ModulationOrderType(
+                                    main_val
+                                ).name,
+                                skip_modulation_order=ModulationOrderType(
+                                    skip_val
+                                ).name,
+                                num_subcarriers=num_sc,
                             )
                         )
 
                     else:
                         self.logger.warning(
                             "Unknown scheme type %s in profile %s; stopping schema parse for this profile",
-                            scheme_type, profile_id
+                            scheme_type,
+                            profile_id,
                         )
                         break  # can't safely advance without a known format
 
                 except Exception as exc:
                     self.logger.exception(
                         "Error decoding scheme (profile %s at pos %s): %s",
-                        profile_id, pos, exc
+                        profile_id,
+                        pos,
+                        exc,
                     )
                     break
 
-            results.append(ModulationProfileModel(profile_id=profile_id, schemes=schemes))
+            results.append(
+                ModulationProfileModel(profile_id=profile_id, schemes=schemes)
+            )
 
         return results
 
@@ -242,14 +278,16 @@ class CmDsOfdmModulationProfile(PnmHeader):
         spacing = int(self._model.subcarrier_spacing)
         f_zero = int(self._model.subcarrier_zero_frequency)
         first_idx = int(self._model.first_active_subcarrier_index)
-        #TODO: Need to calculate the number of subcarries using Profile-A
+        # TODO: Need to calculate the number of subcarries using Profile-A
         n = 0
 
         if spacing <= 0 or n <= 0:
             return []
 
         start = f_zero + spacing * first_idx
-        freqs: FrequencySeriesHz = cast(FrequencySeriesHz, [start + i * spacing for i in range(n)])
+        freqs: FrequencySeriesHz = cast(
+            FrequencySeriesHz, [start + i * spacing for i in range(n)]
+        )
         return freqs
 
     def to_model(self) -> CmDsOfdmModulationProfileModel:

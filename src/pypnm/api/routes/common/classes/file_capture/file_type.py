@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -18,9 +17,9 @@ class FileType(IntEnum):
                such as CSV, PNG, and other artifacts
                (media type "application/zip")
     """
-    JSON    = 0
-    CSV     = 1
-    PNG     = 2
-    XLSX    = 3
-    ARCHIVE = 4
 
+    JSON = 0
+    CSV = 1
+    PNG = 2
+    XLSX = 3
+    ARCHIVE = 4

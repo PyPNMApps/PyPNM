@@ -23,18 +23,23 @@ from pypnm.lib.types import InetAddressStr, MacAddressStr
 
 logger = logging.getLogger(__name__)
 
-class CmDocsDevService:
 
-    def __init__(self, mac_address: MacAddressStr,
-                 ip_address: InetAddressStr,
-                 snmp_config: SNMPConfig | None = None) -> None:
+class CmDocsDevService:
+    def __init__(
+        self,
+        mac_address: MacAddressStr,
+        ip_address: InetAddressStr,
+        snmp_config: SNMPConfig | None = None,
+    ) -> None:
         if snmp_config is None:
             snmp_config = SNMPConfig(snmp_v2c=SNMPv2c(community=None))
         self._mac = MacAddress(mac_address)
         self._ip = Inet(ip_address)
-        self._cm = CableModem(mac_address   =   self._mac,
-                              inet          =   self._ip,
-                              write_community = snmp_config.snmp_v2c.community)
+        self._cm = CableModem(
+            mac_address=self._mac,
+            inet=self._ip,
+            write_community=snmp_config.snmp_v2c.community,
+        )
 
     def get_mac_address(self) -> MacAddressStr:
         return self._mac.mac_address
@@ -52,14 +57,16 @@ class CmDocsDevService:
 
             try:
                 _, event_data = next(iter(raw.items()))
-                log_entries.append(EventLogEntry(
-                    docsDevEvFirstTime  =event_data.get("docsDevEvFirstTime", ""),
-                    docsDevEvLastTime   =event_data.get("docsDevEvLastTime", ""),
-                    docsDevEvCounts     =event_data.get("docsDevEvCounts", 0),
-                    docsDevEvLevel      =event_data.get("docsDevEvLevel", 0),
-                    docsDevEvId         =event_data.get("docsDevEvId", 0),
-                    docsDevEvText       =event_data.get("docsDevEvText", ""),
-                ))
+                log_entries.append(
+                    EventLogEntry(
+                        docsDevEvFirstTime=event_data.get("docsDevEvFirstTime", ""),
+                        docsDevEvLastTime=event_data.get("docsDevEvLastTime", ""),
+                        docsDevEvCounts=event_data.get("docsDevEvCounts", 0),
+                        docsDevEvLevel=event_data.get("docsDevEvLevel", 0),
+                        docsDevEvId=event_data.get("docsDevEvId", 0),
+                        docsDevEvText=event_data.get("docsDevEvText", ""),
+                    )
+                )
             except Exception:
                 continue
 
@@ -71,13 +78,13 @@ class CmDocsDevService:
                 return PnmResponse(
                     mac_address=self._mac.mac_address,
                     status=ServiceStatusCode.RESET_NOW_FAILED,
-                    message=f"Reset command to cable modem at {self._ip} failed."
+                    message=f"Reset command to cable modem at {self._ip} failed.",
                 )
 
             return PnmResponse(
-                mac_address =   self._mac.mac_address,
-                status      =   ServiceStatusCode.SUCCESS,
-                message     =   f"Reset command sent to cable modem at {self._ip} successfully."
+                mac_address=self._mac.mac_address,
+                status=ServiceStatusCode.SUCCESS,
+                message=f"Reset command sent to cable modem at {self._ip} successfully.",
             )
 
         except Exception as e:
@@ -88,15 +95,15 @@ class CmDocsDevService:
         try:
             if not self._cm.is_ping_reachable():
                 return PnmResponse(
-                    mac_address =   self._mac.mac_address,
-                    status      =   ServiceStatusCode.PING_FAILED,
-                    message     =   f"Ping to {self._ip} failed."
+                    mac_address=self._mac.mac_address,
+                    status=ServiceStatusCode.PING_FAILED,
+                    message=f"Ping to {self._ip} failed.",
                 )
 
             return PnmResponse(
-                mac_address =   self._mac.mac_address,
-                status      =   ServiceStatusCode.SUCCESS,
-                message     =   f"Ping to cable modem at {self._ip} succeeded."
+                mac_address=self._mac.mac_address,
+                status=ServiceStatusCode.SUCCESS,
+                message=f"Ping to cable modem at {self._ip} succeeded.",
             )
 
         except Exception as e:

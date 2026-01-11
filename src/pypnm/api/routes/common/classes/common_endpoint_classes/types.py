@@ -13,6 +13,6 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import
     SnmpResponse,
 )
 
-MeasurementCommonResponse       = PnmMeasurementResponse | SnmpResponse
-MeasurementStatsCommonResponse  = SnmpResponse
-AnalysisCommonResponse          = PnmAnalysisResponse | FileResponse | SnmpResponse
+MeasurementCommonResponse = PnmMeasurementResponse | SnmpResponse
+MeasurementStatsCommonResponse = SnmpResponse
+AnalysisCommonResponse = PnmAnalysisResponse | FileResponse | SnmpResponse

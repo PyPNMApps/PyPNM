@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -15,9 +14,11 @@ class DocsPnmBulkUploadControl(IntEnum):
         NO_AUTO_UPLOAD (2): Bulk data files are not automatically uploaded.
         AUTO_UPLOAD (3): Bulk data files are automatically uploaded when available.
     """
+
     OTHER = 1
     NO_AUTO_UPLOAD = 2
     AUTO_UPLOAD = 3
+
 
 class InetAddressType(IntEnum):
     """
@@ -47,11 +48,12 @@ class InetAddressType(IntEnum):
     IPV6Z = 4
     DNS = 16
 
+
 class DocsisIfType(IntEnum):
-    docsCableMaclayer           = 127   # CATV MAC Layer
-    docsCableDownstream         = 128   # CATV Downstream Interface
-    docsCableUpstream           = 129   # CATV Upstream Interface
-    docsCableUpstreamChannel    = 205   # CATV Upstream Channel
-    docsCableUpstreamRfPort     = 256   # DOCSIS Upstream RF Port
-    docsOfdmDownstream          = 277   # DOCSIS Downstream OFDM Interface
-    docsOfdmaUpstream           = 278   # DOCSIS Upstream OFDMA Interface
+    docsCableMaclayer = 127  # CATV MAC Layer
+    docsCableDownstream = 128  # CATV Downstream Interface
+    docsCableUpstream = 129  # CATV Upstream Interface
+    docsCableUpstreamChannel = 205  # CATV Upstream Channel
+    docsCableUpstreamRfPort = 256  # DOCSIS Upstream RF Port
+    docsOfdmDownstream = 277  # DOCSIS Downstream OFDM Interface
+    docsOfdmaUpstream = 278  # DOCSIS Upstream OFDMA Interface

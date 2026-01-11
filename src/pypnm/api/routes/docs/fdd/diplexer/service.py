@@ -32,9 +32,12 @@ class FddDiplexerBandEdgeCapabilityService:
     in the modem's SNMP MIBs (e.g., `docsFddDiplexerUsUpperBandEdgeCapability`, etc.).
     """
 
-    def __init__(self, mac_address: MacAddressStr,
-                 ip_address: InetAddressStr,
-                 snmp_config: SNMPConfig | None = None) -> None:
+    def __init__(
+        self,
+        mac_address: MacAddressStr,
+        ip_address: InetAddressStr,
+        snmp_config: SNMPConfig | None = None,
+    ) -> None:
         """
         Initialize the service using a modem's MAC and IP address.
 
@@ -46,9 +49,11 @@ class FddDiplexerBandEdgeCapabilityService:
         if snmp_config is None:
             snmp_config = SNMPConfig(snmp_v2c=SNMPv2c(community=None))
 
-        self.cm = CableModem(mac_address=MacAddress(mac_address),
-                             inet=Inet(ip_address),
-                             write_community=snmp_config.snmp_v2c.community)
+        self.cm = CableModem(
+            mac_address=MacAddress(mac_address),
+            inet=Inet(ip_address),
+            write_community=snmp_config.snmp_v2c.community,
+        )
 
     def isDocsis40(self) -> bool:
         return self.cm.getDocsisBaseCapability() == ClabsDocsisVersion.DOCSIS_40
@@ -66,8 +71,9 @@ class FddDiplexerBandEdgeCapabilityService:
         Returns:
             List[Dict]: A list of populated band edge capability entries.
         """
-        fdd_band_edge_list: list[DocsFddCmFddBandEdgeCapabilities] | None = \
-            await self.cm.getDocsFddCmFddBandEdgeCapabilities(create_and_start=False)
+        fdd_band_edge_list: (
+            list[DocsFddCmFddBandEdgeCapabilities] | None
+        ) = await self.cm.getDocsFddCmFddBandEdgeCapabilities(create_and_start=False)
 
         if fdd_band_edge_list is None:
             return []

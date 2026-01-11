@@ -21,22 +21,23 @@ class DocsIf31CmDsOfdmChanEntry(BaseModel):
     - All values are retrieved via symbolic OIDs (no compiled OIDs).
     - Presence of fields depends on device/MIB support.
     """
-    docsIf31CmDsOfdmChanChannelId:                ChannelId = INVALID_CHANNEL_ID
-    docsIf31CmDsOfdmChanChanIndicator:            int | None = None
-    docsIf31CmDsOfdmChanSubcarrierZeroFreq:       FrequencyHz | None = None
+
+    docsIf31CmDsOfdmChanChannelId: ChannelId = INVALID_CHANNEL_ID
+    docsIf31CmDsOfdmChanChanIndicator: int | None = None
+    docsIf31CmDsOfdmChanSubcarrierZeroFreq: FrequencyHz | None = None
     docsIf31CmDsOfdmChanFirstActiveSubcarrierNum: int | None = None
-    docsIf31CmDsOfdmChanLastActiveSubcarrierNum:  int | None = None
-    docsIf31CmDsOfdmChanNumActiveSubcarriers:     int | None = None
-    docsIf31CmDsOfdmChanSubcarrierSpacing:        int | None = None
-    docsIf31CmDsOfdmChanCyclicPrefix:             int | None = None
-    docsIf31CmDsOfdmChanRollOffPeriod:            int | None = None
-    docsIf31CmDsOfdmChanPlcFreq:                  FrequencyHz | None = None
-    docsIf31CmDsOfdmChanNumPilots:                int | None = None
-    docsIf31CmDsOfdmChanTimeInterleaverDepth:     int | None = None
-    docsIf31CmDsOfdmChanPlcTotalCodewords:        int | None = None
-    docsIf31CmDsOfdmChanPlcUnreliableCodewords:   int | None = None
-    docsIf31CmDsOfdmChanNcpTotalFields:           int | None = None
-    docsIf31CmDsOfdmChanNcpFieldCrcFailures:      int | None = None
+    docsIf31CmDsOfdmChanLastActiveSubcarrierNum: int | None = None
+    docsIf31CmDsOfdmChanNumActiveSubcarriers: int | None = None
+    docsIf31CmDsOfdmChanSubcarrierSpacing: int | None = None
+    docsIf31CmDsOfdmChanCyclicPrefix: int | None = None
+    docsIf31CmDsOfdmChanRollOffPeriod: int | None = None
+    docsIf31CmDsOfdmChanPlcFreq: FrequencyHz | None = None
+    docsIf31CmDsOfdmChanNumPilots: int | None = None
+    docsIf31CmDsOfdmChanTimeInterleaverDepth: int | None = None
+    docsIf31CmDsOfdmChanPlcTotalCodewords: int | None = None
+    docsIf31CmDsOfdmChanPlcUnreliableCodewords: int | None = None
+    docsIf31CmDsOfdmChanNcpTotalFields: int | None = None
+    docsIf31CmDsOfdmChanNcpFieldCrcFailures: int | None = None
 
 
 class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
@@ -52,12 +53,15 @@ class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
     entry : DocsIf31CmDsOfdmChanEntry
         Populated OFDM channel attributes for this index.
     """
+
     index: int
     channel_id: int
     entry: DocsIf31CmDsOfdmChanEntry
 
     @classmethod
-    async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsIf31CmDsOfdmChanChannelEntry:
+    async def from_snmp(
+        cls, index: int, snmp: Snmp_v2c
+    ) -> DocsIf31CmDsOfdmChanChannelEntry:
         logger = logging.getLogger(cls.__name__)
 
         def safe_cast(value: str, cast: Callable) -> int | float | str | bool | None:
@@ -66,7 +70,9 @@ class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
             except Exception:
                 return None
 
-        async def fetch(field: str, cast: Callable | None = None) -> None | int | float | str | bool:
+        async def fetch(
+            field: str, cast: Callable | None = None
+        ) -> None | int | float | str | bool:
             try:
                 raw = await snmp.get(f"{field}.{index}")
                 val = Snmp_v2c.get_result_value(raw)
@@ -91,32 +97,67 @@ class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
                 return None
 
         entry = DocsIf31CmDsOfdmChanEntry(
-            docsIf31CmDsOfdmChanChannelId                 = await fetch("docsIf31CmDsOfdmChanChannelId", ChannelId),
-            docsIf31CmDsOfdmChanChanIndicator             = await fetch("docsIf31CmDsOfdmChanChanIndicator", int),
-            docsIf31CmDsOfdmChanSubcarrierZeroFreq        = await fetch("docsIf31CmDsOfdmChanSubcarrierZeroFreq", FrequencyHz),
-            docsIf31CmDsOfdmChanFirstActiveSubcarrierNum  = await fetch("docsIf31CmDsOfdmChanFirstActiveSubcarrierNum", int),
-            docsIf31CmDsOfdmChanLastActiveSubcarrierNum   = await fetch("docsIf31CmDsOfdmChanLastActiveSubcarrierNum", int),
-            docsIf31CmDsOfdmChanNumActiveSubcarriers      = await fetch("docsIf31CmDsOfdmChanNumActiveSubcarriers", int),
-            docsIf31CmDsOfdmChanSubcarrierSpacing         = await fetch("docsIf31CmDsOfdmChanSubcarrierSpacing", int) * KHZ,
-            docsIf31CmDsOfdmChanCyclicPrefix              = await fetch("docsIf31CmDsOfdmChanCyclicPrefix", int),
-            docsIf31CmDsOfdmChanRollOffPeriod             = await fetch("docsIf31CmDsOfdmChanRollOffPeriod", int),
-            docsIf31CmDsOfdmChanPlcFreq                   = await fetch("docsIf31CmDsOfdmChanPlcFreq", FrequencyHz),
-            docsIf31CmDsOfdmChanNumPilots                 = await fetch("docsIf31CmDsOfdmChanNumPilots", int),
-            docsIf31CmDsOfdmChanTimeInterleaverDepth      = await fetch("docsIf31CmDsOfdmChanTimeInterleaverDepth", int),
-            docsIf31CmDsOfdmChanPlcTotalCodewords         = await fetch("docsIf31CmDsOfdmChanPlcTotalCodewords", int),
-            docsIf31CmDsOfdmChanPlcUnreliableCodewords    = await fetch("docsIf31CmDsOfdmChanPlcUnreliableCodewords", int),
-            docsIf31CmDsOfdmChanNcpTotalFields            = await fetch("docsIf31CmDsOfdmChanNcpTotalFields", int),
-            docsIf31CmDsOfdmChanNcpFieldCrcFailures       = await fetch("docsIf31CmDsOfdmChanNcpFieldCrcFailures", int),
+            docsIf31CmDsOfdmChanChannelId=await fetch(
+                "docsIf31CmDsOfdmChanChannelId", ChannelId
+            ),
+            docsIf31CmDsOfdmChanChanIndicator=await fetch(
+                "docsIf31CmDsOfdmChanChanIndicator", int
+            ),
+            docsIf31CmDsOfdmChanSubcarrierZeroFreq=await fetch(
+                "docsIf31CmDsOfdmChanSubcarrierZeroFreq", FrequencyHz
+            ),
+            docsIf31CmDsOfdmChanFirstActiveSubcarrierNum=await fetch(
+                "docsIf31CmDsOfdmChanFirstActiveSubcarrierNum", int
+            ),
+            docsIf31CmDsOfdmChanLastActiveSubcarrierNum=await fetch(
+                "docsIf31CmDsOfdmChanLastActiveSubcarrierNum", int
+            ),
+            docsIf31CmDsOfdmChanNumActiveSubcarriers=await fetch(
+                "docsIf31CmDsOfdmChanNumActiveSubcarriers", int
+            ),
+            docsIf31CmDsOfdmChanSubcarrierSpacing=await fetch(
+                "docsIf31CmDsOfdmChanSubcarrierSpacing", int
+            )
+            * KHZ,
+            docsIf31CmDsOfdmChanCyclicPrefix=await fetch(
+                "docsIf31CmDsOfdmChanCyclicPrefix", int
+            ),
+            docsIf31CmDsOfdmChanRollOffPeriod=await fetch(
+                "docsIf31CmDsOfdmChanRollOffPeriod", int
+            ),
+            docsIf31CmDsOfdmChanPlcFreq=await fetch(
+                "docsIf31CmDsOfdmChanPlcFreq", FrequencyHz
+            ),
+            docsIf31CmDsOfdmChanNumPilots=await fetch(
+                "docsIf31CmDsOfdmChanNumPilots", int
+            ),
+            docsIf31CmDsOfdmChanTimeInterleaverDepth=await fetch(
+                "docsIf31CmDsOfdmChanTimeInterleaverDepth", int
+            ),
+            docsIf31CmDsOfdmChanPlcTotalCodewords=await fetch(
+                "docsIf31CmDsOfdmChanPlcTotalCodewords", int
+            ),
+            docsIf31CmDsOfdmChanPlcUnreliableCodewords=await fetch(
+                "docsIf31CmDsOfdmChanPlcUnreliableCodewords", int
+            ),
+            docsIf31CmDsOfdmChanNcpTotalFields=await fetch(
+                "docsIf31CmDsOfdmChanNcpTotalFields", int
+            ),
+            docsIf31CmDsOfdmChanNcpFieldCrcFailures=await fetch(
+                "docsIf31CmDsOfdmChanNcpFieldCrcFailures", int
+            ),
         )
 
         return cls(
-            index      = index,
-            channel_id = entry.docsIf31CmDsOfdmChanChannelId or 0,
-            entry      = entry
+            index=index,
+            channel_id=entry.docsIf31CmDsOfdmChanChannelId or 0,
+            entry=entry,
         )
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsIf31CmDsOfdmChanChannelEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsIf31CmDsOfdmChanChannelEntry]:
         logger = logging.getLogger(cls.__name__)
         results: list[DocsIf31CmDsOfdmChanChannelEntry] = []
 
@@ -129,13 +170,17 @@ class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
             if entry.entry.docsIf31CmDsOfdmChanChannelId != INVALID_CHANNEL_ID:
                 results.append(entry)
             else:
-                logger.warning(f"Failed to retrieve OFDM channel {i}: invalid channel ID")
+                logger.warning(
+                    f"Failed to retrieve OFDM channel {i}: invalid channel ID"
+                )
 
         return results
 
     # NEW: entries-only helper to accommodate your existing method signature.
     @classmethod
-    async def get_entries(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsIf31CmDsOfdmChanEntry]:
+    async def get_entries(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsIf31CmDsOfdmChanEntry]:
         """
         Convenience wrapper that returns only the `DocsIf31CmDsOfdmChanEntry`
         objects (no channel wrapper), preserving a return type of

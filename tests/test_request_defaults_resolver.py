@@ -25,12 +25,16 @@ from pypnm.lib.inet import Inet
 
 
 def test_tftp_ipv4_blank_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="tftp\\.ipv4 must be null or a valid IP address"):
+    with pytest.raises(
+        ValidationError, match="tftp\\.ipv4 must be null or a valid IP address"
+    ):
         TftpConfig(ipv4="", ipv6=None)
 
 
 def test_tftp_ipv6_blank_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="tftp\\.ipv6 must be null or a valid IP address"):
+    with pytest.raises(
+        ValidationError, match="tftp\\.ipv6 must be null or a valid IP address"
+    ):
         TftpConfig(ipv4=None, ipv6="")
 
 
@@ -39,11 +43,21 @@ def test_snmp_v2c_blank_is_rejected() -> None:
         SNMPv2c(community="")
 
 
-def test_resolver_defaults_used_for_null_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "tftp"))
-    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10"))
-    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10"))
-    monkeypatch.setattr(SystemConfigSettings, "snmp_write_community", staticmethod(lambda: "private"))
+def test_resolver_defaults_used_for_null_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "tftp")
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10")
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10")
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings, "snmp_write_community", staticmethod(lambda: "private")
+    )
 
     tftp = TftpConfig(ipv4=None, ipv6=None)
     snmp = SNMPConfig(snmp_v2c=SNMPv2c(community=None))
@@ -55,10 +69,18 @@ def test_resolver_defaults_used_for_null_overrides(monkeypatch: pytest.MonkeyPat
     assert community == "private"
 
 
-def test_resolver_ignores_request_when_not_tftp(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "http"))
-    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10"))
-    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10"))
+def test_resolver_ignores_request_when_not_tftp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "http")
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10")
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10")
+    )
 
     tftp = TftpConfig(ipv4="192.168.0.20", ipv6="2001:db8::20")
     tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(tftp)

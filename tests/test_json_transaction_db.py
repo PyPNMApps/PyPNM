@@ -24,11 +24,12 @@ from pypnm.lib.types import HashStr, TimeStamp, TransactionId
 # Model Tests
 # ────────────────────────────────────────────────────────────────────────────────
 
+
 def test_json_transaction_record_model_valid() -> None:
     timestamp: TimeStamp = TimeStamp(1_700_000_000)
-    filename:  str       = "example.json"
-    byte_size: int       = 128
-    sha256:    HashStr   = HashStr("a" * 64)
+    filename: str = "example.json"
+    byte_size: int = 128
+    sha256: HashStr = HashStr("a" * 64)
 
     record = JsonTransactionRecordModel(
         timestamp=timestamp,
@@ -38,9 +39,9 @@ def test_json_transaction_record_model_valid() -> None:
     )
 
     assert record.timestamp == timestamp
-    assert record.filename  == filename
+    assert record.filename == filename
     assert record.byte_size == byte_size
-    assert record.sha256    == sha256
+    assert record.sha256 == sha256
 
 
 def test_json_transaction_db_model_add_and_access() -> None:
@@ -77,15 +78,16 @@ def test_json_return_model_inherits_metadata_and_adds_data() -> None:
     )
 
     assert ret_model.timestamp == base_record.timestamp
-    assert ret_model.filename  == base_record.filename
+    assert ret_model.filename == base_record.filename
     assert ret_model.byte_size == base_record.byte_size
-    assert ret_model.sha256    == base_record.sha256
-    assert ret_model.data      == payload_text
+    assert ret_model.sha256 == base_record.sha256
+    assert ret_model.data == payload_text
 
 
 # ────────────────────────────────────────────────────────────────────────────────
 # JsonTransactionDb Tests
 # ────────────────────────────────────────────────────────────────────────────────
+
 
 def _make_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> JsonTransactionDb:
     """
@@ -123,7 +125,9 @@ def _make_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> JsonTransaction
     return db
 
 
-def test_write_json_creates_payload_and_updates_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_json_creates_payload_and_updates_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fixed_time: TimeStamp = TimeStamp(1_700_000_010)
 
     monkeypatch.setattr(
@@ -135,13 +139,15 @@ def test_write_json_creates_payload_and_updates_db(tmp_path: Path, monkeypatch: 
 
     payload: Mapping[str, Any] = {"foo": "bar", "value": 42}
 
-    updated_db: JsonTransactionDbModel = db.write_json(payload, fname="payload", extension="json")
+    updated_db: JsonTransactionDbModel = db.write_json(
+        payload, fname="payload", extension="json"
+    )
     assert isinstance(updated_db, JsonTransactionDbModel)
     assert len(updated_db.records) == 1
 
     tx_id, record = next(iter(updated_db.records.items()))
 
-    db_path: Path      = tmp_path / "transactions.json"
+    db_path: Path = tmp_path / "transactions.json"
     payload_path: Path = tmp_path / "json" / str(record.filename)
 
     assert isinstance(tx_id, str)
@@ -175,7 +181,9 @@ def test_read_json_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
 
     payload: Mapping[str, Any] = {"alpha": 1, "beta": True, "gamma": "text"}
-    updated_db: JsonTransactionDbModel = db.write_json(payload, fname="roundtrip", extension="json")
+    updated_db: JsonTransactionDbModel = db.write_json(
+        payload, fname="roundtrip", extension="json"
+    )
 
     tx_id, record = next(iter(updated_db.records.items()))
 
@@ -183,28 +191,32 @@ def test_read_json_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert isinstance(result, JsonReturnModel)
 
     assert result.timestamp == record.timestamp
-    assert result.filename  == str(record.filename)
+    assert result.filename == str(record.filename)
     assert result.byte_size == record.byte_size
-    assert result.sha256    == record.sha256
+    assert result.sha256 == record.sha256
 
     parsed_payload: dict[str, Any] = json.loads(result.data)
     assert parsed_payload == dict(payload)
 
 
-def test_read_json_missing_transaction_returns_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_json_missing_transaction_returns_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
 
     missing_id: TransactionId = TransactionId("non-existent-transaction-id")
-    result: JsonReturnModel   = db.read_json(missing_id)
+    result: JsonReturnModel = db.read_json(missing_id)
 
     assert result.timestamp == TimeStamp(0)
-    assert result.filename  == ""
+    assert result.filename == ""
     assert result.byte_size == 0
-    assert result.sha256    == HashStr("")
-    assert result.data      == ""
+    assert result.sha256 == HashStr("")
+    assert result.data == ""
 
 
-def test_read_json_hash_mismatch_returns_empty_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_json_hash_mismatch_returns_empty_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fixed_time: TimeStamp = TimeStamp(1_700_000_030)
     monkeypatch.setattr(
         "pypnm.lib.db.json_transaction.time.time",
@@ -214,7 +226,9 @@ def test_read_json_hash_mismatch_returns_empty_data(tmp_path: Path, monkeypatch:
     db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
 
     payload: Mapping[str, Any] = {"key": "original"}
-    updated_db: JsonTransactionDbModel = db.write_json(payload, fname="corrupt_me", extension="json")
+    updated_db: JsonTransactionDbModel = db.write_json(
+        payload, fname="corrupt_me", extension="json"
+    )
 
     tx_id, record = next(iter(updated_db.records.items()))
     payload_path: Path = tmp_path / "json" / str(record.filename)
@@ -225,17 +239,18 @@ def test_read_json_hash_mismatch_returns_empty_data(tmp_path: Path, monkeypatch:
     result: JsonReturnModel = db.read_json(tx_id)
 
     assert result.timestamp == record.timestamp
-    assert result.filename  == str(record.filename)
+    assert result.filename == str(record.filename)
     assert result.byte_size == record.byte_size
-    assert result.sha256    == record.sha256
-    assert result.data      == ""
+    assert result.sha256 == record.sha256
+    assert result.data == ""
 
 
-def test_write_json_raises_on_non_serializable_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_json_raises_on_non_serializable_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
 
-    class _NonSerializable:
-        ...
+    class _NonSerializable: ...
 
     bad_payload: Mapping[str, Any] = {"obj": _NonSerializable()}
 

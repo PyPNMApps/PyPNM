@@ -25,30 +25,37 @@ class _FakeSnmp:
 
 
 @pytest.mark.asyncio
-async def test_chan_est_from_snmp_scaling_and_types(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_chan_est_from_snmp_scaling_and_types(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(Snmp_v2c, "get_result_value", staticmethod(lambda x: x))
 
     idx = 11
-    fake = _FakeSnmp(idx, {
-        "docsPnmCmOfdmChEstCoefTrigEnable": 1,               # -> True
-        "docsPnmCmOfdmChEstCoefAmpRipplePkToPk": 3323,       # -> 33.23
-        "docsPnmCmOfdmChEstCoefAmpRippleRms": 631,           # -> 6.31
-        "docsPnmCmOfdmChEstCoefAmpSlope": 92,                # -> 0.92
-        "docsPnmCmOfdmChEstCoefGrpDelayRipplePkToPk": 7,     # int
-        "docsPnmCmOfdmChEstCoefGrpDelayRippleRms": 5,        # int
-        "docsPnmCmOfdmChEstCoefMeasStatus": 4,               # -> "sample_ready"
-        "docsPnmCmOfdmChEstCoefFileName": "chan_est.bin",
-        "docsPnmCmOfdmChEstCoefAmpMean": 4288,               # -> 42.88
-        "docsPnmCmOfdmChEstCoefGrpDelaySlope": 3,            # int
-        "docsPnmCmOfdmChEstCoefGrpDelayMean": 12,            # int
-    })
+    fake = _FakeSnmp(
+        idx,
+        {
+            "docsPnmCmOfdmChEstCoefTrigEnable": 1,  # -> True
+            "docsPnmCmOfdmChEstCoefAmpRipplePkToPk": 3323,  # -> 33.23
+            "docsPnmCmOfdmChEstCoefAmpRippleRms": 631,  # -> 6.31
+            "docsPnmCmOfdmChEstCoefAmpSlope": 92,  # -> 0.92
+            "docsPnmCmOfdmChEstCoefGrpDelayRipplePkToPk": 7,  # int
+            "docsPnmCmOfdmChEstCoefGrpDelayRippleRms": 5,  # int
+            "docsPnmCmOfdmChEstCoefMeasStatus": 4,  # -> "sample_ready"
+            "docsPnmCmOfdmChEstCoefFileName": "chan_est.bin",
+            "docsPnmCmOfdmChEstCoefAmpMean": 4288,  # -> 42.88
+            "docsPnmCmOfdmChEstCoefGrpDelaySlope": 3,  # int
+            "docsPnmCmOfdmChEstCoefGrpDelayMean": 12,  # int
+        },
+    )
 
     e = await DocsPnmCmOfdmChanEstCoefEntry.from_snmp(idx, fake)  # type: ignore[arg-type]
     assert e.index == idx and e.channel_id == idx
     f: DocsPnmCmOfdmChanEstCoefFields = e.entry
 
     assert f.docsPnmCmOfdmChEstCoefTrigEnable is True
-    assert f.docsPnmCmOfdmChEstCoefMeasStatus == str(MeasStatusType(4))  # "sample_ready"
+    assert f.docsPnmCmOfdmChEstCoefMeasStatus == str(
+        MeasStatusType(4)
+    )  # "sample_ready"
     assert f.docsPnmCmOfdmChEstCoefFileName == "chan_est.bin"
 
     assert f.docsPnmCmOfdmChEstCoefAmpRipplePkToPk == pytest.approx(33.23, abs=0.0)
@@ -66,19 +73,22 @@ async def test_chan_est_from_snmp_scaling_and_types(monkeypatch: pytest.MonkeyPa
 async def test_chan_est_missing_field_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Snmp_v2c, "get_result_value", staticmethod(lambda x: x))
     idx = 2
-    fake = _FakeSnmp(idx, {
-        "docsPnmCmOfdmChEstCoefTrigEnable": 1,
-        "docsPnmCmOfdmChEstCoefAmpRipplePkToPk": 100,       # 1.00
-        "docsPnmCmOfdmChEstCoefAmpRippleRms": 200,          # 2.00
-        "docsPnmCmOfdmChEstCoefAmpSlope": 50,               # 0.50
-        "docsPnmCmOfdmChEstCoefGrpDelayRipplePkToPk": 1,
-        "docsPnmCmOfdmChEstCoefGrpDelayRippleRms": 1,
-        "docsPnmCmOfdmChEstCoefMeasStatus": 3,
-        "docsPnmCmOfdmChEstCoefFileName": "x.bin",
-        # "docsPnmCmOfdmChEstCoefAmpMean": MISSING -> should raise
-        "docsPnmCmOfdmChEstCoefGrpDelaySlope": 1,
-        "docsPnmCmOfdmChEstCoefGrpDelayMean": 1,
-    })
+    fake = _FakeSnmp(
+        idx,
+        {
+            "docsPnmCmOfdmChEstCoefTrigEnable": 1,
+            "docsPnmCmOfdmChEstCoefAmpRipplePkToPk": 100,  # 1.00
+            "docsPnmCmOfdmChEstCoefAmpRippleRms": 200,  # 2.00
+            "docsPnmCmOfdmChEstCoefAmpSlope": 50,  # 0.50
+            "docsPnmCmOfdmChEstCoefGrpDelayRipplePkToPk": 1,
+            "docsPnmCmOfdmChEstCoefGrpDelayRippleRms": 1,
+            "docsPnmCmOfdmChEstCoefMeasStatus": 3,
+            "docsPnmCmOfdmChEstCoefFileName": "x.bin",
+            # "docsPnmCmOfdmChEstCoefAmpMean": MISSING -> should raise
+            "docsPnmCmOfdmChEstCoefGrpDelaySlope": 1,
+            "docsPnmCmOfdmChEstCoefGrpDelayMean": 1,
+        },
+    )
     with pytest.raises(ValueError):
         await DocsPnmCmOfdmChanEstCoefEntry.from_snmp(idx, fake)  # type: ignore[arg-type]
 

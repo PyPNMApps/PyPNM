@@ -13,16 +13,18 @@ from pypnm.lib.inet import Inet
 
 class SecurityLevel(str, Enum):
     """SNMPv3 security level."""
+
     NO_AUTH_NO_PRIV = "noAuthNoPriv"
-    AUTH_NO_PRIV    = "authNoPriv"
-    AUTH_PRIV       = "authPriv"
+    AUTH_NO_PRIV = "authNoPriv"
+    AUTH_PRIV = "authPriv"
 
 
 class AuthProtocol(str, Enum):
     """Auth protocol names; map to pysnmp later."""
+
     NONE = "NONE"
-    MD5  = "MD5"
-    SHA  = "SHA"
+    MD5 = "MD5"
+    SHA = "SHA"
     SHA224 = "SHA224"
     SHA256 = "SHA256"
     SHA384 = "SHA384"
@@ -31,9 +33,10 @@ class AuthProtocol(str, Enum):
 
 class PrivProtocol(str, Enum):
     """Privacy (encryption) protocol names; map to pysnmp later."""
+
     NONE = "NONE"
-    DES  = "DES"
-    AES  = "AES"
+    DES = "DES"
+    AES = "AES"
     AES128 = "AES128"
     AES192 = "AES192"
     AES256 = "AES256"
@@ -101,12 +104,18 @@ class Snmp_v3:
         """
         Basic parameter checks so misconfigurations fail fast even in stub mode.
         """
-        if (self._sec_level in (SecurityLevel.AUTH_NO_PRIV, SecurityLevel.AUTH_PRIV)
-                and (self._auth_proto == AuthProtocol.NONE or not self._auth_pass)):
+        if self._sec_level in (
+            SecurityLevel.AUTH_NO_PRIV,
+            SecurityLevel.AUTH_PRIV,
+        ) and (self._auth_proto == AuthProtocol.NONE or not self._auth_pass):
             raise ValueError("SNMPv3 auth* requires auth_protocol and auth_password.")
 
-        if self._sec_level is SecurityLevel.AUTH_PRIV and (self._priv_proto == PrivProtocol.NONE or not self._priv_pass):
-            raise ValueError("SNMPv3 authPriv requires priv_protocol and priv_password.")
+        if self._sec_level is SecurityLevel.AUTH_PRIV and (
+            self._priv_proto == PrivProtocol.NONE or not self._priv_pass
+        ):
+            raise ValueError(
+                "SNMPv3 authPriv requires priv_protocol and priv_password."
+            )
 
         if not isinstance(self._host, str) or not self._host:
             raise ValueError("Invalid host provided to Snmp_v3.")
@@ -115,9 +124,12 @@ class Snmp_v3:
     # Public API (signatures align with Snmp_v2c; behavior is stubbed)
     # ─────────────────────────────────────────────────────────────────────
 
-    async def get(self, oid: str | tuple[str, str, int],
-                  timeout: int | None = None,
-                  retries: int | None = None) -> NoReturn:
+    async def get(
+        self,
+        oid: str | tuple[str, str, int],
+        timeout: int | None = None,
+        retries: int | None = None,
+    ) -> NoReturn:
         """
         Stub for SNMP GET (v3).
         """
@@ -131,11 +143,15 @@ class Snmp_v3:
         self.logger.debug("Snmp_v3.walk(%r) called (stub).", oid)
         raise NotImplementedError("Snmp_v3.walk is not implemented yet.")
 
-    async def set(self, oid: str, value: str | int | float | bytes | bool, value_type: str) -> NoReturn:
+    async def set(
+        self, oid: str, value: str | int | float | bytes | bool, value_type: str
+    ) -> NoReturn:
         """
         Stub for SNMP SET (v3).
         """
-        self.logger.debug("Snmp_v3.set(%r, %r, %r) called (stub).", oid, value, value_type)
+        self.logger.debug(
+            "Snmp_v3.set(%r, %r, %r) called (stub).", oid, value, value_type
+        )
         raise NotImplementedError("Snmp_v3.set is not implemented yet.")
 
     def close(self) -> None:

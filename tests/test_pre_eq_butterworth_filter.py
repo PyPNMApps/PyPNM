@@ -22,8 +22,8 @@ def _make_test_coefficients(n: int = 128) -> NDArrayC128:
     """Generate a deterministic complex sequence with both low and high frequency content."""
     x = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
 
-    low  = np.exp(1j * x)                 # low-frequency complex tone
-    high = 0.3 * np.exp(1j * 8.0 * x)     # higher-frequency component
+    low = np.exp(1j * x)  # low-frequency complex tone
+    high = 0.3 * np.exp(1j * 8.0 * x)  # higher-frequency component
 
     rng_real = np.random.RandomState(0)
     rng_imag = np.random.RandomState(1)
@@ -36,7 +36,7 @@ def _make_test_real_series(n: int = 128) -> NDArrayF64:
     """Generate a deterministic real-valued series with low + high frequency content."""
     x = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
 
-    low  = np.sin(x)
+    low = np.sin(x)
     high = 0.3 * np.sin(8.0 * x)
 
     rng = np.random.RandomState(2)
@@ -47,33 +47,33 @@ def _make_test_real_series(n: int = 128) -> NDArrayF64:
 
 def test_from_subcarrier_spacing_builds_equivalent_config() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
     order: int = 6
     zero_phase: bool = False
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = order,
-        zero_phase            = zero_phase,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=order,
+        zero_phase=zero_phase,
     )
 
     assert isinstance(filt.config, PreEqButterworthConfig)
     assert int(filt.config.sample_rate_hz) == int(subcarrier_spacing_hz)
-    assert int(filt.config.cutoff_hz)      == int(cutoff_hz)
-    assert filt.config.order               == order
-    assert filt.config.zero_phase         is zero_phase
+    assert int(filt.config.cutoff_hz) == int(cutoff_hz)
+    assert filt.config.order == order
+    assert filt.config.zero_phase is zero_phase
 
 
 def test_apply_zero_phase_preserves_shape_and_types() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = True,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
     )
 
     coeffs: NDArrayC128 = _make_test_coefficients(256)
@@ -81,9 +81,9 @@ def test_apply_zero_phase_preserves_shape_and_types() -> None:
     result = filt.apply(coeffs)
 
     assert int(result.sample_rate_hz) == int(subcarrier_spacing_hz)
-    assert int(result.cutoff_hz)      == int(cutoff_hz)
-    assert result.order               == 4
-    assert result.zero_phase         is True
+    assert int(result.cutoff_hz) == int(cutoff_hz)
+    assert result.order == 4
+    assert result.zero_phase is True
 
     assert isinstance(result.original_coefficients, np.ndarray)
     assert isinstance(result.filtered_coefficients, np.ndarray)
@@ -99,13 +99,13 @@ def test_apply_zero_phase_preserves_shape_and_types() -> None:
 
 def test_apply_causal_filter_path_runs_and_changes_data() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = False,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=False,
     )
 
     coeffs: NDArrayC128 = _make_test_coefficients(256)
@@ -120,13 +120,13 @@ def test_apply_causal_filter_path_runs_and_changes_data() -> None:
 
 def test_apply_constant_sequence_is_stable() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = True,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
     )
 
     constant_value = 1.0 + 0.5j
@@ -139,11 +139,11 @@ def test_apply_constant_sequence_is_stable() -> None:
 
 def test_apply_raises_on_empty_array() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
     )
 
     empty: NDArrayC128 = np.array([], dtype=np.complex128)
@@ -154,11 +154,11 @@ def test_apply_raises_on_empty_array() -> None:
 
 def test_apply_raises_on_non_1d_array() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = PreEqButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
     )
 
     coeffs_2d: NDArrayC128 = np.zeros((4, 4), dtype=np.complex128)
@@ -169,13 +169,13 @@ def test_apply_raises_on_non_1d_array() -> None:
 
 def test_invalid_normalized_cutoff_raises_on_init() -> None:
     sample_rate_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:      FrequencyHz = FrequencyHz(int(sample_rate_hz) // 2)
+    cutoff_hz: FrequencyHz = FrequencyHz(int(sample_rate_hz) // 2)
 
     config = PreEqButterworthConfig(
-        sample_rate_hz = sample_rate_hz,
-        cutoff_hz      = cutoff_hz,
-        order          = 4,
-        zero_phase     = True,
+        sample_rate_hz=sample_rate_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
     )
 
     with pytest.raises(ValueError, match="Normalized cutoff"):
@@ -184,33 +184,33 @@ def test_invalid_normalized_cutoff_raises_on_init() -> None:
 
 def test_config_forbids_extra_fields() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     with pytest.raises(ValidationError):
         PreEqButterworthConfig.model_validate(
             {
                 "sample_rate_hz": int(subcarrier_spacing_hz),
-                "cutoff_hz":      int(cutoff_hz),
-                "order":          4,
-                "zero_phase":     True,
-                "extra_field":    123,
+                "cutoff_hz": int(cutoff_hz),
+                "order": 4,
+                "zero_phase": True,
+                "extra_field": 123,
             }
         )
 
 
 def test_result_accepts_ndarray_and_forbids_extra_fields() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     coeffs: NDArrayC128 = _make_test_coefficients(64)
 
     result = PreEqButterworthResult(
-        sample_rate_hz        = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = True,
-        original_coefficients = coeffs,
-        filtered_coefficients = coeffs,
+        sample_rate_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
+        original_coefficients=coeffs,
+        filtered_coefficients=coeffs,
     )
 
     assert isinstance(result.original_coefficients, np.ndarray)
@@ -219,26 +219,26 @@ def test_result_accepts_ndarray_and_forbids_extra_fields() -> None:
     with pytest.raises(ValidationError):
         PreEqButterworthResult.model_validate(
             {
-                "sample_rate_hz":        int(subcarrier_spacing_hz),
-                "cutoff_hz":             int(cutoff_hz),
-                "order":                 4,
-                "zero_phase":            True,
+                "sample_rate_hz": int(subcarrier_spacing_hz),
+                "cutoff_hz": int(cutoff_hz),
+                "order": 4,
+                "zero_phase": True,
                 "original_coefficients": coeffs,
                 "filtered_coefficients": coeffs,
-                "extra_field":           "not-allowed",
+                "extra_field": "not-allowed",
             }
         )
 
 
 def test_magnitude_filter_zero_phase_smooths_real_series() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = MagnitudeButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = True,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
     )
 
     series: NDArrayF64 = _make_test_real_series(256)
@@ -246,9 +246,9 @@ def test_magnitude_filter_zero_phase_smooths_real_series() -> None:
     result = filt.apply(series)
 
     assert int(result.sample_rate_hz) == int(subcarrier_spacing_hz)
-    assert int(result.cutoff_hz)      == int(cutoff_hz)
-    assert result.order               == 4
-    assert result.zero_phase         is True
+    assert int(result.cutoff_hz) == int(cutoff_hz)
+    assert result.order == 4
+    assert result.zero_phase is True
 
     assert isinstance(result.original_values, np.ndarray)
     assert isinstance(result.filtered_values, np.ndarray)
@@ -264,13 +264,13 @@ def test_magnitude_filter_zero_phase_smooths_real_series() -> None:
 
 def test_magnitude_filter_constant_sequence_is_stable() -> None:
     subcarrier_spacing_hz: FrequencyHz = FrequencyHz(50_000)
-    cutoff_hz:            FrequencyHz = FrequencyHz(5_000)
+    cutoff_hz: FrequencyHz = FrequencyHz(5_000)
 
     filt = MagnitudeButterworthFilter.from_subcarrier_spacing(
-        subcarrier_spacing_hz = subcarrier_spacing_hz,
-        cutoff_hz             = cutoff_hz,
-        order                 = 4,
-        zero_phase            = True,
+        subcarrier_spacing_hz=subcarrier_spacing_hz,
+        cutoff_hz=cutoff_hz,
+        order=4,
+        zero_phase=True,
     )
 
     constant_value = 35.0

@@ -136,7 +136,9 @@ class QamByteToSymbolMapper:
             return
         # Choose chunker by bit order
         codewords = (
-            self._chunks_msb_first(data) if self.bit_order == "msb" else self._chunks_lsb_first(data)
+            self._chunks_msb_first(data)
+            if self.bit_order == "msb"
+            else self._chunks_lsb_first(data)
         )
         keys = self._keys_sorted  # local alias
         lut = self._lut
@@ -178,12 +180,16 @@ class QamByteToSymbolMapper:
         """
         n_syms = self._symbol_count(len(data))
         if n_syms == 0:
-            return np.empty((0, 2), dtype=np.float64) if not as_complex else np.empty((0,), dtype=np.complex128)
+            return (
+                np.empty((0, 2), dtype=np.float64)
+                if not as_complex
+                else np.empty((0,), dtype=np.complex128)
+            )
 
         if not as_complex:
             out = np.empty((n_syms, 2), dtype=np.float64)
             i = 0
-            for (I, Q) in self.iter_symbols(data):  # noqa: E741
+            for I, Q in self.iter_symbols(data):  # noqa: E741
                 out[i, 0] = I
                 out[i, 1] = Q
                 i += 1
@@ -195,7 +201,7 @@ class QamByteToSymbolMapper:
         # complex128
         outc = np.empty((n_syms,), dtype=np.complex128)
         i = 0
-        for (I, Q) in self.iter_symbols(data):  # noqa: E741
+        for I, Q in self.iter_symbols(data):  # noqa: E741
             outc[i] = complex(I, Q)
             i += 1
         if i != n_syms:

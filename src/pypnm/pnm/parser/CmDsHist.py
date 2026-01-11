@@ -41,24 +41,27 @@ class CmDsHist(PnmHeader):
         self._dwell_count_values: IntSeries
         self._hit_count_values_length: int
         self._hit_count_values: IntSeries
-        self._model:CmDsHistModel
+        self._model: CmDsHistModel
 
         self.__process()
 
     def __process(self) -> None:
-
         if self.get_pnm_file_type() != PnmFileType.DOWNSTREAM_HISTOGRAM:
             cann = PnmFileType.DOWNSTREAM_HISTOGRAM.get_pnm_cann()
             actual_type = self.get_pnm_file_type()
             actual_cann = actual_type.get_pnm_cann() if actual_type else "Unknown"
-            raise ValueError(f"PNM File Stream is not RxMER file type: {cann}, Error: {actual_cann}")
+            raise ValueError(
+                f"PNM File Stream is not RxMER file type: {cann}, Error: {actual_cann}"
+            )
 
-        mac_sym_format = '>6sB'
+        mac_sym_format = ">6sB"
         mac_sym_header_size = calcsize(mac_sym_format)
 
         try:
             unpacked = unpack(mac_sym_format, self.pnm_data[:mac_sym_header_size])
-            self._mac_address = MacAddress(unpacked[0]).to_mac_format(MacAddressFormat.COLON)
+            self._mac_address = MacAddress(unpacked[0]).to_mac_format(
+                MacAddressFormat.COLON
+            )
             self._symmetry = unpacked[1]
         except Exception as e:
             raise ValueError(f"Failed to unpack header: {e}") from e
@@ -66,28 +69,37 @@ class CmDsHist(PnmHeader):
         offset = mac_sym_header_size
 
         # Dwell Count Values
-        self._dwell_count_values_length = int.from_bytes(self.pnm_data[offset:offset + 4], byteorder='big')
+        self._dwell_count_values_length = int.from_bytes(
+            self.pnm_data[offset : offset + 4], byteorder="big"
+        )
         offset += 4
-        count                       = self._dwell_count_values_length // 4
-        self._dwell_count_values    = [int.from_bytes(self.pnm_data[offset + i*4:offset + (i+1)*4], 'big') for i in range(count)]
+        count = self._dwell_count_values_length // 4
+        self._dwell_count_values = [
+            int.from_bytes(self.pnm_data[offset + i * 4 : offset + (i + 1) * 4], "big")
+            for i in range(count)
+        ]
         offset += self._dwell_count_values_length
 
         # Hit Count Values
-        self._hit_count_values_length = int.from_bytes(self.pnm_data[offset:offset + 4], byteorder='big')
+        self._hit_count_values_length = int.from_bytes(
+            self.pnm_data[offset : offset + 4], byteorder="big"
+        )
         offset += 4
         count = self._hit_count_values_length // 4
-        self._hit_count_values = [int.from_bytes(self.pnm_data[offset + i*4:offset + (i+1)*4], 'big') for i in range(count)]
+        self._hit_count_values = [
+            int.from_bytes(self.pnm_data[offset + i * 4 : offset + (i + 1) * 4], "big")
+            for i in range(count)
+        ]
 
         self._model = CmDsHistModel(
-            pnm_header                  =   self.getPnmHeaderParameterModel(),
-            mac_address                 =   self._mac_address,
-            symmetry                    =   self._symmetry,
-            dwell_count_values_length   =   self._dwell_count_values_length,
-            dwell_count_values          =   self._dwell_count_values,
-            hit_count_values_length     =   self._hit_count_values_length,
-            hit_count_values            =   self._hit_count_values,
+            pnm_header=self.getPnmHeaderParameterModel(),
+            mac_address=self._mac_address,
+            symmetry=self._symmetry,
+            dwell_count_values_length=self._dwell_count_values_length,
+            dwell_count_values=self._dwell_count_values,
+            hit_count_values_length=self._hit_count_values_length,
+            hit_count_values=self._hit_count_values,
         )
-
 
     def to_model(self) -> CmDsHistModel:
         return self._model
@@ -101,7 +113,7 @@ class CmDsHist(PnmHeader):
         """
         return self.to_model().model_dump()
 
-    def to_json(self, indent:int=2) -> str:
+    def to_json(self, indent: int = 2) -> str:
         """
         Returns a JSON-formatted string of the summarized histogram data.
 

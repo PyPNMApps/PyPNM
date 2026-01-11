@@ -32,10 +32,15 @@ class MultiChannelEstimationService(AbstractCaptureService):
       - duration: total measurement duration in seconds.
       - interval: interval between captures in seconds.
     """
-    def __init__(self, cm: CableModem,
-                tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                tftp_path: str = PnmConfigManager.get_tftp_path(),
-                 duration: float = 1, interval: float = 1) -> None:
+
+    def __init__(
+        self,
+        cm: CableModem,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+        duration: float = 1,
+        interval: float = 1,
+    ) -> None:
         """
         Initialize the MultiChannelEstimationService.
 
@@ -65,8 +70,9 @@ class MultiChannelEstimationService(AbstractCaptureService):
             - Validates payload type and entry contents.
         """
         try:
-            msg_rsp: MessageResponse = \
-                await CmDsOfdmChanEstCoefService(self.cm, self.tftp_servers, self.tftp_path).set_and_go()
+            msg_rsp: MessageResponse = await CmDsOfdmChanEstCoefService(
+                self.cm, self.tftp_servers, self.tftp_path
+            ).set_and_go()
 
         except Exception as exc:
             err_msg = f"Exception during ChannelEstimation SNMP/TFTP operation: {exc}"

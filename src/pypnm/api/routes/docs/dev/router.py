@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -24,6 +23,7 @@ from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 
 logger = logging.getLogger(__name__)
 
+
 class DocsDevRouter:
     """
     Router class for DOCSIS device management operations such as retrieving event logs
@@ -36,9 +36,11 @@ class DocsDevRouter:
         self._add_routes()
 
     def _add_routes(self) -> None:
-        @self.router.post("/eventLog",
-                          response_model=EventLogResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/eventLog",
+            response_model=EventLogResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_event_log(request: BaseDeviceConnectRequest) -> EventLogResponse:
             """
             **Retrieve DOCSIS Cable Modem Event Log**
@@ -53,36 +55,44 @@ class DocsDevRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving event log for MAC: {mac}, IP: {ip}")
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 logger.error(msg)
-                return EventLogResponse(mac_address =   mac,
-                                        status = status,
-                                        message = msg, logs=[])
+                return EventLogResponse(
+                    mac_address=mac, status=status, message=msg, logs=[]
+                )
 
             try:
-                service = CmDocsDevService(mac_address=mac,
-                                           ip_address=ip,
-                                           snmp_config=request.cable_modem.snmp)
+                service = CmDocsDevService(
+                    mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+                )
                 log_entries = await service.fetch_event_log()
-                return EventLogResponse(mac_address =   service.get_mac_address(),
-                                        status      =   ServiceStatusCode.SUCCESS,
-                                        logs        =   log_entries)
+                return EventLogResponse(
+                    mac_address=service.get_mac_address(),
+                    status=ServiceStatusCode.SUCCESS,
+                    logs=log_entries,
+                )
 
             except HTTPException:
                 raise
 
             except Exception as e:
-                logger.exception(f"Failed to fetch event log, Mac: {mac}, IP: {ip}, error: {e}")
+                logger.exception(
+                    f"Failed to fetch event log, Mac: {mac}, IP: {ip}, error: {e}"
+                )
                 raise HTTPException(status_code=500, detail=str(e)) from e
 
-        @self.router.post("/reset",
-                          response_model= None,
-                          responses=FAST_API_RESPONSE,)
-        async def reset_cable_modem(request: BaseDeviceConnectRequest) -> SnmpResponse | JSONResponse:
+        @self.router.post(
+            "/reset",
+            response_model=None,
+            responses=FAST_API_RESPONSE,
+        )
+        async def reset_cable_modem(
+            request: BaseDeviceConnectRequest,
+        ) -> SnmpResponse | JSONResponse:
             """
             **Reset a DOCSIS Cable Modem**
 
@@ -97,27 +107,28 @@ class DocsDevRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             self.logger.info(f"Resetting cable modem for MAC: {mac}, IP: {ip}")
-            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
-                                                          ip_address    =   ip,
-                                                          snmp_config   =   request.cable_modem.snmp).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac,
-                                    status=status,
-                                    message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             try:
-                service = CmDocsDevService(mac_address=mac,
-                                           ip_address=ip,
-                                           snmp_config=request.cable_modem.snmp)
+                service = CmDocsDevService(
+                    mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+                )
                 result = await service.reset_cable_modem()
                 return JSONResponse(content=result.model_dump())
 
             except HTTPException:
                 raise
             except Exception as e:
-                logger.exception(f"Failed to reset cable modem, Mac: {mac}, IP: {ip}, error: {e}")
+                logger.exception(
+                    f"Failed to reset cable modem, Mac: {mac}, IP: {ip}, error: {e}"
+                )
                 raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 router = DocsDevRouter().router

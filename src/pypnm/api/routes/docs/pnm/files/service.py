@@ -120,11 +120,11 @@ class PnmFileService:
 
                 file_entries.append(
                     FileEntry(
-                        transaction_id      = entry.transaction_id,
-                        filename            = entry.filename,
-                        pnm_test_type       = entry.pnm_test_type,
-                        timestamp           = entry.timestamp,
-                        system_description  = system_description,
+                        transaction_id=entry.transaction_id,
+                        filename=entry.filename,
+                        pnm_test_type=entry.pnm_test_type,
+                        timestamp=entry.timestamp,
+                        system_description=system_description,
                     )
                 )
 
@@ -146,15 +146,17 @@ class PnmFileService:
         filename = txn_data.get("filename")
         full_path = Path(self.pnm_dir) / str(filename)
 
-        self.logger.info(f"Retrieving file for transaction {transaction_id}: {full_path}")
+        self.logger.info(
+            f"Retrieving file for transaction {transaction_id}: {full_path}"
+        )
 
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="File not found on disk.")
 
         return FileResponse(
-            path        =   full_path,
-            filename    =   filename,
-            media_type  =   MediaType.APPLICATION_OCTET_STREAM,
+            path=full_path,
+            filename=filename,
+            media_type=MediaType.APPLICATION_OCTET_STREAM,
         )
 
     def get_file_by_operation_id(self, operation_id: OperationId) -> FileResponse:
@@ -166,11 +168,13 @@ class PnmFileService:
         corresponding PNM files on disk, and packages them into a single ZIP
         archive for download.
         """
-        resolver    = OperationCaptureGroupResolver()
-        txn_models  = resolver.get_transaction_models_for_operation(operation_id)
+        resolver = OperationCaptureGroupResolver()
+        txn_models = resolver.get_transaction_models_for_operation(operation_id)
 
         if not txn_models:
-            raise HTTPException(status_code=404, detail="No transactions found for Operation ID.")
+            raise HTTPException(
+                status_code=404, detail="No transactions found for Operation ID."
+            )
 
         files_to_archive: list[Path] = []
         for rec in txn_models:
@@ -185,7 +189,9 @@ class PnmFileService:
             files_to_archive.append(src_path)
 
         if not files_to_archive:
-            raise HTTPException(status_code=404, detail="No files on disk for Operation ID.")
+            raise HTTPException(
+                status_code=404, detail="No files on disk for Operation ID."
+            )
 
         archive_dir = Path(SystemConfigSettings.archive_dir())
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -194,23 +200,31 @@ class PnmFileService:
         archive_path = archive_dir / archive_name
 
         ArchiveManager.zip_files(
-            files         = files_to_archive,
-            archive_path  = archive_path,
-            mode          = "w",
-            compression   = "zipdeflated",
-            preserve_tree = False,
+            files=files_to_archive,
+            archive_path=archive_path,
+            mode="w",
+            compression="zipdeflated",
+            preserve_tree=False,
         )
 
         if not archive_path.is_file():
-            self.logger.error("Archive creation failed for Operation ID %s at %s", operation_id, archive_path)
-            raise HTTPException(status_code=500, detail="Failed to create archive for Operation ID.")
+            self.logger.error(
+                "Archive creation failed for Operation ID %s at %s",
+                operation_id,
+                archive_path,
+            )
+            raise HTTPException(
+                status_code=500, detail="Failed to create archive for Operation ID."
+            )
 
-        self.logger.info("Returning ZIP archive for Operation ID %s: %s", operation_id, archive_path)
+        self.logger.info(
+            "Returning ZIP archive for Operation ID %s: %s", operation_id, archive_path
+        )
 
         return FileResponse(
-            path        = str(archive_path),
-            filename    = archive_name,
-            media_type  = MediaType.APPLICATION_ZIP,
+            path=str(archive_path),
+            filename=archive_name,
+            media_type=MediaType.APPLICATION_ZIP,
         )
 
     def get_file_by_mac_address(self, mac_address: MacAddressStr) -> FileResponse:
@@ -223,10 +237,14 @@ class PnmFileService:
 
         If no records are found, or none of the files exist on disk, a 404 is raised.
         """
-        records = PnmFileTransaction().get_file_info_via_macaddress(MacAddress(mac_address))
+        records = PnmFileTransaction().get_file_info_via_macaddress(
+            MacAddress(mac_address)
+        )
 
         if not records:
-            raise HTTPException(status_code=404, detail="No transactions found for MAC address.")
+            raise HTTPException(
+                status_code=404, detail="No transactions found for MAC address."
+            )
 
         files_to_archive: list[Path] = []
         for rec in records:
@@ -241,7 +259,9 @@ class PnmFileService:
             files_to_archive.append(src_path)
 
         if not files_to_archive:
-            raise HTTPException(status_code=404, detail="No files on disk for MAC address.")
+            raise HTTPException(
+                status_code=404, detail="No files on disk for MAC address."
+            )
 
         archive_dir = Path(SystemConfigSettings.archive_dir())
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -251,23 +271,29 @@ class PnmFileService:
         archive_path = archive_dir / archive_name
 
         ArchiveManager.zip_files(
-            files           = files_to_archive,
-            archive_path    = archive_path,
-            mode            = "w",
-            compression     = "zipdeflated",
-            preserve_tree   = False,
+            files=files_to_archive,
+            archive_path=archive_path,
+            mode="w",
+            compression="zipdeflated",
+            preserve_tree=False,
         )
 
         if not archive_path.is_file():
-            self.logger.error("Archive creation failed for MAC %s at %s", mac_address, archive_path)
-            raise HTTPException(status_code=500, detail="Failed to create archive for MAC address.")
+            self.logger.error(
+                "Archive creation failed for MAC %s at %s", mac_address, archive_path
+            )
+            raise HTTPException(
+                status_code=500, detail="Failed to create archive for MAC address."
+            )
 
-        self.logger.info("Returning ZIP archive for MAC %s: %s", mac_address, archive_path)
+        self.logger.info(
+            "Returning ZIP archive for MAC %s: %s", mac_address, archive_path
+        )
 
         return FileResponse(
-            path        =   str(archive_path),
-            filename    =   archive_name,
-            media_type  =   MediaType.APPLICATION_ZIP,
+            path=str(archive_path),
+            filename=archive_name,
+            media_type=MediaType.APPLICATION_ZIP,
         )
 
     def upload_file(self, filename: FileName, data: bytes) -> UploadFileResponse:
@@ -292,15 +318,15 @@ class PnmFileService:
         pnm_file_type: PnmFileType = params.file_type
 
         transaction_id = PnmFileTransaction().set_file_by_user(
-            mac_address   = MacAddress(mac_address),
-            pnm_test_type = PnmFileTypeMapper.get_test_type(pnm_file_type),
-            filename      = filename,
+            mac_address=MacAddress(mac_address),
+            pnm_test_type=PnmFileTypeMapper.get_test_type(pnm_file_type),
+            filename=filename,
         )
 
         return UploadFileResponse(
-            mac_address     = MacAddress(mac_address).mac_address,
-            filename        = filename,
-            transaction_id  = transaction_id,
+            mac_address=MacAddress(mac_address).mac_address,
+            filename=filename,
+            transaction_id=transaction_id,
         )
 
     def get_file(self, file_type: FileType, filename: PathLike) -> FileResponse:
@@ -316,7 +342,9 @@ class PnmFileService:
 
         valid_extensions = [".csv", ".json", ".zip"]
         if not any(safe_name.endswith(ext) for ext in valid_extensions):
-            raise HTTPException(status_code=400, detail=f"Invalid file extension, file: {safe_name}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid file extension, file: {safe_name}"
+            )
 
         if file_type == FileType.CSV:
             base_dir = SystemConfigSettings.csv_dir()
@@ -332,7 +360,9 @@ class PnmFileService:
 
         else:
             self.logger.error(f"Unsupported file type requested: {file_type.name}")
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type.name}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported file type: {file_type.name}"
+            )
 
         file_path = Path(base_dir) / safe_name
         if not file_path.is_file():
@@ -340,12 +370,14 @@ class PnmFileService:
             raise HTTPException(status_code=404, detail="File not found on disk.")
 
         return FileResponse(
-            path        =   str(file_path),
-            filename    =   safe_name,
-            media_type  =   media_type,
+            path=str(file_path),
+            filename=safe_name,
+            media_type=media_type,
         )
 
-    def get_analysis(self, req: FileAnalysisRequest) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
+    def get_analysis(
+        self, req: FileAnalysisRequest
+    ) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
         """
         Returns basic analysis result for a stored PNM file identified by transaction ID.
         The analysis performed depends on the PNM file type.
@@ -356,26 +388,37 @@ class PnmFileService:
         """
         txn_rec = PnmFileTransaction().get_record(req.search.transaction_id)
         if not txn_rec:
-            raise HTTPException(status_code=404, detail="Transaction ID not found for analysis.")
+            raise HTTPException(
+                status_code=404, detail="Transaction ID not found for analysis."
+            )
 
         filename = txn_rec.get("filename")
         if not filename:
-            raise HTTPException(status_code=404, detail="Filename not found in transaction record.")
+            raise HTTPException(
+                status_code=404, detail="Filename not found in transaction record."
+            )
 
-        self.logger.info(f"Starting analysis for transaction ID {req.search.transaction_id} on file: {self.pnm_dir}/{filename}")
+        self.logger.info(
+            f"Starting analysis for transaction ID {req.search.transaction_id} on file: {self.pnm_dir}/{filename}"
+        )
 
         # Get binary file
-        file_path = f'{self.pnm_dir}/{filename}'
+        file_path = f"{self.pnm_dir}/{filename}"
 
         if not Path(file_path).is_file():
-            raise HTTPException(status_code=404, detail="PNM file not found on disk for analysis.")
+            raise HTTPException(
+                status_code=404, detail="PNM file not found on disk for analysis."
+            )
         fp = FileProcessor(file_path).read_file()
 
         # Get PnmHeader to Determine PnmFileType
         from pypnm.pnm.parser.pnm_parameter import GetPnmParserAndParameters
-        parser, model  = GetPnmParserAndParameters(fp).get_parser()
 
-        self.logger.info(f"Performing {model.file_type.name} analysis for transaction {req.search.transaction_id} on file {filename}")
+        parser, model = GetPnmParserAndParameters(fp).get_parser()
+
+        self.logger.info(
+            f"Performing {model.file_type.name} analysis for transaction {req.search.transaction_id} on file {filename}"
+        )
 
         return self.__get_analysis(parser, model)
 
@@ -405,7 +448,9 @@ class PnmFileService:
 
         filename = txn_data.get("filename")
         if not filename:
-            raise HTTPException(status_code=404, detail="Filename not found in transaction record.")
+            raise HTTPException(
+                status_code=404, detail="Filename not found in transaction record."
+            )
 
         full_path = Path(self.pnm_dir) / str(filename)
 
@@ -425,7 +470,9 @@ class PnmFileService:
 
         return full_path
 
-    def get_hexdump_by_transaction_id(self, transaction_id: TransactionId, bytes_per_line: int) -> HexDumpResponse:
+    def get_hexdump_by_transaction_id(
+        self, transaction_id: TransactionId, bytes_per_line: int
+    ) -> HexDumpResponse:
         """
         Generate A Structured Hexdump For A PNM File Identified By Transaction ID.
 
@@ -450,9 +497,9 @@ class PnmFileService:
         if bytes_per_line <= 0:
             bytes_per_line = DEFAULT_HEXDUMP_BYTES_PER_LINE
 
-        file_path  = self.get_pnm_path_for_transaction(transaction_id)
-        processor  = FileProcessor(file_path)
-        lines      = processor.hexdump(bytes_per_line=bytes_per_line)
+        file_path = self.get_pnm_path_for_transaction(transaction_id)
+        processor = FileProcessor(file_path)
+        lines = processor.hexdump(bytes_per_line=bytes_per_line)
 
         if not lines:
             self.logger.error(
@@ -460,54 +507,78 @@ class PnmFileService:
                 transaction_id,
                 file_path,
             )
-            raise HTTPException(status_code=500, detail="Failed to generate hexdump for PNM file.")
+            raise HTTPException(
+                status_code=500, detail="Failed to generate hexdump for PNM file."
+            )
 
         return HexDumpResponse(
-            transaction_id = transaction_id,
-            bytes_per_line = bytes_per_line,
-            lines          = lines,
+            transaction_id=transaction_id,
+            bytes_per_line=bytes_per_line,
+            lines=lines,
         )
 
-    def __get_analysis(self, parser: PnmParsers, model:PnmParserParametersModel) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
+    def __get_analysis(
+        self, parser: PnmParsers, model: PnmParserParametersModel
+    ) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
         """
         Internal method to instantiate the Analysis class with the given parser and model.
         """
         from pypnm.api.routes.common.classes.analysis.analysis import Analysis
+
         if model.file_type == PnmFileType.RECEIVE_MODULATION_ERROR_RATIO:
-            return Analysis.basic_analysis_rxmer_from_model(cast(CmDsOfdmRxMerModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_rxmer_from_model(
+                cast(CmDsOfdmRxMerModel, parser.to_model())
+            ), model.file_type
 
         elif model.file_type == PnmFileType.OFDM_CHANNEL_ESTIMATE_COEFFICIENT:
-            return Analysis.basic_analysis_ds_chan_est_from_model(cast(CmDsOfdmChanEstimateCoefModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_ds_chan_est_from_model(
+                cast(CmDsOfdmChanEstimateCoefModel, parser.to_model())
+            ), model.file_type
 
         elif model.file_type == PnmFileType.OFDM_MODULATION_PROFILE:
-            return Analysis.basic_analysis_ds_modulation_profile_from_model(cast(CmDsOfdmModulationProfileModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_ds_modulation_profile_from_model(
+                cast(CmDsOfdmModulationProfileModel, parser.to_model())
+            ), model.file_type
 
         elif model.file_type == PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:
-            return Analysis.basic_analysis_ds_constellation_display_from_model(cast(CmDsConstDispMeasModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_ds_constellation_display_from_model(
+                cast(CmDsConstDispMeasModel, parser.to_model())
+            ), model.file_type
 
         elif model.file_type == PnmFileType.DOWNSTREAM_HISTOGRAM:
-            return Analysis.basic_analysis_ds_histogram_from_model(cast(CmDsHistModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_ds_histogram_from_model(
+                cast(CmDsHistModel, parser.to_model())
+            ), model.file_type
 
         elif model.file_type == PnmFileType.OFDM_FEC_SUMMARY:
-            return Analysis.basic_analysis_ds_ofdm_fec_summary_from_model(cast(CmDsOfdmFecSummaryModel, parser.to_model())), model.file_type
+            return Analysis.basic_analysis_ds_ofdm_fec_summary_from_model(
+                cast(CmDsOfdmFecSummaryModel, parser.to_model())
+            ), model.file_type
 
-        elif model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS or model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE:
-            return Analysis.basic_analysis_us_ofdma_pre_equalization_from_model(cast(CmUsOfdmaPreEqModel, parser.to_model())), model.file_type
+        elif (
+            model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
+            or model.file_type
+            == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
+        ):
+            return Analysis.basic_analysis_us_ofdma_pre_equalization_from_model(
+                cast(CmUsOfdmaPreEqModel, parser.to_model())
+            ), model.file_type
 
         raise HTTPException(
             status_code=400,
-            detail=f"Analysis not implemented for file type: {model.file_type.name}"
+            detail=f"Analysis not implemented for file type: {model.file_type.name}",
         )
 
     def get_archive(self, request: FileAnalysisRequest) -> FileResponse:
         rpt: Path = Path()
 
         theme = request.analysis.plot.ui.theme
-        plot_config = AnalysisRptMatplotConfig(theme = theme)
+        plot_config = AnalysisRptMatplotConfig(theme=theme)
         analysis_model, pnm_ftype = self.get_analysis(request)
 
         # TODO: Need to clean up circlar import at next major release
         from pypnm.api.routes.common.classes.analysis.analysis import Analysis
+
         analysis = Analysis.get_analysis_from_model(analysis_model)
 
         if pnm_ftype == PnmFileType.RECEIVE_MODULATION_ERROR_RATIO:
@@ -523,17 +594,20 @@ class PnmFileService:
             rpt: Path = cast(Path, analysis_rpt.build_report())
 
         elif pnm_ftype == PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:
-            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme = theme)
+            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme=theme)
             analysis_rpt = ConstellationDisplayReport(analysis, plot_config)
             rpt: Path = cast(Path, analysis_rpt.build_report())
 
-        elif pnm_ftype == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS or pnm_ftype == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE:
-            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme = theme)
+        elif (
+            pnm_ftype == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
+            or pnm_ftype == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
+        ):
+            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme=theme)
             analysis_rpt = CmUsOfdmaPreEqReport(analysis)
             rpt: Path = cast(Path, analysis_rpt.build_report())
 
         elif pnm_ftype == PnmFileType.OFDM_FEC_SUMMARY:
-            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme = theme)
+            plot_config = ConstDisplayAnalysisRptMatplotConfig(theme=theme)
             analysis_rpt = FecSummaryAnalysisReport(analysis, plot_config)
             rpt: Path = cast(Path, analysis_rpt.build_report())
 
@@ -567,7 +641,7 @@ class PnmFileService:
 
         for rec in records:
             mac_value = getattr(rec, "mac_address", "")
-            mac_str   = str(mac_value).lower().strip()
+            mac_str = str(mac_value).lower().strip()
             if not mac_str:
                 continue
 
@@ -614,8 +688,8 @@ class PnmFileService:
         for mac_str, (_ts, sd) in sorted(latest_by_mac.items(), key=lambda x: x[0]):
             entries.append(
                 MacAddressSystemDescriptorEntry(
-                    mac_address         = mac_str,
-                    system_description  = sd,
+                    mac_address=mac_str,
+                    system_description=sd,
                 )
             )
 

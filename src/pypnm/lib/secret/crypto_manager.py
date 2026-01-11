@@ -71,16 +71,16 @@ class SecretCryptoManager:
     token is altered, decryption will fail with an integrity error.
     """
 
-    DEFAULT_ENV_VAR_NAME            = "PYPNM_SECRET_KEY"
-    DEFAULT_KEY_FILE_NAME           = "pypnm_secrets.key"
-    DEFAULT_TOKEN_VERSION           = "v1"
-    DEFAULT_TOKEN_PREFIX            = "ENC"
-    SSH_DIR_NAME                    = ".ssh"
+    DEFAULT_ENV_VAR_NAME = "PYPNM_SECRET_KEY"
+    DEFAULT_KEY_FILE_NAME = "pypnm_secrets.key"
+    DEFAULT_TOKEN_VERSION = "v1"
+    DEFAULT_TOKEN_PREFIX = "ENC"
+    SSH_DIR_NAME = ".ssh"
 
-    FERNET_KEY_SIZE_BYTES           = 32
+    FERNET_KEY_SIZE_BYTES = 32
 
-    KEY_FILE_PERMISSIONS            = 0o600
-    SSH_DIR_PERMISSIONS             = 0o700
+    KEY_FILE_PERMISSIONS = 0o600
+    SSH_DIR_PERMISSIONS = 0o700
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
@@ -96,7 +96,11 @@ class SecretCryptoManager:
             The default key file path: ~/.ssh/pypnm_secrets.key
         """
         home_dir = Path.home()
-        return home_dir / SecretCryptoManager.SSH_DIR_NAME / SecretCryptoManager.DEFAULT_KEY_FILE_NAME
+        return (
+            home_dir
+            / SecretCryptoManager.SSH_DIR_NAME
+            / SecretCryptoManager.DEFAULT_KEY_FILE_NAME
+        )
 
     @staticmethod
     def build_token(payload: str, version: str = DEFAULT_TOKEN_VERSION) -> str:
@@ -139,17 +143,19 @@ class SecretCryptoManager:
         """
         prefix = f"{SecretCryptoManager.DEFAULT_TOKEN_PREFIX}["
         if not token.startswith(prefix):
-            raise SecretCryptoError("Encrypted token missing expected 'ENC[...]:...' prefix.")
+            raise SecretCryptoError(
+                "Encrypted token missing expected 'ENC[...]:...' prefix."
+            )
 
         end_bracket_index = token.find("]:")
         if end_bracket_index < 0:
             raise SecretCryptoError("Encrypted token missing closing ']:' delimiter.")
 
-        version = token[len(prefix):end_bracket_index].strip()
+        version = token[len(prefix) : end_bracket_index].strip()
         if version == "":
             raise SecretCryptoError("Encrypted token version is empty.")
 
-        payload = token[end_bracket_index + 2:].strip()
+        payload = token[end_bracket_index + 2 :].strip()
         if payload == "":
             raise SecretCryptoError("Encrypted token payload is empty.")
 
@@ -236,10 +242,14 @@ class SecretCryptoManager:
         try:
             Fernet(key_str.encode("utf-8"))
         except Exception as exc:
-            raise SecretCryptoError(f"Secret key is not a valid Fernet key: {exc}") from exc
+            raise SecretCryptoError(
+                f"Secret key is not a valid Fernet key: {exc}"
+            ) from exc
 
     @staticmethod
-    def load_key_bytes(key_path: Path, env_var_name: str = DEFAULT_ENV_VAR_NAME) -> bytes:
+    def load_key_bytes(
+        key_path: Path, env_var_name: str = DEFAULT_ENV_VAR_NAME
+    ) -> bytes:
         """
         Load Secret Key Bytes From Key File Or Environment Variable.
 
@@ -312,14 +322,20 @@ class SecretCryptoManager:
         """
         password_str = password.strip()
         if password_str == "":
-            raise SecretCryptoError("Password is empty; refusing to encrypt empty value.")
+            raise SecretCryptoError(
+                "Password is empty; refusing to encrypt empty value."
+            )
 
-        actual_key_path = key_path if key_path is not None else SecretCryptoManager.default_key_path()
-        key_bytes       = SecretCryptoManager.load_key_bytes(actual_key_path, env_var_name=env_var_name)
-        fernet          = Fernet(key_bytes)
+        actual_key_path = (
+            key_path if key_path is not None else SecretCryptoManager.default_key_path()
+        )
+        key_bytes = SecretCryptoManager.load_key_bytes(
+            actual_key_path, env_var_name=env_var_name
+        )
+        fernet = Fernet(key_bytes)
 
         token_bytes = fernet.encrypt(password_str.encode("utf-8"))
-        token_str   = token_bytes.decode("utf-8")
+        token_str = token_bytes.decode("utf-8")
 
         return SecretCryptoManager.build_token(payload=token_str, version=version)
 
@@ -355,8 +371,8 @@ class SecretCryptoManager:
             If decryption fails due to invalid token, missing key, wrong key,
             unsupported token version, or integrity/authentication failure.
         """
-        token_str         = token.strip()
-        parsed            = SecretCryptoManager.parse_token(token_str)
+        token_str = token.strip()
+        parsed = SecretCryptoManager.parse_token(token_str)
         version_supported = parsed.version in accepted_versions
 
         if not version_supported:
@@ -364,18 +380,26 @@ class SecretCryptoManager:
                 f"Unsupported encrypted token version '{parsed.version}'. Allowed: {', '.join(accepted_versions)}"
             )
 
-        actual_key_path = key_path if key_path is not None else SecretCryptoManager.default_key_path()
-        key_bytes       = SecretCryptoManager.load_key_bytes(actual_key_path, env_var_name=env_var_name)
-        fernet          = Fernet(key_bytes)
+        actual_key_path = (
+            key_path if key_path is not None else SecretCryptoManager.default_key_path()
+        )
+        key_bytes = SecretCryptoManager.load_key_bytes(
+            actual_key_path, env_var_name=env_var_name
+        )
+        fernet = Fernet(key_bytes)
 
         try:
             clear_bytes = fernet.decrypt(parsed.payload.encode("utf-8"))
         except InvalidToken as exc:
-            raise SecretCryptoError("Failed to decrypt password: invalid token or wrong secret key.") from exc
+            raise SecretCryptoError(
+                "Failed to decrypt password: invalid token or wrong secret key."
+            ) from exc
 
         clear_str = clear_bytes.decode("utf-8").strip()
         if clear_str == "":
-            raise SecretCryptoError("Decrypted password is empty; token or key may be invalid.")
+            raise SecretCryptoError(
+                "Decrypted password is empty; token or key may be invalid."
+            )
 
         return clear_str
 
@@ -408,7 +432,7 @@ class SecretCryptoManager:
                 continue
 
             password_enc = str(method_cfg.get("password_enc", "") or "").strip()
-            password     = str(method_cfg.get("password", "") or "").strip()
+            password = str(method_cfg.get("password", "") or "").strip()
 
             token_source = password_enc if password_enc != "" else password
 
@@ -420,7 +444,9 @@ class SecretCryptoManager:
             if token_source.startswith("ENC["):
                 method_cfg["password_enc"] = token_source
             else:
-                method_cfg["password_enc"] = SecretCryptoManager.encrypt_password(token_source)
+                method_cfg["password_enc"] = SecretCryptoManager.encrypt_password(
+                    token_source
+                )
 
             method_cfg.pop("password", None)
 

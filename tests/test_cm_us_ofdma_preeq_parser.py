@@ -12,9 +12,9 @@ import pytest
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq, CmUsOfdmaPreEqModel
 
-DATA_DIR: Path          = Path(__file__).parent / "files"
-US_PREEQ_PATH: Path     = DATA_DIR / "us_pre_equalizer_coef.bin"
-RXMER_PATH: Path        = DATA_DIR / "rxmer.bin"
+DATA_DIR: Path = Path(__file__).parent / "files"
+US_PREEQ_PATH: Path = DATA_DIR / "us_pre_equalizer_coef.bin"
+RXMER_PATH: Path = DATA_DIR / "rxmer.bin"
 
 MAC_RE: re.Pattern[str] = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
 
@@ -82,7 +82,7 @@ def test_cm_us_ofdma_preeq_bandwidth_matches_coefficients_and_spacing() -> None:
     model: CmUsOfdmaPreEqModel = parser.to_model()
 
     taps: Sequence[Sequence[float]] = model.values
-    tap_count: int                   = len(taps)
+    tap_count: int = len(taps)
     assert tap_count > 0
 
     expected_bw: int = tap_count * int(model.subcarrier_spacing)

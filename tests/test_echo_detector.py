@@ -14,12 +14,12 @@ from pypnm.api.routes.advance.analysis.signal_analysis.detection.echo.echo_detec
 from pypnm.lib.types import ChannelId
 
 # Fixed PHY/Test parameters
-DF_HZ = 50_000.0               # subcarrier spacing (Hz)
-NFFT = 4096                    # IFFT length
-FS = NFFT * DF_HZ              # sample rate (Hz) = 204.8 MHz
-VF = 0.87                      # RG6 default
-C0 = 299_792_458.0             # m/s
-V = C0 * VF                    # propagation speed in the cable
+DF_HZ = 50_000.0  # subcarrier spacing (Hz)
+NFFT = 4096  # IFFT length
+FS = NFFT * DF_HZ  # sample rate (Hz) = 204.8 MHz
+VF = 0.87  # RG6 default
+C0 = 299_792_458.0  # m/s
+V = C0 * VF  # propagation speed in the cable
 FEET_PER_METER = 3.280839895013123
 
 
@@ -33,7 +33,9 @@ def _bins_for_distance_ft(distance_ft: float, fs: float = FS, v: float = V) -> i
     return int(round(t * fs))
 
 
-def _make_freq_response_from_impulses(pulses: list[tuple[int, float]], nfft: int = NFFT) -> np.ndarray:
+def _make_freq_response_from_impulses(
+    pulses: list[tuple[int, float]], nfft: int = NFFT
+) -> np.ndarray:
     """
     Build H(f) by FFT of h[n] with time-domain impulses:
     pulses = [(bin_index, amplitude), ...]
@@ -67,8 +69,8 @@ def test_direct_plus_known_echo_bin_and_distance() -> None:
 
     rep = det.multi_echo(
         threshold_mode="fractional",
-        threshold_frac=0.05,            # 5% of direct amplitude
-        guard_bins=0,                   # allow immediate search; detector also has 10-ft guard by default
+        threshold_frac=0.05,  # 5% of direct amplitude
+        guard_bins=0,  # allow immediate search; detector also has 10-ft guard by default
         min_separation_s=8.0 / det.fs,  # ~8 bins
         max_delay_s=3.5e-6,
         max_peaks=3,
@@ -116,12 +118,16 @@ def test_snapshot_average_with_guard_and_min_separation() -> None:
     valid_bin = _bins_for_distance_ft(valid_ft)
 
     # Build two snapshots with slight amplitude variation
-    H1 = _make_freq_response_from_impulses([(0, 1.0), (near_bin, 0.5), (valid_bin, 0.25)], nfft=NFFT)
-    H2 = _make_freq_response_from_impulses([(0, 1.0), (near_bin, 0.45), (valid_bin, 0.3)], nfft=NFFT)
+    H1 = _make_freq_response_from_impulses(
+        [(0, 1.0), (near_bin, 0.5), (valid_bin, 0.25)], nfft=NFFT
+    )
+    H2 = _make_freq_response_from_impulses(
+        [(0, 1.0), (near_bin, 0.45), (valid_bin, 0.3)], nfft=NFFT
+    )
     H_snapshots = np.vstack([H1, H2])  # shape (2, NFFT), complex
 
     det = EchoDetector(
-        freq_data=H_snapshots,          # (M, N) complex → averaged internally
+        freq_data=H_snapshots,  # (M, N) complex → averaged internally
         subcarrier_spacing_hz=DF_HZ,
         n_fft=NFFT,
         cable_type="RG6",
@@ -131,8 +137,8 @@ def test_snapshot_average_with_guard_and_min_separation() -> None:
     rep = det.multi_echo(
         threshold_mode="fractional",
         threshold_frac=0.05,
-        guard_bins=0,                    # leave explicit guard at 0; detector uses 10-ft min distance guard
-        min_separation_s=8.0 / det.fs,   # ~8 bins
+        guard_bins=0,  # leave explicit guard at 0; detector uses 10-ft min distance guard
+        min_separation_s=8.0 / det.fs,  # ~8 bins
         max_delay_s=3.5e-6,
         max_peaks=3,
         include_time_response=False,
@@ -160,4 +166,6 @@ def test_snapshot_average_with_guard_and_min_separation() -> None:
     # Min separation: all selected bins spaced by ≥ ~8 bins
     bins_sorted = sorted(bins)
     for i in range(1, len(bins_sorted)):
-        assert (bins_sorted[i] - bins_sorted[i - 1]) >= 8 - 1, "Echo picks violate min separation constraint"
+        assert (bins_sorted[i] - bins_sorted[i - 1]) >= 8 - 1, (
+            "Echo picks violate min separation constraint"
+        )

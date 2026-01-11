@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -28,14 +27,16 @@ class InterfaceStatsRouter:
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.router = APIRouter(
-            prefix="/docs/pnm/interface",
-            tags=["Interface Statistics"])
+            prefix="/docs/pnm/interface", tags=["Interface Statistics"]
+        )
         self._add_routes()
 
     def _add_routes(self) -> None:
-        @self.router.post("/stats",
-                          response_model=SnmpResponse,
-                          responses=FAST_API_RESPONSE,)
+        @self.router.post(
+            "/stats",
+            response_model=SnmpResponse,
+            responses=FAST_API_RESPONSE,
+        )
         async def get_interface_stats(request: SnmpRequest) -> SnmpResponse:
             """
             Retrieve DOCSIS interface statistics grouped by interface type.
@@ -45,23 +46,30 @@ class InterfaceStatsRouter:
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
             community: str = request.cable_modem.snmp.snmp_v2c.community
-            self.logger.info(f"Retrieving interface statistics for MAC: {mac}, IP: {ip}")
+            self.logger.info(
+                f"Retrieving interface statistics for MAC: {mac}, IP: {ip}"
+            )
 
-            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
-                                                          ip_address    =   ip,
-                                                          snmp_config   =   request.cable_modem.snmp).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                mac_address=mac, ip_address=ip, snmp_config=request.cable_modem.snmp
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse( mac_address=mac, status=status, message=msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            service = InterfaceStatsService(mac_address=mac, ip_address=ip, write_community=community)
+            service = InterfaceStatsService(
+                mac_address=mac, ip_address=ip, write_community=community
+            )
             data: dict[str, list[dict]] = await service.get_interface_stat_entries()
 
-            return SnmpResponse(mac_address=mac,
-                                status=ServiceStatusCode.SUCCESS,
-                                message="Interface statistics retrieved successfully",
-                                results=data)
+            return SnmpResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="Interface statistics retrieved successfully",
+                results=data,
+            )
+
 
 # Required for dynamic auto-registration
 router = InterfaceStatsRouter().router

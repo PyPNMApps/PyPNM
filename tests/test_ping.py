@@ -18,7 +18,9 @@ class DummyCompleted:
         self.returncode = returncode
 
 
-def _mock_run_factory(expected_cmd_out: list[str], rc: int = 0) -> Callable[..., DummyCompleted]:
+def _mock_run_factory(
+    expected_cmd_out: list[str], rc: int = 0
+) -> Callable[..., DummyCompleted]:
     captured: dict[str, object] = {}
 
     def _mock_run(cmd: list[str], *args: object, **kwargs: object) -> DummyCompleted:
@@ -37,7 +39,9 @@ def _mock_run_factory(expected_cmd_out: list[str], rc: int = 0) -> Callable[...,
     return _mock_run
 
 
-def test_linux_mac_builds_correct_command_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_linux_mac_builds_correct_command_and_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("platform.system", lambda: "Linux")
 
     expected_cmd = ["ping", "-c", "3", "-W", "2", "host.example"]
@@ -61,7 +65,9 @@ def test_linux_mac_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mock_run.captured["cmd"] == expected_cmd
 
 
-def test_windows_builds_correct_command_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_windows_builds_correct_command_and_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("platform.system", lambda: "Windows")
 
     expected_cmd = ["ping", "-n", "4", "-w", "3000", "10.0.0.1"]

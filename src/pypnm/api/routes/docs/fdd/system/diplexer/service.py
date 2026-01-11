@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -15,6 +14,7 @@ from pypnm.lib.mac_address import MacAddress, MacAddressStr
 
 logger = logging.getLogger(__name__)
 
+
 class FddDiplexerConfigService:
     """
     Service for retrieving the current DOCSIS 4.0 FDD diplexer configuration
@@ -27,9 +27,9 @@ class FddDiplexerConfigService:
     MHZ: int = 1_000_000  # Constant for MHz unit conversion (currently unused)
 
     @staticmethod
-    async def fetch_fdd_diplexer_config(mac_address: MacAddressStr,
-                                        ip_address: InetAddressStr,
-                                        snmp_config: SNMPConfig) -> DocsFddCmFddSystemCfgState:
+    async def fetch_fdd_diplexer_config(
+        mac_address: MacAddressStr, ip_address: InetAddressStr, snmp_config: SNMPConfig
+    ) -> DocsFddCmFddSystemCfgState:
         """
         Connects to the cable modem using the given MAC and IP address,
         and retrieves its currently configured FDD diplexer band edge settings.
@@ -47,11 +47,14 @@ class FddDiplexerConfigService:
         logger.info(f"Fetching diplexer config for {mac_address}@{ip_address}")
 
         cm = CableModem(
-            mac_address     =MacAddress(mac_address),
-            inet            =Inet(ip_address),
-            write_community =snmp_config.snmp_v2c.community)
+            mac_address=MacAddress(mac_address),
+            inet=Inet(ip_address),
+            write_community=snmp_config.snmp_v2c.community,
+        )
 
-        state: DocsFddCmFddSystemCfgState | None = await cm.getDocsFddCmFddSystemCfgState()
+        state: (
+            DocsFddCmFddSystemCfgState | None
+        ) = await cm.getDocsFddCmFddSystemCfgState()
         if state is None:
             logger.error("Diplexer configuration returned None")
             raise RuntimeError("Failed to retrieve diplexer configuration")

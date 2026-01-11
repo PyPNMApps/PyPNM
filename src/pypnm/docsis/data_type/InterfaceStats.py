@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -18,10 +17,12 @@ class IfAdminStatus(IntEnum):
     down = 2
     testing = 3
 
+
 class IfOperStatus(IntEnum):
     up = 1
     down = 2
     testing = 3
+
 
 class IfEntry(BaseModel):
     ifIndex: int
@@ -47,6 +48,7 @@ class IfEntry(BaseModel):
     ifOutQLen: int | None = None
     ifSpecific: str | None = None
 
+
 class IfXEntry(BaseModel):
     ifName: str
     ifInMulticastPkts: int
@@ -68,12 +70,15 @@ class IfXEntry(BaseModel):
     ifAlias: str
     ifCounterDiscontinuityTime: int
 
+
 class InterfaceStats(BaseModel):
     ifEntry: IfEntry
     ifXEntry: IfXEntry | None = None
 
     @classmethod
-    async def from_snmp(cls, snmp: Snmp_v2c, if_type_filter: DocsisIfType) -> list[InterfaceStats]:
+    async def from_snmp(
+        cls, snmp: Snmp_v2c, if_type_filter: DocsisIfType
+    ) -> list[InterfaceStats]:
         stats_list = []
 
         for if_index in await snmp.walk("ifIndex"):
@@ -88,13 +93,17 @@ class InterfaceStats(BaseModel):
             if type_val is None or int(type_val) != if_type_filter:
                 continue
 
-            def safe_cast(value: str, cast: Callable) -> int | float | str | bool | None:
+            def safe_cast(
+                value: str, cast: Callable
+            ) -> int | float | str | bool | None:
                 try:
                     return cast(value)
                 except (ValueError, TypeError):
                     return None
 
-            async def fetch(field: str, cast: Callable | None = None, index: str | int = index) -> None | int | float | str | bool:
+            async def fetch(
+                field: str, cast: Callable | None = None, index: str | int = index
+            ) -> None | int | float | str | bool:
                 """Fetch and optionally cast an SNMP field value for a given index."""
                 raw = await snmp.get(f"{field}.{index}")
                 val = Snmp_v2c.get_result_value(raw)
@@ -142,10 +151,14 @@ class InterfaceStats(BaseModel):
             )
 
             try:
-                xentry = IfXEntry(**{
-                    field: Snmp_v2c.get_result_value(await snmp.get(f"{field}.{index}"))
-                    for field in IfXEntry.__annotations__
-                })
+                xentry = IfXEntry(
+                    **{
+                        field: Snmp_v2c.get_result_value(
+                            await snmp.get(f"{field}.{index}")
+                        )
+                        for field in IfXEntry.__annotations__
+                    }
+                )
             except Exception:
                 xentry = None
 

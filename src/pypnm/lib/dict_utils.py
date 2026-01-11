@@ -71,9 +71,13 @@ class DictGenerate:
             The cleaned structure (same object when in_place=True where possible).
         """
         targets: set[str] = set(keys_to_remove)
-        targets_lower: set[str] | None = {k.lower() for k in targets} if not case_sensitive else None
+        targets_lower: set[str] | None = (
+            {k.lower() for k in targets} if not case_sensitive else None
+        )
 
-        NodeType = dict[str, object] | list[object] | tuple[object, ...] | set[object] | object
+        NodeType = (
+            dict[str, object] | list[object] | tuple[object, ...] | set[object] | object
+        )
 
         def _walk(node: NodeType) -> NodeType:
             if isinstance(node, dict):
@@ -82,7 +86,9 @@ class DictGenerate:
                 if case_sensitive:
                     to_delete = [k for k in list(d.keys()) if k in targets]
                 else:
-                    to_delete = [k for k in list(d.keys()) if k.lower() in targets_lower]  # type: ignore[arg-type]
+                    to_delete = [
+                        k for k in list(d.keys()) if k.lower() in targets_lower
+                    ]  # type: ignore[arg-type]
 
                 for k in to_delete:
                     d.pop(k, None)
@@ -103,7 +109,7 @@ class DictGenerate:
 
             if isinstance(node, set):
                 # If nested results become unhashable, this may raise—callers should avoid such shapes.
-                return { _walk(v) for v in node }
+                return {_walk(v) for v in node}
 
             return node
 
@@ -140,6 +146,7 @@ class DictGenerate:
             - If `by` is provided and an item lacks that field/attribute.
             - If duplicate `by` keys are encountered.
         """
+
         def dump_one(obj: BaseModel | Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(obj, BaseModel):  # type: ignore[arg-type]
                 if hasattr(obj, "model_dump"):

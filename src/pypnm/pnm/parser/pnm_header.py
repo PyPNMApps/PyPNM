@@ -17,15 +17,24 @@ from pypnm.pnm.parser.pnm_file_type import PnmFileType
 
 class PnmHeaderParameters(BaseModel):
     """Typed fields parsed from a PNM header."""
-    file_type: str | None  = Field(default="PNN", description="PNM file type identifier (e.g., 'PNN')")
-    file_type_version: int    = Field(default=0, description="Numeric version of the file type (e.g., 10 for PNN10)")
-    major_version: int        = Field(default=1, description="Major version of the PNM format")
-    minor_version: int        = Field(default=0, description="Minor version of the PNM format")
-    capture_time: CaptureTime = Field(default=DEFAULT_CAPTURE_TIME, description="Capture timestamp as epoch seconds since 1970-01-01")
+
+    file_type: str | None = Field(
+        default="PNN", description="PNM file type identifier (e.g., 'PNN')"
+    )
+    file_type_version: int = Field(
+        default=0, description="Numeric version of the file type (e.g., 10 for PNN10)"
+    )
+    major_version: int = Field(default=1, description="Major version of the PNM format")
+    minor_version: int = Field(default=0, description="Minor version of the PNM format")
+    capture_time: CaptureTime = Field(
+        default=DEFAULT_CAPTURE_TIME,
+        description="Capture timestamp as epoch seconds since 1970-01-01",
+    )
 
 
 class PnmHeaderModel(BaseModel):
     """Model wrapper for PNM header parameters."""
+
     pnm_header: PnmHeaderParameters
 
 
@@ -42,11 +51,13 @@ class PnmHeader:
         '!3sBBBI' -> file_type(3s), file_type_num(u8), major(u8), minor(u8), capture_time(u32)
     """
 
-    _FMT_LE: str = "<3sBBB"   # special case (no capture_time)
+    _FMT_LE: str = "<3sBBB"  # special case (no capture_time)
     _FMT_BE: str = "!3sBBBI"  # standard (with capture_time)
 
     # File types that omit capture_time in their header
-    _MISSING_CAPTURE_TYPES = {PnmFileType.OFDM_FEC_SUMMARY.value}  # FEC Summary file type(s)
+    _MISSING_CAPTURE_TYPES = {
+        PnmFileType.OFDM_FEC_SUMMARY.value
+    }  # FEC Summary file type(s)
 
     def __init__(self, byte_array: bytes) -> None:
         """
@@ -61,12 +72,12 @@ class PnmHeader:
 
         self._pnmheader_model: PnmHeaderModel
         self._parameters: PnmHeaderParameters
-        self._file_type: bytes | None   = None
-        self._file_type_num: int           = -1
-        self._major_version: int           = -1
-        self._minor_version: int           = -1
-        self._capture_time: CaptureTime    = DEFAULT_CAPTURE_TIME
-        self.pnm_data: bytes               = b""
+        self._file_type: bytes | None = None
+        self._file_type_num: int = -1
+        self._major_version: int = -1
+        self._minor_version: int = -1
+        self._capture_time: CaptureTime = DEFAULT_CAPTURE_TIME
+        self.pnm_data: bytes = b""
 
         self.__parse_header(byte_array)
         self.__build_pnm_header_model()
@@ -115,11 +126,13 @@ class PnmHeader:
     def __build_pnm_header_model(self) -> None:
         """Build the internal Pydantic model representation of the parsed header."""
         self._parameters = PnmHeaderParameters(
-            file_type         = self._file_type.decode("utf-8").strip() if self._file_type else None,
-            file_type_version = self._file_type_num,
-            major_version     = self._major_version,
-            minor_version     = self._minor_version,
-            capture_time      = self._capture_time,
+            file_type=self._file_type.decode("utf-8").strip()
+            if self._file_type
+            else None,
+            file_type_version=self._file_type_num,
+            major_version=self._major_version,
+            minor_version=self._minor_version,
+            capture_time=self._capture_time,
         )
         self._pnmheader_model = PnmHeaderModel(pnm_header=self._parameters)
 
@@ -190,7 +203,9 @@ class PnmHeader:
             Matching enumeration value, or None if unrecognized.
         """
         if self._file_type and self._file_type_num is not None:
-            pnm_id: str = f"{self._file_type.decode('utf-8').strip()}{self._file_type_num}"
+            pnm_id: str = (
+                f"{self._file_type.decode('utf-8').strip()}{self._file_type_num}"
+            )
             for t in PnmFileType:
                 if t.value == pnm_id:
                     return t
@@ -222,7 +237,9 @@ class PnmHeader:
         self.logger.debug("Attempting to override capture_time to %s", capture_time)
 
         if not self._file_type or self._file_type_num is None:
-            self.logger.warning("Cannot override capture_time: incomplete header fields")
+            self.logger.warning(
+                "Cannot override capture_time: incomplete header fields"
+            )
             return False
 
         pnm_type = f"{self._file_type.decode('utf-8').strip()}{self._file_type_num}"
@@ -230,7 +247,9 @@ class PnmHeader:
         if pnm_type in self._MISSING_CAPTURE_TYPES:
             self._capture_time = capture_time
             self.__build_pnm_header_model()
-            self.logger.debug("Overrode capture_time=%s for PNM type=%s", capture_time, pnm_type)
+            self.logger.debug(
+                "Overrode capture_time=%s for PNM type=%s", capture_time, pnm_type
+            )
             return True
 
         self.logger.debug("No override needed for PNM type=%s", pnm_type)
@@ -254,26 +273,28 @@ class PnmHeader:
         return cls(data)
 
     @staticmethod
-    def get_model_from_dict(data: Mapping[str, Any] | dict[str, Any]) -> PnmHeaderParameters:
+    def get_model_from_dict(
+        data: Mapping[str, Any] | dict[str, Any],
+    ) -> PnmHeaderParameters:
         """
-        Build a `PnmHeaderParameters` from a known PNM header dictionary.
+                Build a `PnmHeaderParameters` from a known PNM header dictionary.
 
-        This is intended for cases where the original binary header is not
-        available and only the structured dictionary (or JSON) form of the
-        header exists.
+                This is intended for cases where the original binary header is not
+                available and only the structured dictionary (or JSON) form of the
+                header exists.
 
-        Parameters
-        ----------
-        data : Dict[str, Any]
-            Dictionary containing PNM header fields. This may be either:
-            - The full structure produced by `getPnmHeader()` which wraps
-              parameters under the `pnm_header` key, or
-            - A flat mapping of `PnmHeaderParameters` fields.
+                Parameters
+                ----------
+                data : Dict[str, Any]
+                    Dictionary containing PNM header fields. This may be either:
+                    - The full structure produced by `getPnmHeader()` which wraps
+                      parameters under the `pnm_header` key, or
+                    - A flat mapping of `PnmHeaderParameters` fields.
 
-        Returns
-        -------
-        PnmHeaderParameters
-.
+                Returns
+                -------
+                PnmHeaderParameters
+        .
         """
         header_data = data.get("pnm_header", data)
 

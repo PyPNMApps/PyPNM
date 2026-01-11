@@ -14,9 +14,9 @@ def test_time_unit_values() -> None:
     """
     Verify that TimeUnit enum members have the expected string values.
     """
-    assert TimeUnit.SECONDS.value      == "s"
+    assert TimeUnit.SECONDS.value == "s"
     assert TimeUnit.MILLISECONDS.value == "ms"
-    assert TimeUnit.NANOSECONDS.value  == "ns"
+    assert TimeUnit.NANOSECONDS.value == "ns"
 
 
 def test_time_stamp_default_is_seconds(monkeypatch: pytest.MonkeyPatch) -> None:

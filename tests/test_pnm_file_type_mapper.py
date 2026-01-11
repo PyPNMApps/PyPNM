@@ -40,9 +40,13 @@ def test_unmapped_test_type_returns_none_if_any_exist() -> None:
     If there are DocsPnmCmCtlTest members not present in the mapping,
     verify that get_file_type returns None for at least one of them.
     """
-    unmapped_tests = [t for t in DocsPnmCmCtlTest if t not in PnmFileTypeMapper._test_to_file_type]
+    unmapped_tests = [
+        t for t in DocsPnmCmCtlTest if t not in PnmFileTypeMapper._test_to_file_type
+    ]
     if not unmapped_tests:
-        pytest.skip("All DocsPnmCmCtlTest values are mapped; no unmapped test type to validate.")
+        pytest.skip(
+            "All DocsPnmCmCtlTest values are mapped; no unmapped test type to validate."
+        )
     assert PnmFileTypeMapper.get_file_type(unmapped_tests[0]) is None
 
 
@@ -54,5 +58,7 @@ def test_unmapped_file_type_returns_none_if_any_exist() -> None:
     mapped_file_types = set(PnmFileTypeMapper._test_to_file_type.values())
     unmapped_file_types = [ft for ft in PnmFileType if ft not in mapped_file_types]
     if not unmapped_file_types:
-        pytest.skip("All PnmFileType values are mapped; no unmapped file type to validate.")
+        pytest.skip(
+            "All PnmFileType values are mapped; no unmapped file type to validate."
+        )
     assert PnmFileTypeMapper.get_test_type(unmapped_file_types[0]) is None

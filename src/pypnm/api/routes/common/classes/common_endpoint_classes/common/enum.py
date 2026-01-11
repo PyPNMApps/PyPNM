@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -7,8 +6,9 @@ from pypnm.lib.types import StringEnum
 
 
 class OutputType(StringEnum):
-    JSON    =   'json'
-    ARCHIVE =   'archive'
+    JSON = "json"
+    ARCHIVE = "archive"
+
 
 class AnalysisType(StringEnum):
-    BASIC   =   'basic'
+    BASIC = "basic"

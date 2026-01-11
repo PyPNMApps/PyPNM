@@ -22,9 +22,12 @@ class UsScQamChannelService:
         cm (CableModem): An instance of the CableModem class used to perform SNMP operations.
     """
 
-    def __init__(self, mac_address: MacAddressStr,
-                 ip_address: InetAddressStr,
-                 snmp_config: SNMPConfig) -> None:
+    def __init__(
+        self,
+        mac_address: MacAddressStr,
+        ip_address: InetAddressStr,
+        snmp_config: SNMPConfig,
+    ) -> None:
         """
         Initializes the service with a MAC and IP address.
 
@@ -32,9 +35,11 @@ class UsScQamChannelService:
             mac_address (str): MAC address of the target cable modem.
             ip_address (str): IP address of the target cable modem.
         """
-        self.cm = CableModem(mac_address=MacAddress(mac_address),
-                             inet=Inet(ip_address),
-                             write_community=snmp_config.snmp_v2c.community)
+        self.cm = CableModem(
+            mac_address=MacAddress(mac_address),
+            inet=Inet(ip_address),
+            write_community=snmp_config.snmp_v2c.community,
+        )
 
     async def get_upstream_entries(self) -> list[dict]:
         """
@@ -46,7 +51,7 @@ class UsScQamChannelService:
         entries = await self.cm.getDocsIfUpstreamChannelEntry()
         return [entry.model_dump() for entry in entries]
 
-    async def get_upstream_pre_equalizations(self) ->  dict[int, dict]:
+    async def get_upstream_pre_equalizations(self) -> dict[int, dict]:
         """
         Fetches upstream pre-equalization coefficient data.
 

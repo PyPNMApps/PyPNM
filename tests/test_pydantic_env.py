@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -40,7 +39,9 @@ def test_model_validator_after_instance_style() -> None:
         @model_validator(mode="after")
         def _check_auth(self) -> DemoModel:
             if self.security_level.startswith("auth") and not self.auth_password:
-                raise ValueError("auth_password required when using auth* security_level")
+                raise ValueError(
+                    "auth_password required when using auth* security_level"
+                )
             return self
 
     m = DemoModel(security_level="noAuthNoPriv")
@@ -93,7 +94,9 @@ def test_field_default_and_required_behavior() -> None:
 
     class FieldDefaultsModel(BaseModel):
         required_value: int = Field(..., description="Required integer value")
-        optional_value: int | None = Field(default=None, description="Optional integer value")
+        optional_value: int | None = Field(
+            default=None, description="Optional integer value"
+        )
         with_default: int = Field(default=10, description="Integer with default")
 
     # Missing required_value should fail
@@ -140,7 +143,9 @@ def test_field_default_factory_behavior() -> None:
         return 100 + counter["calls"]
 
     class FactoryModel(BaseModel):
-        seq: int = Field(default_factory=_factory, description="Sequence with default_factory")
+        seq: int = Field(
+            default_factory=_factory, description="Sequence with default_factory"
+        )
 
     m1 = FactoryModel()
     m2 = FactoryModel()
@@ -149,6 +154,7 @@ def test_field_default_factory_behavior() -> None:
     assert m1.seq == 101
     assert m2.seq == 102
     assert counter["calls"] == 2
+
 
 def test_field_validator_basic() -> None:
     """Test basic functionality of field validators in Pydantic models."""

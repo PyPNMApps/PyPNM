@@ -16,15 +16,15 @@ from pypnm.lib.constants import SPEED_OF_LIGHT as C0
 def test_to_model_detects_single_echo_basic() -> None:
     # Build a simple time response: impulse at 0 and smaller echo at bin d
     N = 256
-    d = 10                       # echo at 10 samples
-    fs = 1_000_000.0             # 1 MHz sample rate -> 1 us per sample
-    vf = 0.87                    # velocity factor for to_model() (used in detector ctor)
+    d = 10  # echo at 10 samples
+    fs = 1_000_000.0  # 1 MHz sample rate -> 1 us per sample
+    vf = 0.87  # velocity factor for to_model() (used in detector ctor)
 
     h = np.zeros(N, dtype=np.complex128)
     h[0] = 1.0 + 0j
     h[d] = 0.4 + 0j
 
-    H = np.fft.fft(h)            # detector expects frequency-domain data
+    H = np.fft.fft(h)  # detector expects frequency-domain data
     det = IfftEchoDetector(H, sample_rate=fs, prop_speed_frac=vf)
 
     m = det.to_model(threshold_frac=0.2, guard_bins=1, max_delay_s=None, n_fft=None)
@@ -37,7 +37,9 @@ def test_to_model_detects_single_echo_basic() -> None:
     expected_delay = d / fs
     expected_dist_m = expected_delay * (C0 * vf) / 2.0
     assert m.reflection.reflection_delay_s == pytest.approx(expected_delay, rel=1e-6)
-    assert m.reflection.reflection_distance_m == pytest.approx(expected_dist_m, rel=1e-6)
+    assert m.reflection.reflection_distance_m == pytest.approx(
+        expected_dist_m, rel=1e-6
+    )
 
     # Amplitude ratio ~ 0.4
     assert m.reflection.amp_ratio == pytest.approx(0.4, rel=1e-3)

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -39,13 +38,16 @@ class DocsIfUpstreamEntry(BaseModel):
     docsIf3CmStatusUsIsMuted: bool | None = None
     docsIf3CmStatusUsRangingStatus: int | None = None
 
+
 class DocsIfUpstreamChannelEntry(BaseModel):
     index: int
     channel_id: int
     entry: DocsIfUpstreamEntry
 
     @classmethod
-    async def from_snmp(cls, index: int, snmp: Snmp_v2c) -> DocsIfUpstreamChannelEntry | None:
+    async def from_snmp(
+        cls, index: int, snmp: Snmp_v2c
+    ) -> DocsIfUpstreamChannelEntry | None:
         logger = logging.getLogger(cls.__name__)
 
         def tenthdBmV_to_float(value: str) -> float | None:
@@ -60,7 +62,9 @@ class DocsIfUpstreamChannelEntry(BaseModel):
             except Exception:
                 return None
 
-        async def fetch(field: str, cast: Callable | None = None) -> None | int | float | str | bool:
+        async def fetch(
+            field: str, cast: Callable | None = None
+        ) -> None | int | float | str | bool:
             try:
                 raw = await snmp.get(f"{field}.{index}")
                 val = Snmp_v2c.get_result_value(raw)
@@ -82,41 +86,64 @@ class DocsIfUpstreamChannelEntry(BaseModel):
                 return None
 
         entry = DocsIfUpstreamEntry(
-            docsIfUpChannelId                   =   await fetch("docsIfUpChannelId", int),
-            docsIfUpChannelFrequency            =   await fetch("docsIfUpChannelFrequency", int),
-            docsIfUpChannelWidth                =   await fetch("docsIfUpChannelWidth", int),
-            docsIfUpChannelModulationProfile    =   await fetch("docsIfUpChannelModulationProfile", int),
-            docsIfUpChannelSlotSize             =   await fetch("docsIfUpChannelSlotSize", int),
-            docsIfUpChannelTxTimingOffset       =   await fetch("docsIfUpChannelTxTimingOffset", int),
-            docsIfUpChannelRangingBackoffStart =   await fetch("docsIfUpChannelRangingBackoffStart", int),
-            docsIfUpChannelRangingBackoffEnd   =   await fetch("docsIfUpChannelRangingBackoffEnd", int),
-            docsIfUpChannelTxBackoffStart      =   await fetch("docsIfUpChannelTxBackoffStart", int),
-            docsIfUpChannelTxBackoffEnd        =   await fetch("docsIfUpChannelTxBackoffEnd", int),
-            docsIfUpChannelType                =   await fetch("docsIfUpChannelType", int),
-            docsIfUpChannelCloneFrom           =   await fetch("docsIfUpChannelCloneFrom", int),
-            docsIfUpChannelUpdate              =   await fetch("docsIfUpChannelUpdate", Snmp_v2c.truth_value),
-            docsIfUpChannelStatus              =   await fetch("docsIfUpChannelStatus", int),
-            docsIfUpChannelPreEqEnable         =   await fetch("docsIfUpChannelPreEqEnable", Snmp_v2c.truth_value),
-
-            docsIf3CmStatusUsTxPower           =   await fetch("docsIf3CmStatusUsTxPower", tenthdBmV_to_float),
-            docsIf3CmStatusUsT3Timeouts        =   await fetch("docsIf3CmStatusUsT3Timeouts", int),
-            docsIf3CmStatusUsT4Timeouts        =   await fetch("docsIf3CmStatusUsT4Timeouts", int),
-            docsIf3CmStatusUsRangingAborteds   =   await fetch("docsIf3CmStatusUsRangingAborteds", int),
-            docsIf3CmStatusUsModulationType    =   await fetch("docsIf3CmStatusUsModulationType", int),
-            docsIf3CmStatusUsEqData            =   await fetch("docsIf3CmStatusUsEqData", str),
-            docsIf3CmStatusUsT3Exceededs       =   await fetch("docsIf3CmStatusUsT3Exceededs", int),
-            docsIf3CmStatusUsIsMuted           =   await fetch("docsIf3CmStatusUsIsMuted", Snmp_v2c.truth_value),
-            docsIf3CmStatusUsRangingStatus     =   await fetch("docsIf3CmStatusUsRangingStatus", int)
+            docsIfUpChannelId=await fetch("docsIfUpChannelId", int),
+            docsIfUpChannelFrequency=await fetch("docsIfUpChannelFrequency", int),
+            docsIfUpChannelWidth=await fetch("docsIfUpChannelWidth", int),
+            docsIfUpChannelModulationProfile=await fetch(
+                "docsIfUpChannelModulationProfile", int
+            ),
+            docsIfUpChannelSlotSize=await fetch("docsIfUpChannelSlotSize", int),
+            docsIfUpChannelTxTimingOffset=await fetch(
+                "docsIfUpChannelTxTimingOffset", int
+            ),
+            docsIfUpChannelRangingBackoffStart=await fetch(
+                "docsIfUpChannelRangingBackoffStart", int
+            ),
+            docsIfUpChannelRangingBackoffEnd=await fetch(
+                "docsIfUpChannelRangingBackoffEnd", int
+            ),
+            docsIfUpChannelTxBackoffStart=await fetch(
+                "docsIfUpChannelTxBackoffStart", int
+            ),
+            docsIfUpChannelTxBackoffEnd=await fetch("docsIfUpChannelTxBackoffEnd", int),
+            docsIfUpChannelType=await fetch("docsIfUpChannelType", int),
+            docsIfUpChannelCloneFrom=await fetch("docsIfUpChannelCloneFrom", int),
+            docsIfUpChannelUpdate=await fetch(
+                "docsIfUpChannelUpdate", Snmp_v2c.truth_value
+            ),
+            docsIfUpChannelStatus=await fetch("docsIfUpChannelStatus", int),
+            docsIfUpChannelPreEqEnable=await fetch(
+                "docsIfUpChannelPreEqEnable", Snmp_v2c.truth_value
+            ),
+            docsIf3CmStatusUsTxPower=await fetch(
+                "docsIf3CmStatusUsTxPower", tenthdBmV_to_float
+            ),
+            docsIf3CmStatusUsT3Timeouts=await fetch("docsIf3CmStatusUsT3Timeouts", int),
+            docsIf3CmStatusUsT4Timeouts=await fetch("docsIf3CmStatusUsT4Timeouts", int),
+            docsIf3CmStatusUsRangingAborteds=await fetch(
+                "docsIf3CmStatusUsRangingAborteds", int
+            ),
+            docsIf3CmStatusUsModulationType=await fetch(
+                "docsIf3CmStatusUsModulationType", int
+            ),
+            docsIf3CmStatusUsEqData=await fetch("docsIf3CmStatusUsEqData", str),
+            docsIf3CmStatusUsT3Exceededs=await fetch(
+                "docsIf3CmStatusUsT3Exceededs", int
+            ),
+            docsIf3CmStatusUsIsMuted=await fetch(
+                "docsIf3CmStatusUsIsMuted", Snmp_v2c.truth_value
+            ),
+            docsIf3CmStatusUsRangingStatus=await fetch(
+                "docsIf3CmStatusUsRangingStatus", int
+            ),
         )
 
-        return cls(
-            index=index,
-            channel_id=entry.docsIfUpChannelId or 0,
-            entry=entry
-        )
+        return cls(index=index, channel_id=entry.docsIfUpChannelId or 0, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsIfUpstreamChannelEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsIfUpstreamChannelEntry]:
         logger = logging.getLogger(cls.__name__)
         results: list[DocsIfUpstreamChannelEntry] = []
 

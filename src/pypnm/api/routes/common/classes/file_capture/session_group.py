@@ -44,9 +44,7 @@ class SessionGroup:
     """
 
     def __init__(
-        self,
-        session_id: str | None = None,
-        db_path: Path | None = None
+        self, session_id: str | None = None, db_path: Path | None = None
     ) -> None:
         """
         Initialize the SessionGroup manager.
@@ -84,7 +82,7 @@ class SessionGroup:
         Load the JSON DB into memory; resets on error.
         """
         try:
-            with self.db_path.open('r', encoding='utf-8') as f:
+            with self.db_path.open("r", encoding="utf-8") as f:
                 self._db = json.load(f)
         except (ValueError, JSONDecodeError):
             self.logger.warning("Corrupt DB file; resetting to empty")
@@ -97,8 +95,8 @@ class SessionGroup:
         """
         Atomically write the given data dict to the JSON DB file.
         """
-        temp_path = self.db_path.with_suffix('.tmp')
-        with temp_path.open('w', encoding='utf-8') as f:
+        temp_path = self.db_path.with_suffix(".tmp")
+        with temp_path.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         temp_path.replace(self.db_path)
 
@@ -184,7 +182,9 @@ class SessionGroup:
         Remove sessions older than the given age (seconds).
         """
         cutoff = int(time.time()) - seconds
-        to_delete = [gid for gid, info in self._db.items() if info.get("created", 0) < cutoff]
+        to_delete = [
+            gid for gid, info in self._db.items() if info.get("created", 0) < cutoff
+        ]
         for gid in to_delete:
             del self._db[gid]
         if to_delete:

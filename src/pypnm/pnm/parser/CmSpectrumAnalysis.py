@@ -23,24 +23,57 @@ class CmSpectrumAnalyzerModel(BaseModel):
     Spectrum Analyzer capture, including frequencies, FFT configuration,
     raw data, and processed amplitude segments.
     """
-    model_config                                    = ConfigDict(extra="ignore", populate_by_name=True, ser_json_bytes="base64")
-    pnm_header:PnmHeaderParameters                  = Field(..., description="")
-    channel_id: ChannelId                           = Field(..., description="Downstream/upstream channel identifier.")
-    mac_address: MacAddressStr                      = Field(..., description="Device MAC address (string).")
-    first_segment_center_frequency: FrequencyHz     = Field(..., description="Center frequency of the first segment in Hz.")
-    last_segment_center_frequency: FrequencyHz      = Field(..., description="Center frequency of the last segment in Hz.")
-    segment_frequency_span: FrequencyHz             = Field(..., description="Per-segment frequency span in Hz.")
-    num_bins_per_segment: int                       = Field(..., ge=1, description="Number of FFT bins per segment.")
-    equivalent_noise_bandwidth: float               = Field(..., gt=0, description="Equivalent noise bandwidth (Hz).")
-    window_function: int                            = Field(..., description="Window function identifier used during analysis (e.g., Hann, Hamming).")
-    bin_frequency_spacing: int                      = Field(..., gt=0, description="Frequency spacing between adjacent bins in Hz.")
-    spectrum_analysis_data_length: int              = Field(..., ge=0, description="Length of the raw spectrum analysis data buffer (bytes).")
-    spectrum_analysis_data: bytes                   = Field(..., description="Raw spectrum analysis payload (bytes).")
-    amplitude_bin_segments_float: list[FloatSeries] = Field(..., description="Amplitude values per bin (float dB), concatenated across segments.")
+
+    model_config = ConfigDict(
+        extra="ignore", populate_by_name=True, ser_json_bytes="base64"
+    )
+    pnm_header: PnmHeaderParameters = Field(..., description="")
+    channel_id: ChannelId = Field(
+        ..., description="Downstream/upstream channel identifier."
+    )
+    mac_address: MacAddressStr = Field(..., description="Device MAC address (string).")
+    first_segment_center_frequency: FrequencyHz = Field(
+        ..., description="Center frequency of the first segment in Hz."
+    )
+    last_segment_center_frequency: FrequencyHz = Field(
+        ..., description="Center frequency of the last segment in Hz."
+    )
+    segment_frequency_span: FrequencyHz = Field(
+        ..., description="Per-segment frequency span in Hz."
+    )
+    num_bins_per_segment: int = Field(
+        ..., ge=1, description="Number of FFT bins per segment."
+    )
+    equivalent_noise_bandwidth: float = Field(
+        ..., gt=0, description="Equivalent noise bandwidth (Hz)."
+    )
+    window_function: int = Field(
+        ...,
+        description="Window function identifier used during analysis (e.g., Hann, Hamming).",
+    )
+    bin_frequency_spacing: int = Field(
+        ..., gt=0, description="Frequency spacing between adjacent bins in Hz."
+    )
+    spectrum_analysis_data_length: int = Field(
+        ...,
+        ge=0,
+        description="Length of the raw spectrum analysis data buffer (bytes).",
+    )
+    spectrum_analysis_data: bytes = Field(
+        ..., description="Raw spectrum analysis payload (bytes)."
+    )
+    amplitude_bin_segments_float: list[FloatSeries] = Field(
+        ...,
+        description="Amplitude values per bin (float dB), concatenated across segments.",
+    )
 
     @field_serializer("spectrum_analysis_data")
-    def _ser_spectrum_analysis_data(self, v: bytes,) -> str:
+    def _ser_spectrum_analysis_data(
+        self,
+        v: bytes,
+    ) -> str:
         return v.hex()
+
 
 class CmSpectrumAnalysis(PnmHeader):
     """
@@ -72,9 +105,9 @@ class CmSpectrumAnalysis(PnmHeader):
         self._bin_frequency_spacing: int
         self._amplitude_bin_segments_float: list[FloatSeries] = []
         self._number_of_bin_segments: int
-        self._num_of_bin_segments:int = 0
+        self._num_of_bin_segments: int = 0
 
-        self._model:CmSpectrumAnalyzerModel
+        self._model: CmSpectrumAnalyzerModel
 
         self.__process()
 
@@ -87,26 +120,33 @@ class CmSpectrumAnalysis(PnmHeader):
             cann = PnmFileType.SPECTRUM_ANALYSIS.get_pnm_cann()
             actual_type = self.get_pnm_file_type()
             error_cann = actual_type.get_pnm_cann() if actual_type else "Unknown"
-            raise ValueError(f"PNM File Stream is not RxMER file type: {cann}, "
-                             f"Error: {error_cann}")
+            raise ValueError(
+                f"PNM File Stream is not RxMER file type: {cann}, Error: {error_cann}"
+            )
 
-        spectrum_analysis_format = '>B6sIIIHHHI'
+        spectrum_analysis_format = ">B6sIIIHHHI"
         spectrum_analysis_size = calcsize(spectrum_analysis_format)
-        unpacked_data = unpack(spectrum_analysis_format, self.pnm_data[:spectrum_analysis_size])
+        unpacked_data = unpack(
+            spectrum_analysis_format, self.pnm_data[:spectrum_analysis_size]
+        )
 
-        self._channel_id                     = unpacked_data[0]
-        self._mac_address                    = MacAddress(unpacked_data[1]).to_mac_format(MacAddressFormat.COLON)
+        self._channel_id = unpacked_data[0]
+        self._mac_address = MacAddress(unpacked_data[1]).to_mac_format(
+            MacAddressFormat.COLON
+        )
         self._first_segment_center_frequency = unpacked_data[2]
-        self._last_segment_center_frequency  = unpacked_data[3]
-        self._segment_frequency_span         = unpacked_data[4]
-        self._num_bins_per_segment           = unpacked_data[5]
-        self._equivalent_noise_bandwidth     = unpacked_data[6]
-        self._window_function                = unpacked_data[7]
-        self._spectrum_analysis_data_length  = unpacked_data[8]
-        self._spectrum_analysis_data         = self.pnm_data[spectrum_analysis_size:]
+        self._last_segment_center_frequency = unpacked_data[3]
+        self._segment_frequency_span = unpacked_data[4]
+        self._num_bins_per_segment = unpacked_data[5]
+        self._equivalent_noise_bandwidth = unpacked_data[6]
+        self._window_function = unpacked_data[7]
+        self._spectrum_analysis_data_length = unpacked_data[8]
+        self._spectrum_analysis_data = self.pnm_data[spectrum_analysis_size:]
 
         if self._num_bins_per_segment:
-            self._bin_frequency_spacing = int(self._segment_frequency_span / self._num_bins_per_segment)
+            self._bin_frequency_spacing = int(
+                self._segment_frequency_span / self._num_bins_per_segment
+            )
 
         self._process_amplitude_data()
         self._build_model()
@@ -126,21 +166,29 @@ class CmSpectrumAnalysis(PnmHeader):
         try:
             segment_size_bytes = self._num_bins_per_segment * self.AMPLITUDE_BIN_SIZE
             total_data_len = len(self._spectrum_analysis_data)
-            self.logger.debug(f'Total Data Length: {total_data_len} bytes')
+            self.logger.debug(f"Total Data Length: {total_data_len} bytes")
 
             for offset in range(0, total_data_len, segment_size_bytes):
-                segment_bytes = self._spectrum_analysis_data[offset:offset + segment_size_bytes]
+                segment_bytes = self._spectrum_analysis_data[
+                    offset : offset + segment_size_bytes
+                ]
                 actual_bins = len(segment_bytes) // self.AMPLITUDE_BIN_SIZE
 
                 if actual_bins == 0:
-                    self.logger.warning(f"Empty segment encountered at offset {offset}, skipping.")
+                    self.logger.warning(
+                        f"Empty segment encountered at offset {offset}, skipping."
+                    )
                     continue
 
                 if actual_bins < self._num_bins_per_segment:
-                    self.logger.warning(f"Incomplete segment encountered at offset {offset} with only {actual_bins} bins.")
+                    self.logger.warning(
+                        f"Incomplete segment encountered at offset {offset} with only {actual_bins} bins."
+                    )
 
-                format_string = f'>{actual_bins}h'
-                self.logger.debug(f'Unpack format: {format_string} for {actual_bins} bins')
+                format_string = f">{actual_bins}h"
+                self.logger.debug(
+                    f"Unpack format: {format_string} for {actual_bins} bins"
+                )
 
                 raw_bins = unpack(format_string, segment_bytes)
                 amplitude_values = [val / 100.0 for val in raw_bins]
@@ -157,19 +205,19 @@ class CmSpectrumAnalysis(PnmHeader):
         header fields and processed amplitude data.
         """
         self._model = CmSpectrumAnalyzerModel(
-            pnm_header                     = self.getPnmHeaderParameterModel(),
-            channel_id                     = self._channel_id,
-            mac_address                    = self._mac_address,
-            first_segment_center_frequency = self._first_segment_center_frequency,
-            last_segment_center_frequency  = self._last_segment_center_frequency,
-            segment_frequency_span         = self._segment_frequency_span,
-            num_bins_per_segment           = self._num_bins_per_segment,
-            equivalent_noise_bandwidth     = self._equivalent_noise_bandwidth,
-            window_function                = self._window_function,
-            bin_frequency_spacing          = self._bin_frequency_spacing,
-            spectrum_analysis_data_length  = self._spectrum_analysis_data_length,
-            spectrum_analysis_data         = self._spectrum_analysis_data or b"",
-            amplitude_bin_segments_float   = self._amplitude_bin_segments_float,
+            pnm_header=self.getPnmHeaderParameterModel(),
+            channel_id=self._channel_id,
+            mac_address=self._mac_address,
+            first_segment_center_frequency=self._first_segment_center_frequency,
+            last_segment_center_frequency=self._last_segment_center_frequency,
+            segment_frequency_span=self._segment_frequency_span,
+            num_bins_per_segment=self._num_bins_per_segment,
+            equivalent_noise_bandwidth=self._equivalent_noise_bandwidth,
+            window_function=self._window_function,
+            bin_frequency_spacing=self._bin_frequency_spacing,
+            spectrum_analysis_data_length=self._spectrum_analysis_data_length,
+            spectrum_analysis_data=self._spectrum_analysis_data or b"",
+            amplitude_bin_segments_float=self._amplitude_bin_segments_float,
         )
         return self._model
 
@@ -187,7 +235,7 @@ class CmSpectrumAnalysis(PnmHeader):
         """
         return self._model.model_dump()
 
-    def to_json(self, indent:int=2) -> str:
+    def to_json(self, indent: int = 2) -> str:
         """
         Return the spectrum analysis results as a JSON string.
 

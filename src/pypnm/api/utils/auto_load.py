@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -24,7 +23,7 @@ class RouterRegistrar:
     def __init__(self, base_dir: pathlib.Path = None) -> None:
         self.logger = logging.getLogger(__name__)
         # Locate project root (up to 'pypnm')
-        self.project_root = (base_dir or pathlib.Path(__file__).resolve())
+        self.project_root = base_dir or pathlib.Path(__file__).resolve()
         while self.project_root.name != "pypnm":
             if self.project_root == self.project_root.parent:
                 msg = "Could not find 'pypnm' directory in path."
@@ -76,8 +75,15 @@ class RouterRegistrar:
 
             except Exception:
                 error_tb = traceback.format_exc()
-                self.logger.error(f"Failed to register router from '{router_file}':\n{error_tb}")
-                self.errors.append((module_path if 'module_path' in locals() else str(router_file), error_tb))
+                self.logger.error(
+                    f"Failed to register router from '{router_file}':\n{error_tb}"
+                )
+                self.errors.append(
+                    (
+                        module_path if "module_path" in locals() else str(router_file),
+                        error_tb,
+                    )
+                )
 
         self._report_summary()
 

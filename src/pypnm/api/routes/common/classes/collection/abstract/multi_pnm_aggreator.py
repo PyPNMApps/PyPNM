@@ -13,8 +13,13 @@ from pypnm.pnm.parser.CmDsOfdmFecSummary import CmDsOfdmFecSummary
 from pypnm.pnm.parser.CmDsOfdmModulationProfile import CmDsOfdmModulationProfile
 from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer
 
-MultiPnmCollectionObject = CmDsOfdmRxMer | CmDsOfdmModulationProfile | CmDsOfdmFecSummary
-MultiPnmCollectionType = type[CmDsOfdmRxMer] | type[CmDsOfdmModulationProfile] | type[CmDsOfdmFecSummary]
+MultiPnmCollectionObject = (
+    CmDsOfdmRxMer | CmDsOfdmModulationProfile | CmDsOfdmFecSummary
+)
+MultiPnmCollectionType = (
+    type[CmDsOfdmRxMer] | type[CmDsOfdmModulationProfile] | type[CmDsOfdmFecSummary]
+)
+
 
 class MultiPnmCollection(ABC):
     """
@@ -24,7 +29,10 @@ class MultiPnmCollection(ABC):
     at (channel_id, capture_time). Provides common add/get/list behavior.
     """
 
-    def __init__(self, collection_type: MultiPnmCollectionType | tuple[MultiPnmCollectionType, ...]) -> None:
+    def __init__(
+        self,
+        collection_type: MultiPnmCollectionType | tuple[MultiPnmCollectionType, ...],
+    ) -> None:
         """
         Initialize the collection with the allowed capture object type(s).
 
@@ -76,7 +84,9 @@ class MultiPnmCollection(ABC):
         """
         if not isinstance(obj, self._collection_types):
             allowed = ", ".join(t.__name__ for t in self._collection_types)
-            raise TypeError(f"Unsupported capture object type: {type(obj).__name__}. Allowed: {allowed}.")
+            raise TypeError(
+                f"Unsupported capture object type: {type(obj).__name__}. Allowed: {allowed}."
+            )
 
         m = obj.to_model()
         channel_id: ChannelId = m.channel_id
@@ -91,7 +101,9 @@ class MultiPnmCollection(ABC):
         if channel_id not in self._store:
             self._store[channel_id] = {}
 
-        self.logger.debug(f'Adding {obj.__class__.__name__} for Channel={channel_id} at captureTime={capture_time}')
+        self.logger.debug(
+            f"Adding {obj.__class__.__name__} for Channel={channel_id} at captureTime={capture_time}"
+        )
         self._store[channel_id][capture_time] = obj
 
         self.__update_mac(cast(MacAddressStr, m.mac_address))
@@ -142,9 +154,13 @@ class MultiPnmCollection(ABC):
         return sorted(self._store[channel_id].keys())
 
     @overload
-    def get(self, channel_id: ChannelId) -> list[tuple[CaptureTime, MultiPnmCollectionObject]]: ...
+    def get(
+        self, channel_id: ChannelId
+    ) -> list[tuple[CaptureTime, MultiPnmCollectionObject]]: ...
     @overload
-    def get(self, channel_id: ChannelId, capture_time: CaptureTime) -> MultiPnmCollectionObject | None: ...
+    def get(
+        self, channel_id: ChannelId, capture_time: CaptureTime
+    ) -> MultiPnmCollectionObject | None: ...
 
     def get(self, channel_id: ChannelId, capture_time: CaptureTime | None = None):
         """
@@ -202,11 +218,15 @@ class MultiPnmCollection(ABC):
             return True
 
         if self._mac_address != mac:
-            raise ValueError(f"MAC mismatch in MultiPnmCollection: existing={self._mac_address}, new={mac}")
+            raise ValueError(
+                f"MAC mismatch in MultiPnmCollection: existing={self._mac_address}, new={mac}"
+            )
 
         return True
 
-    def __get_fec_summary_capture_time(self, fec_summary:CmDsOfdmFecSummary) -> CaptureTime:
+    def __get_fec_summary_capture_time(
+        self, fec_summary: CmDsOfdmFecSummary
+    ) -> CaptureTime:
         """
         Extract the canonical capture time for a CmDsOfdmFecSummary object.
 
@@ -229,5 +249,7 @@ class MultiPnmCollection(ABC):
             If the `timestamp` list is empty.
         """
         model = fec_summary.to_model()
-        timestamps:list[TimeStamp] = model.fec_summary_data[0].codeword_entries.timestamp
+        timestamps: list[TimeStamp] = model.fec_summary_data[
+            0
+        ].codeword_entries.timestamp
         return min(timestamps)

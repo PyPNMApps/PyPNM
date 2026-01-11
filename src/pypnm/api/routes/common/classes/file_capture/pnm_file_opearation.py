@@ -99,19 +99,24 @@ class OperationCaptureGroupResolver:
         op_db = self._load_json(self.operation_db_path)
         rec = op_db.get(operation_id)
         if not rec:
-            self.logger.info("No operation record found for operation_id=%s", operation_id)
+            self.logger.info(
+                "No operation record found for operation_id=%s", operation_id
+            )
             return None
 
         capture_group_id = rec.get("capture_group_id")
         if not capture_group_id:
             self.logger.warning(
-                "Operation record for %s is missing 'capture_group_id' field", operation_id
+                "Operation record for %s is missing 'capture_group_id' field",
+                operation_id,
             )
             return None
 
         return capture_group_id
 
-    def get_transaction_ids_for_capture_group(self, capture_group_id: GroupId) -> list[TransactionId]:
+    def get_transaction_ids_for_capture_group(
+        self, capture_group_id: GroupId
+    ) -> list[TransactionId]:
         """
         Resolve All Transaction IDs Belonging To A Capture Group.
 
@@ -121,7 +126,10 @@ class OperationCaptureGroupResolver:
         cg_db = self._load_json(self.capture_group_db_path)
         rec = cg_db.get(capture_group_id)
         if not rec:
-            self.logger.info("No capture group record found for capture_group_id=%s", capture_group_id)
+            self.logger.info(
+                "No capture group record found for capture_group_id=%s",
+                capture_group_id,
+            )
             return []
 
         txns = rec.get("transactions") or []
@@ -135,7 +143,9 @@ class OperationCaptureGroupResolver:
 
         return [TransactionId(str(tid)) for tid in txns]
 
-    def get_transaction_ids_for_operation(self, operation_id: OperationId) -> list[TransactionId]:
+    def get_transaction_ids_for_operation(
+        self, operation_id: OperationId
+    ) -> list[TransactionId]:
         """
         Resolve All Transaction IDs Associated With An Operation ID.
 
@@ -148,7 +158,9 @@ class OperationCaptureGroupResolver:
             return []
         return self.get_transaction_ids_for_capture_group(capture_group_id)
 
-    def get_transaction_models_for_operation(self, operation_id: OperationId) -> list[TransactionRecordModel]:
+    def get_transaction_models_for_operation(
+        self, operation_id: OperationId
+    ) -> list[TransactionRecordModel]:
         """
         Resolve TransactionRecordModel Instances For An Operation ID.
 
@@ -160,7 +172,9 @@ class OperationCaptureGroupResolver:
         """
         txn_ids = self.get_transaction_ids_for_operation(operation_id)
         if not txn_ids:
-            self.logger.info("No transaction IDs found for operation_id=%s", operation_id)
+            self.logger.info(
+                "No transaction IDs found for operation_id=%s", operation_id
+            )
             return []
 
         txn_store = PnmFileTransaction()
@@ -173,7 +187,8 @@ class OperationCaptureGroupResolver:
                 models.append(model)
             else:
                 self.logger.warning(
-                    "TransactionRecordModel for tid=%s is null/empty and will be skipped", tid
+                    "TransactionRecordModel for tid=%s is null/empty and will be skipped",
+                    tid,
                 )
 
         return models

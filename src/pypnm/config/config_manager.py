@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -20,7 +19,6 @@ class ConfigManager:
     """
 
     def __init__(self, config_path: str | None = None) -> None:
-
         CONFIG_NAME = "system.json"
         CONFIG_DIR = "settings"
         CONFIG_PATH = os.path.join(CONFIG_DIR, CONFIG_NAME)
@@ -49,7 +47,15 @@ class ConfigManager:
             template_candidates = [
                 f"{actual_path}.template",
                 os.path.join(os.path.dirname(actual_path), "system.json.template"),
-                os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), "deploy", "docker", "config", "system.json.template"),
+                os.path.join(
+                    os.path.abspath(
+                        os.path.join(os.path.dirname(__file__), "..", "..")
+                    ),
+                    "deploy",
+                    "docker",
+                    "config",
+                    "system.json.template",
+                ),
             ]
             for template in template_candidates:
                 if os.path.exists(template):

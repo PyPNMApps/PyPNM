@@ -82,20 +82,26 @@ class MultiRxMerRouter(AbstractService):
     AbstractService
         Provides `loadService(...)` and `getService(...)` for service lifecycle and operation lookup.
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.router = APIRouter(
             prefix="/advance/multiRxMer",
-            tags=["PNM Operations - Multi-Downstream OFDM RxMER"],)
+            tags=["PNM Operations - Multi-Downstream OFDM RxMER"],
+        )
         self._add_routes()
 
     def _add_routes(self) -> None:
-        @self.router.post("/start",
+        @self.router.post(
+            "/start",
             response_model=MultiRxMerStartResponse | SnmpResponse,
             summary="Start a Multi-RxMER capture",
-            responses=FAST_API_RESPONSE,)
-        async def start_multi_rxmer(request: MultiRxMerRequest) -> SnmpResponse | MultiRxMerStartResponse:
+            responses=FAST_API_RESPONSE,
+        )
+        async def start_multi_rxmer(
+            request: MultiRxMerRequest,
+        ) -> SnmpResponse | MultiRxMerStartResponse:
             """
             Start Multi-RxMER Capture
 
@@ -120,69 +126,84 @@ class MultiRxMerRouter(AbstractService):
 
             mac_address: MacAddressStr = request.cable_modem.mac_address
             ip_address: InetAddressStr = request.cable_modem.ip_address
-            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
-            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+            community = RequestDefaultsResolver.resolve_snmp_community(
+                request.cable_modem.snmp
+            )
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(
+                request.cable_modem.pnm_parameters.tftp
+            )
             duration = request.capture.parameters.measurement_duration
             interval = request.capture.parameters.sample_interval
 
             measure_modes = request.measure.mode
-            msg:str = ""
+            msg: str = ""
 
             self.logger.info(
                 f"Starting Multi-RxMER capture for MAC={mac_address} "
-                f"(duration={duration}s, interval={interval}s)")
+                f"(duration={duration}s, interval={interval}s)"
+            )
 
-            cable_modem = CableModem(mac_address=MacAddress(mac_address),
-                                     inet=Inet(ip_address),
-                                     write_community=community)
+            cable_modem = CableModem(
+                mac_address=MacAddress(mac_address),
+                inet=Inet(ip_address),
+                write_community=community,
+            )
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cable_modem,
-                                                          validate_ofdm_exist=True,
-                                                          validate_pnm_ready_status=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cable_modem,
+                validate_ofdm_exist=True,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac_address, status=status, message=msg)
 
             if measure_modes == MultiRxMerMeasureModes.CONTINUOUS:
-                msg=f'Starting Multi-RxMER capture for MAC={mac_address}'
-                self.logger.info(f'{msg}')
+                msg = f"Starting Multi-RxMER capture for MAC={mac_address}"
+                self.logger.info(f"{msg}")
                 group_id, operation_id = await self.loadService(
                     MultiRxMerService,
                     cable_modem,
                     tftp_servers,
                     duration=duration,
-                    interval=interval,)
+                    interval=interval,
+                )
 
             elif measure_modes == MultiRxMerMeasureModes.OFDM_PERFORMANCE_1:
-                msg=f'Starting Multi-RxMER-OFDM-Performance-1 capture for MAC={mac_address}'
-                self.logger.info(f'{msg}')
+                msg = f"Starting Multi-RxMER-OFDM-Performance-1 capture for MAC={mac_address}"
+                self.logger.info(f"{msg}")
                 group_id, operation_id = await self.loadService(
                     MultiRxMer_Ofdm_Performance_1_Service,
                     cable_modem,
                     tftp_servers,
                     duration=duration,
-                    interval=interval,)
+                    interval=interval,
+                )
 
             else:
-                self.logger.error(f'Invalid Measure Mode Selected: ({measure_modes})')
+                self.logger.error(f"Invalid Measure Mode Selected: ({measure_modes})")
                 return MultiRxMerStartResponse(
-                    mac_address =   mac_address,
-                    status      =   ServiceStatusCode.MEASURE_MODE_INVALID,
-                    message =f"{ServiceStatusCode.MEASURE_MODE_INVALID.name}",
-                    group_id="", operation_id="",)
+                    mac_address=mac_address,
+                    status=ServiceStatusCode.MEASURE_MODE_INVALID,
+                    message=f"{ServiceStatusCode.MEASURE_MODE_INVALID.name}",
+                    group_id="",
+                    operation_id="",
+                )
 
             return MultiRxMerStartResponse(
-                mac_address =   mac_address,
-                status      =   OperationState.RUNNING,
-                message     =   msg,
-                group_id    =   group_id,
-                operation_id=   operation_id,
+                mac_address=mac_address,
+                status=OperationState.RUNNING,
+                message=msg,
+                group_id=group_id,
+                operation_id=operation_id,
             )
 
-        @self.router.get("/status/{operation_id}",
+        @self.router.get(
+            "/status/{operation_id}",
             response_model=MultiRxMerStatusResponse,
             summary="Get status of a Multi-RxMER capture",
-            responses=FAST_API_RESPONSE,)
+            responses=FAST_API_RESPONSE,
+        )
         def get_status(operation_id: OperationId) -> MultiRxMerStatusResponse:
             """
             Check Multi-RxMER Capture Status
@@ -209,31 +230,37 @@ class MultiRxMerRouter(AbstractService):
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
             try:
-                service:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
+                service: MultiRxMerService = cast(
+                    MultiRxMerService, self.getService(operation_id)
+                )
 
             except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
 
             status = service.status(operation_id)
 
-            self.logger.debug(f'OpId: {operation_id} - Status: {status}')
+            self.logger.debug(f"OpId: {operation_id} - Status: {status}")
 
             return MultiRxMerStatusResponse(
-                mac_address =   service.cm.get_mac_address.mac_address,
-                status      =   "success",
-                message     =   None,
-                operation   =   MultiRxMerResponseStatus(
-                                    operation_id    =   operation_id,
-                                    state           =   status["state"],
-                                    collected       =   status["collected"],
-                                    time_remaining  =   status["time_remaining"],
-                                    message         =   None,
+                mac_address=service.cm.get_mac_address.mac_address,
+                status="success",
+                message=None,
+                operation=MultiRxMerResponseStatus(
+                    operation_id=operation_id,
+                    state=status["state"],
+                    collected=status["collected"],
+                    time_remaining=status["time_remaining"],
+                    message=None,
                 ),
             )
 
-        @self.router.get("/results/{operation_id}",
+        @self.router.get(
+            "/results/{operation_id}",
             summary="Download a ZIP archive of all RxMER capture files",
-            responses=FAST_API_RESPONSE,)
+            responses=FAST_API_RESPONSE,
+        )
         def download_measurements_zip(operation_id: OperationId) -> StreamingResponse:
             """
             Download Captured RxMER Measurements (ZIP)
@@ -259,14 +286,18 @@ class MultiRxMerRouter(AbstractService):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
-            svc:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
+            svc: MultiRxMerService = cast(
+                MultiRxMerService, self.getService(operation_id)
+            )
             samples = svc.results(operation_id)
 
             pnm_dir = str(SystemConfigSettings.pnm_dir())
             mac = svc.cm.get_mac_address.mac_address
 
             buf = io.BytesIO()
-            with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(
+                buf, mode="w", compression=zipfile.ZIP_DEFLATED
+            ) as zipf:
                 for sample in samples:
                     file_path = os.path.join(pnm_dir, sample.filename)
                     arcname = os.path.basename(sample.filename)
@@ -279,13 +310,17 @@ class MultiRxMerRouter(AbstractService):
 
             buf.seek(0)
 
-            headers = {"Content-Disposition": f"attachment; filename=multiRxMer_{mac}_{operation_id}.zip"}
+            headers = {
+                "Content-Disposition": f"attachment; filename=multiRxMer_{mac}_{operation_id}.zip"
+            }
             return StreamingResponse(buf, media_type="application/zip", headers=headers)
 
-        @self.router.delete("/stop/{operation_id}",
+        @self.router.delete(
+            "/stop/{operation_id}",
             response_model=MultiRxMerStatusResponse,
             summary="Stop a running Multi-RxMER capture early",
-            responses=FAST_API_RESPONSE,)
+            responses=FAST_API_RESPONSE,
+        )
         def stop_capture(operation_id: OperationId) -> MultiRxMerStatusResponse:
             """
             Stop Multi-RxMER Capture
@@ -311,9 +346,13 @@ class MultiRxMerRouter(AbstractService):
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
             try:
-                service:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
+                service: MultiRxMerService = cast(
+                    MultiRxMerService, self.getService(operation_id)
+                )
             except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
 
             service.stop(operation_id)
             status = service.status(operation_id)
@@ -323,19 +362,23 @@ class MultiRxMerRouter(AbstractService):
                 status=OperationState.STOPPED,
                 message=None,
                 operation=MultiRxMerResponseStatus(
-                    operation_id    =   operation_id,
-                    state           =   status["state"],
-                    collected       =   status["collected"],
-                    time_remaining  =   status["time_remaining"],
-                    message         =   None,
+                    operation_id=operation_id,
+                    state=status["state"],
+                    collected=status["collected"],
+                    time_remaining=status["time_remaining"],
+                    message=None,
                 ),
             )
 
-        @self.router.post("/analysis",
+        @self.router.post(
+            "/analysis",
             response_model=MultiRxMerAnalysisResponse,
             summary="Perform signal analysis on a previously executed Multi-RxMER captures",
-            responses=FAST_API_RESPONSE,)
-        def analysis(request: MultiRxMerAnalysisRequest) -> MultiRxMerAnalysisResponse | FileResponse:
+            responses=FAST_API_RESPONSE,
+        )
+        def analysis(
+            request: MultiRxMerAnalysisRequest,
+        ) -> MultiRxMerAnalysisResponse | FileResponse:
             """
             Multi-RxMER Analysis
 
@@ -370,39 +413,49 @@ class MultiRxMerRouter(AbstractService):
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
             try:
-                capture_group_id:GroupId = OperationManager.get_capture_group(request.operation_id)
-                self.logger.info(f'[analysis] - OperationID: {request.operation_id} -> CaptureGroup: {capture_group_id}')
+                capture_group_id: GroupId = OperationManager.get_capture_group(
+                    request.operation_id
+                )
+                self.logger.info(
+                    f"[analysis] - OperationID: {request.operation_id} -> CaptureGroup: {capture_group_id}"
+                )
 
             except KeyError:
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   MacAddress.null(),
-                    status      =   ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
-                    message     =   f"No capture group found for operation {request.operation_id}",
-                    data        =   {})
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
+                    message=f"No capture group found for operation {request.operation_id}",
+                    data={},
+                )
 
             cda = CaptureDataAggregator(capture_group_id)
 
             try:
                 atype = MultiRxMerAnalysisType(request.analysis.type)
             except ValueError:
-                msg = f'Invalid Analysis Type, reason: {request.analysis.type}'
+                msg = f"Invalid Analysis Type, reason: {request.analysis.type}"
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   MacAddress.null(),
-                    status      =   ServiceStatusCode.DS_OFDM_MULIT_RXMER_ANALYSIS_TYPE,
-                    message     =   msg,
-                    data        =   {})
-            self.logger.info(f'Performing Multi-RxMER Min/Avg/Max Analysis for group: {capture_group_id}')
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.DS_OFDM_MULIT_RXMER_ANALYSIS_TYPE,
+                    message=msg,
+                    data={},
+                )
+            self.logger.info(
+                f"Performing Multi-RxMER Min/Avg/Max Analysis for group: {capture_group_id}"
+            )
 
             if atype == MultiRxMerAnalysisType.MIN_AVG_MAX:
                 engine = MultiRxMerSignalAnalysis(cda, atype)
-                multi_analysis:MultiRxMerAnalysisResult = engine.to_model()
+                multi_analysis: MultiRxMerAnalysisResult = engine.to_model()
 
             elif atype == MultiRxMerAnalysisType.RXMER_HEAT_MAP:
-                engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.RXMER_HEAT_MAP)
+                engine = MultiRxMerSignalAnalysis(
+                    cda, MultiRxMerAnalysisType.RXMER_HEAT_MAP
+                )
                 multi_analysis = engine.to_model()
 
             elif atype == MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1:
-                '''
+                """
                     Operation of this test:
                     -----------------------
                     * Collect a seriers of RxMER
@@ -418,17 +471,20 @@ class MultiRxMerRouter(AbstractService):
                     * Compare each modualtion profile against the RxMER Average
                     * Calculate the percentage of subcarries that are outside a given profile
                     * Provide total FEC Stats for each profile over the time of the capture.
-                '''
-                engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1)
+                """
+                engine = MultiRxMerSignalAnalysis(
+                    cda, MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1
+                )
                 multi_analysis = engine.to_model()
 
             else:
-                msg = f'Invalid Analysis Type {atype}'
+                msg = f"Invalid Analysis Type {atype}"
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   MacAddress.null(),
-                    status      =   ServiceStatusCode.DS_OFDM_MULIT_RXMER_ANALYSIS_TYPE,
-                    message     =   msg,
-                    data        =   {})
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.DS_OFDM_MULIT_RXMER_ANALYSIS_TYPE,
+                    message=msg,
+                    data={},
+                )
 
             # 4) Map analysis output to response fields
             analysis_name = MultiRxMerAnalysisType(atype).name
@@ -437,35 +493,38 @@ class MultiRxMerRouter(AbstractService):
             try:
                 output_type = request.analysis.output.type
             except ValueError:
-                msg = f'Invalid Output Type Selected: ({request.analysis.output.type})'
+                msg = f"Invalid Output Type Selected: ({request.analysis.output.type})"
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   MacAddress.null(),
-                    status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                    message     =   msg,
-                    data        =   {})
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    message=msg,
+                    data={},
+                )
 
             mac_address = multi_analysis.mac_address
 
             if output_type == OutputType.JSON:
                 data = multi_analysis.model_dump().get("data", {})
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   mac_address,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    message     =   message,
-                    data        =   data,)
+                    mac_address=mac_address,
+                    status=ServiceStatusCode.SUCCESS,
+                    message=message,
+                    data=data,
+                )
 
             elif output_type == OutputType.ARCHIVE:
                 rpt = engine.build_report()
                 return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
             else:
-
                 # Fallback for unsupported output types
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   mac_address,
-                    status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                    message     =   f"Unsupported output type: {output_type}",
-                    data        =   {},)
+                    mac_address=mac_address,
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    message=f"Unsupported output type: {output_type}",
+                    data={},
+                )
+
 
 # For dynamic auto-registration
 router = MultiRxMerRouter().router

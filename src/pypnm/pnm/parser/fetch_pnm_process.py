@@ -74,7 +74,10 @@ class PnmFileTypeObjectFetcher(PnmHeader):
             from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer as ParserClass
         elif pnm_type == PnmFileType.DOWNSTREAM_HISTOGRAM:
             from pypnm.pnm.parser.CmDsHist import CmDsHist as ParserClass
-        elif pnm_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS or pnm_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE:
+        elif (
+            pnm_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
+            or pnm_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
+        ):
             from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq as ParserClass
         elif pnm_type == PnmFileType.OFDM_FEC_SUMMARY:
             from pypnm.pnm.parser.CmDsOfdmFecSummary import (
@@ -105,5 +108,7 @@ class PnmFileTypeObjectFetcher(PnmHeader):
             If the parser was not initialized (e.g., unsupported PNM type).
         """
         if self._parser is None:
-            raise RuntimeError("PNM parser not available; unsupported file type or initialization error")
+            raise RuntimeError(
+                "PNM parser not available; unsupported file type or initialization error"
+            )
         return self._parser

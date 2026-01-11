@@ -14,7 +14,10 @@ from pypnm.lib.types import (
     TransactionId,
 )
 
-DeviceDetailsPayload =     SystemDescriptorModel| SystemDescriptor | str | dict[str, Any] | None
+DeviceDetailsPayload = (
+    SystemDescriptorModel | SystemDescriptor | str | dict[str, Any] | None
+)
+
 
 class EntryDict(TypedDict):
     transaction_id: TransactionId
@@ -26,15 +29,16 @@ class EntryDict(TypedDict):
     data: bytes
     mac_address: MacAddressStr
 
+
 class Sort(enum.Enum):
-    CHANNEL_ID      = enum.auto()
-    ASCEND_EPOCH    = enum.auto()
-    PNM_FILE_TYPE   = enum.auto()
-    MAC_ADDRESS     = enum.auto()
+    CHANNEL_ID = enum.auto()
+    ASCEND_EPOCH = enum.auto()
+    PNM_FILE_TYPE = enum.auto()
+    MAC_ADDRESS = enum.auto()
 
 
-TransactionFile             = tuple[TransactionId, FileName, bytes]
-TransactionFileCollection   = list[TransactionFile]
-FlatIndex                   = dict[MacAddressStr, list[EntryDict]]
-GroupedIndex                = dict[MacAddressStr, dict[int, list[EntryDict]]]
-SortOrder                   = list[Sort]
+TransactionFile = tuple[TransactionId, FileName, bytes]
+TransactionFileCollection = list[TransactionFile]
+FlatIndex = dict[MacAddressStr, list[EntryDict]]
+GroupedIndex = dict[MacAddressStr, dict[int, list[EntryDict]]]
+SortOrder = list[Sort]

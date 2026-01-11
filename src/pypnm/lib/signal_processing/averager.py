@@ -8,6 +8,8 @@ import numpy as np
 from pypnm.lib.types import FloatSeries
 
 Number = int | float
+
+
 class MovingAverage:
     r"""
     Sliding-window moving average filter with robust edge handling and
@@ -50,7 +52,9 @@ class MovingAverage:
     [~smoothed values, length 4~]
     """
 
-    def __init__(self, n_points: int, mode: str = "reflect", dtype: np.dtype | None = None) -> None:
+    def __init__(
+        self, n_points: int, mode: str = "reflect", dtype: np.dtype | None = None
+    ) -> None:
         if n_points < 1:
             raise ValueError("n_points must be >= 1")
         if mode not in ("reflect", "same"):
@@ -59,7 +63,9 @@ class MovingAverage:
         self.n_points: int = int(n_points)
         self.mode: str = mode
         self.dtype: np.dtype = np.dtype(float if dtype is None else dtype)
-        self._kernel: np.ndarray = np.ones(self.n_points, dtype=self.dtype) / self.n_points
+        self._kernel: np.ndarray = (
+            np.ones(self.n_points, dtype=self.dtype) / self.n_points
+        )
 
         # Precompute asymmetric left/right extents for even windows
         self._k_left: int = self.n_points // 2

@@ -44,16 +44,22 @@ class CmDsOfdmConstDisplayService(CommonMeasureService):
         - CmDsConstDispMeas: Class used to parse and visualize the retrieved constellation data.
         - CommonMeasureService: Provides core test initiation and file retrieval logic.
     """
-    def __init__(self, cable_modem: CableModem,
-                 modulation_order_offset: int = ConstelDisplayConst.MODULATION_OFFSET.value,
-                 number_sample_symbol:int = ConstelDisplayConst.NUM_SAMPLE_SYMBOL.value,
-                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 tftp_path: str = PnmConfigManager.get_tftp_path()) -> None:
-        super().__init__(DocsPnmCmCtlTest.DS_CONSTELLATION_DISP,
-                        cable_modem,
-                        tftp_servers,
-                        tftp_path,
-                        cable_modem.getWriteCommunity(),
-                        modulation_order_offset=modulation_order_offset,
-                        number_sample_symbol=number_sample_symbol)
+
+    def __init__(
+        self,
+        cable_modem: CableModem,
+        modulation_order_offset: int = ConstelDisplayConst.MODULATION_OFFSET.value,
+        number_sample_symbol: int = ConstelDisplayConst.NUM_SAMPLE_SYMBOL.value,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+    ) -> None:
+        super().__init__(
+            DocsPnmCmCtlTest.DS_CONSTELLATION_DISP,
+            cable_modem,
+            tftp_servers,
+            tftp_path,
+            cable_modem.getWriteCommunity(),
+            modulation_order_offset=modulation_order_offset,
+            number_sample_symbol=number_sample_symbol,
+        )
         self.logger = logging.getLogger(self.__class__.__name__)

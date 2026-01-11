@@ -9,9 +9,10 @@ from typing import Any
 
 
 class Format:
-
     @staticmethod
-    def join_paren(values: Iterable[Any] | None, sep: str = ", ", empty: str = "—") -> str:
+    def join_paren(
+        values: Iterable[Any] | None, sep: str = ", ", empty: str = "—"
+    ) -> str:
         """
         Join items into a comma-separated string wrapped in parentheses.
         Uses only built-ins (str(), join) and strict typing.
@@ -22,7 +23,7 @@ class Format:
         return f"({sep.join(items)})"
 
     @staticmethod
-    def hex_string(hex_string: str, delimiter: str = ':', grouping: int = 2) -> str:
+    def hex_string(hex_string: str, delimiter: str = ":", grouping: int = 2) -> str:
         """
         Format a hexadecimal string by grouping and separating with a custom delimiter.
 
@@ -44,10 +45,14 @@ class Format:
             ```
         """
         # Remove "0x" prefix and all spaces or previous delimiters
-        hex_string = hex_string.replace('0x', '').replace(delimiter, '').replace(' ', '')
+        hex_string = (
+            hex_string.replace("0x", "").replace(delimiter, "").replace(" ", "")
+        )
 
         # Group hex characters and join with the specified delimiter
-        grouped_hex = [hex_string[i:i + grouping] for i in range(0, len(hex_string), grouping)]
+        grouped_hex = [
+            hex_string[i : i + grouping] for i in range(0, len(hex_string), grouping)
+        ]
         return delimiter.join(grouped_hex)
 
     @staticmethod
@@ -74,7 +79,7 @@ class Format:
         """
         if isinstance(value, bytes):
             try:
-                decoded = value.decode('ascii')
+                decoded = value.decode("ascii")
                 if all(c in string.printable for c in decoded):
                     return decoded
                 else:
@@ -85,6 +90,6 @@ class Format:
             if all(c in string.printable for c in value):
                 return value
             else:
-                return value.encode('utf-8').hex()
+                return value.encode("utf-8").hex()
         else:
             return str(value)

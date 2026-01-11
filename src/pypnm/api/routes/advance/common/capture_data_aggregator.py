@@ -35,7 +35,7 @@ class CaptureDataAggregator:
             Identifier for the capture group.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._capture_group_id:GroupId = capture_group_id
+        self._capture_group_id: GroupId = capture_group_id
         self._pnm_dir = Path(SystemConfigSettings.pnm_dir())
         self._trans_file_bin_entries: TransactionFileCollection = []
         self._trans_collection: TransactionCollection = TransactionCollection()
@@ -52,28 +52,33 @@ class CaptureDataAggregator:
         txn_ids: list[TransactionId] = capture_grp.getTransactionIds()
 
         if not txn_ids:
-            self.logger.warning(f"No transactions found for capture_group_id='{self._capture_group_id}'")
+            self.logger.warning(
+                f"No transactions found for capture_group_id='{self._capture_group_id}'"
+            )
             return TransactionCollection()
 
         for file_count, txn_id in enumerate(txn_ids, 1):
-
             record: TransactionRecordModel = PnmFileTransaction().getRecordModel(txn_id)
             file_path = self._safe_join(self._pnm_dir, record.filename)
 
             try:
-                bin:bytes = file_path.read_bytes()
-                self.logger.debug(f'Reading capture - count={file_count},  txn={txn_id},  file={file_path.name}, size={len(bin)}')
+                bin: bytes = file_path.read_bytes()
+                self.logger.debug(
+                    f"Reading capture - count={file_count},  txn={txn_id},  file={file_path.name}, size={len(bin)}"
+                )
 
             except FileNotFoundError:
-                self.logger.error(f'Capture file not found: {file_path}')
+                self.logger.error(f"Capture file not found: {file_path}")
                 raise
 
             except Exception as exc:
-                self.logger.error(f'Error reading file {file_path}: {exc}')
+                self.logger.error(f"Error reading file {file_path}: {exc}")
                 continue
 
             if not self._trans_collection.add(record, bin):
-                self.logger.error(f'Unable to add [{record.filename}] to Transaction Collection')
+                self.logger.error(
+                    f"Unable to add [{record.filename}] to Transaction Collection"
+                )
                 continue
 
         return self._trans_collection
@@ -113,7 +118,11 @@ class CaptureDataAggregator:
             # Outside of base_dir → reject
             self.logger.error(
                 "Rejected filename outside save_dir; group_id=%s base=%s filename=%r resolved=%s",
-                self._capture_group_id, base_resolved, fname, file_path)
+                self._capture_group_id,
+                base_resolved,
+                fname,
+                file_path,
+            )
 
             return base_resolved / "__invalid__"
 

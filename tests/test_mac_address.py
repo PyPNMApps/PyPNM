@@ -30,10 +30,10 @@ def test_construct_from_bytes_and_equality() -> None:
 
 def test_to_mac_format_variants() -> None:
     mac = MacAddress("001a.2b3c.4d5e")
-    assert mac.to_mac_format(MacAddressFormat.FLAT)   == "001a2b3c4d5e"
-    assert mac.to_mac_format(MacAddressFormat.COLON)  == "00:1a:2b:3c:4d:5e"
+    assert mac.to_mac_format(MacAddressFormat.FLAT) == "001a2b3c4d5e"
+    assert mac.to_mac_format(MacAddressFormat.COLON) == "00:1a:2b:3c:4d:5e"
     assert mac.to_mac_format(MacAddressFormat.HYPHEN) == "00-1a-2b-3c-4d-5e"
-    assert mac.to_mac_format(MacAddressFormat.CISCO)  == "001a.2b3c.4d5e"
+    assert mac.to_mac_format(MacAddressFormat.CISCO) == "001a.2b3c.4d5e"
 
 
 def test_is_multicast_and_null() -> None:
@@ -93,6 +93,7 @@ def test_from_bytes_rejects_wrong_length() -> None:
 )
 def test_construct_from_octetstring_when_available() -> None:
     from pysnmp.proto.rfc1902 import OctetString  # type: ignore
+
     octs = OctetString(b"\x00\x1a\x2b\x3c\x4d\x5e")
     mac = MacAddress(octs)
     assert mac.mac_address == "001a2b3c4d5e"

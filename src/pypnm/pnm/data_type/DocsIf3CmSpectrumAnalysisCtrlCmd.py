@@ -20,10 +20,12 @@ class SpectrumRetrievalType(IntEnum):
         FILE (int): Retrieve results from a file (e.g., via TFTP).
         SNMP (int): Retrieve results directly using SNMP queries.
     """
+
     UNKNOWN = -1
-    ERROR   = 0
-    FILE    = 1
-    SNMP    = 2
+    ERROR = 0
+    FILE = 1
+    SNMP = 2
+
 
 class WindowFunction(IntEnum):
     """
@@ -50,6 +52,7 @@ class WindowFunction(IntEnum):
         GAUSSIAN (6): Gaussian shape; parameterized by standard deviation.
         CHEBYSHEV (7): Minimizes main lobe width for a given side lobe level.
     """
+
     OTHER = 0
     HANN = 1
     BLACKMAN_HARRIS = 2
@@ -58,6 +61,7 @@ class WindowFunction(IntEnum):
     FLAT_TOP = 5
     GAUSSIAN = 6
     CHEBYSHEV = 7
+
 
 class SpectrumAnalysisDefaults(IntEnum):
     """
@@ -118,6 +122,7 @@ class SpectrumAnalysisDefaults(IntEnum):
         """
         return json.dumps(cls.to_dict(), indent=4)
 
+
 @dataclass
 class DocsIf3CmSpectrumAnalysisCtrlCmd:
     """
@@ -159,24 +164,45 @@ class DocsIf3CmSpectrumAnalysisCtrlCmd:
         set_file_name(value): Sets file name for output.
         get_member_list(): Returns full SNMP object list with `.0` instance suffixes.
     """
+
     docsIf3CmSpectrumAnalysisCtrlCmdEnable: int = SpectrumAnalysisDefaults.ENABLE
-    docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout: int = SpectrumAnalysisDefaults.INACTIVITY_TIMEOUT
-    docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency: int = SpectrumAnalysisDefaults.FIRST_SEGMENT_CENTER_FREQ
-    docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency: int = SpectrumAnalysisDefaults.LAST_SEGMENT_CENTER_FREQ
-    docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan: int = SpectrumAnalysisDefaults.SEGMENT_FREQ_SPAN
-    docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment: int = SpectrumAnalysisDefaults.NUM_BINS_PER_SEGMENT
-    docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth: int = SpectrumAnalysisDefaults.NOISE_BW
-    docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction: int = SpectrumAnalysisDefaults.WINDOW_FUNCTION
-    docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages: int = SpectrumAnalysisDefaults.NUM_AVERAGES
-    docsIf3CmSpectrumAnalysisCtrlCmdFileEnable: int = SpectrumAnalysisDefaults.FILE_ENABLE
+    docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout: int = (
+        SpectrumAnalysisDefaults.INACTIVITY_TIMEOUT
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency: int = (
+        SpectrumAnalysisDefaults.FIRST_SEGMENT_CENTER_FREQ
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency: int = (
+        SpectrumAnalysisDefaults.LAST_SEGMENT_CENTER_FREQ
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan: int = (
+        SpectrumAnalysisDefaults.SEGMENT_FREQ_SPAN
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment: int = (
+        SpectrumAnalysisDefaults.NUM_BINS_PER_SEGMENT
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth: int = (
+        SpectrumAnalysisDefaults.NOISE_BW
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction: int = (
+        SpectrumAnalysisDefaults.WINDOW_FUNCTION
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages: int = (
+        SpectrumAnalysisDefaults.NUM_AVERAGES
+    )
+    docsIf3CmSpectrumAnalysisCtrlCmdFileEnable: int = (
+        SpectrumAnalysisDefaults.FILE_ENABLE
+    )
     docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus: int = -1
-    docsIf3CmSpectrumAnalysisCtrlCmdFileName: str = f"spectrum_analysis_{Generate.time_stamp()}.bin"
+    docsIf3CmSpectrumAnalysisCtrlCmdFileName: str = (
+        f"spectrum_analysis_{Generate.time_stamp()}.bin"
+    )
 
     def __post_init__(self) -> None:
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+            formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
@@ -200,8 +226,12 @@ class DocsIf3CmSpectrumAnalysisCtrlCmd:
                 If the configured last segment center frequency is lower than the first.
         """
         # Read and convert settings
-        first_center = float(self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency)
-        last_center = float(self.docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency)
+        first_center = float(
+            self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency
+        )
+        last_center = float(
+            self.docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency
+        )
         seg_freq_span = float(self.docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan)
 
         # Compute total range and sanity‐check
@@ -209,18 +239,23 @@ class DocsIf3CmSpectrumAnalysisCtrlCmd:
         if total_range < 0:
             raise ValueError(
                 "docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency "
-                "must be >= docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency")
+                "must be >= docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency"
+            )
 
         # Check for exact divisibility
         remainder = total_range % seg_freq_span
         if remainder == 0:
-            self.logger.debug(f'No changes to SpectrumAnalysisCtrlCmd due to SegmentCenterFrequency({seg_freq_span}) divisible: ({total_range})')
+            self.logger.debug(
+                f"No changes to SpectrumAnalysisCtrlCmd due to SegmentCenterFrequency({seg_freq_span}) divisible: ({total_range})"
+            )
             return False
 
         # Adjust the last center downward to the nearest whole‐segment boundary
         adjusted_first = int(first_center + remainder)
-        self.logger.debug(f'New Start Center Frequency: {adjusted_first}')
-        self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency = adjusted_first
+        self.logger.debug(f"New Start Center Frequency: {adjusted_first}")
+        self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency = (
+            adjusted_first
+        )
         return True
 
     def set_enable(self, value: int) -> None:
@@ -299,17 +334,17 @@ class DocsIf3CmSpectrumAnalysisCtrlCmd:
 
     def to_dict(self) -> dict[str, Any]:
         spectrum_cmd = {
-            "docsIf3CmSpectrumAnalysisCtrlCmdEnable":                          self.docsIf3CmSpectrumAnalysisCtrlCmdEnable,
-            "docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout":               self.docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout,
-            "docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency":     self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency,
-            "docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency":      self.docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency,
-            "docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan":            self.docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan,
-            "docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment":               self.docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment,
-            "docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth":        self.docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth,
-            "docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction":                  self.docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction,
-            "docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages":                self.docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages,
-            "docsIf3CmSpectrumAnalysisCtrlCmdFileEnable":                      self.docsIf3CmSpectrumAnalysisCtrlCmdFileEnable,
-            "docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus":                      self.docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus,
-            "docsIf3CmSpectrumAnalysisCtrlCmdFileName":                        self.docsIf3CmSpectrumAnalysisCtrlCmdFileName,
+            "docsIf3CmSpectrumAnalysisCtrlCmdEnable": self.docsIf3CmSpectrumAnalysisCtrlCmdEnable,
+            "docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout": self.docsIf3CmSpectrumAnalysisCtrlCmdInactivityTimeout,
+            "docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency": self.docsIf3CmSpectrumAnalysisCtrlCmdFirstSegmentCenterFrequency,
+            "docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency": self.docsIf3CmSpectrumAnalysisCtrlCmdLastSegmentCenterFrequency,
+            "docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan": self.docsIf3CmSpectrumAnalysisCtrlCmdSegmentFrequencySpan,
+            "docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment": self.docsIf3CmSpectrumAnalysisCtrlCmdNumBinsPerSegment,
+            "docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth": self.docsIf3CmSpectrumAnalysisCtrlCmdEquivalentNoiseBandwidth,
+            "docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction": self.docsIf3CmSpectrumAnalysisCtrlCmdWindowFunction,
+            "docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages": self.docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages,
+            "docsIf3CmSpectrumAnalysisCtrlCmdFileEnable": self.docsIf3CmSpectrumAnalysisCtrlCmdFileEnable,
+            "docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus": self.docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus,
+            "docsIf3CmSpectrumAnalysisCtrlCmdFileName": self.docsIf3CmSpectrumAnalysisCtrlCmdFileName,
         }
         return spectrum_cmd

@@ -32,7 +32,9 @@ def test_pop_keys_recursive_copy_and_case() -> None:
         "list": [{"a": 4}, {"A": 5}],
         "tuple": ({"a": 6}, 7),
     }
-    cleaned = DictGenerate.pop_keys_recursive(data, ["a"], case_sensitive=False, in_place=False)
+    cleaned = DictGenerate.pop_keys_recursive(
+        data, ["a"], case_sensitive=False, in_place=False
+    )
     assert cleaned == {"b": {"keep": 3}, "list": [{}, {}], "tuple": ({}, 7)}
     # original unchanged
     assert "A" in data and "b" in data
@@ -56,7 +58,10 @@ def test_models_to_nested_dict_list_and_keyed() -> None:
     # include None if desired
     with_none = DictGenerate.models_to_nested_dict(users, "users", exclude_none=False)
     assert with_none == {
-        "users": [{"id": 1, "name": "Ada", "email": None}, {"id": 2, "name": "Linus", "email": None}]
+        "users": [
+            {"id": 1, "name": "Ada", "email": None},
+            {"id": 2, "name": "Linus", "email": None},
+        ]
     }
 
 

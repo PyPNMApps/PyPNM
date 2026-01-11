@@ -20,11 +20,24 @@ from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq
 from pypnm.pnm.parser.pnm_file_type import PnmFileType
 from pypnm.pnm.parser.pnm_header import PnmHeader
 
-PnmParsers = CmDsConstDispMeas | CmDsOfdmChanEstimateCoef | CmDsOfdmFecSummary | CmDsOfdmRxMer | CmUsOfdmaPreEq | CmDsHist
+PnmParsers = (
+    CmDsConstDispMeas
+    | CmDsOfdmChanEstimateCoef
+    | CmDsOfdmFecSummary
+    | CmDsOfdmRxMer
+    | CmUsOfdmaPreEq
+    | CmDsHist
+)
+
 
 class PnmParserParametersModel(BaseModel):
-    file_type: PnmFileType     = Field(..., description="PNM file type enum (e.g., PNN2, PNN3, ...).")
-    mac_address: MacAddressStr = Field(default_factory=MacAddress.null, description="Cable modem MAC address extracted from the PNM payload, if present.")
+    file_type: PnmFileType = Field(
+        ..., description="PNM file type enum (e.g., PNN2, PNN3, ...)."
+    )
+    mac_address: MacAddressStr = Field(
+        default_factory=MacAddress.null,
+        description="Cable modem MAC address extracted from the PNM payload, if present.",
+    )
 
 
 class GetPnmParserAndParameters(PnmHeader):
@@ -158,27 +171,31 @@ class GetPnmParserAndParameters(PnmHeader):
         try:
             file_type_enum = PnmFileType(self.pnm_type)
         except ValueError as exc:
-            raise ValueError(f"Unsupported PNM file type code: {self.pnm_type}") from exc
+            raise ValueError(
+                f"Unsupported PNM file type code: {self.pnm_type}"
+            ) from exc
 
         self.logger.debug("PNM-File-Type-Enum: %s", file_type_enum)
 
         dispatch_map = {
-            PnmFileType.SYMBOL_CAPTURE:                      self._process_symbol_capture,
-            PnmFileType.OFDM_CHANNEL_ESTIMATE_COEFFICIENT:   self._process_ofdm_channel_estimate,
-            PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:    self._process_constellation_display,
-            PnmFileType.RECEIVE_MODULATION_ERROR_RATIO:      self._process_rxmer,
-            PnmFileType.DOWNSTREAM_HISTOGRAM:                self._process_histogram,
+            PnmFileType.SYMBOL_CAPTURE: self._process_symbol_capture,
+            PnmFileType.OFDM_CHANNEL_ESTIMATE_COEFFICIENT: self._process_ofdm_channel_estimate,
+            PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY: self._process_constellation_display,
+            PnmFileType.RECEIVE_MODULATION_ERROR_RATIO: self._process_rxmer,
+            PnmFileType.DOWNSTREAM_HISTOGRAM: self._process_histogram,
             PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS: self._process_upstream_pre_eq,
             PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE: self._process_upstream_pre_eq_update,
-            PnmFileType.OFDM_FEC_SUMMARY:                    self._process_fec_summary,
-            PnmFileType.SPECTRUM_ANALYSIS:                   self._process_spectrum_analysis,
-            PnmFileType.OFDM_MODULATION_PROFILE:             self._process_modulation_profile,
-            PnmFileType.LATENCY_REPORT:                      self._process_latency_report,
+            PnmFileType.OFDM_FEC_SUMMARY: self._process_fec_summary,
+            PnmFileType.SPECTRUM_ANALYSIS: self._process_spectrum_analysis,
+            PnmFileType.OFDM_MODULATION_PROFILE: self._process_modulation_profile,
+            PnmFileType.LATENCY_REPORT: self._process_latency_report,
         }
 
         handler = dispatch_map.get(file_type_enum)
         if handler is None:
-            raise NotImplementedError(f"Handler not implemented for {file_type_enum.name}")
+            raise NotImplementedError(
+                f"Handler not implemented for {file_type_enum.name}"
+            )
         return handler()
 
     # Handlers in enum order
@@ -223,6 +240,7 @@ class GetPnmParserAndParameters(PnmHeader):
         raise NotImplementedError("Spectrum analysis parsing not implemented.")
 
     """This method may never be implemented by CableLabs, no real intrest from operators"""
+
     def _process_symbol_capture(self) -> NoReturn:
         """Symbol capture parser (not implemented) — this always raises NotImplementedError."""
         raise NotImplementedError("Symbol capture parsing not implemented.")

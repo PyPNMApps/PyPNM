@@ -32,15 +32,17 @@ class CmDsOfdmChanEstCoefService(CommonMeasureService):
             Defaults to the configured base path.
     """
 
-    def __init__(self,
-                 cable_modem: CableModem,
-                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 tftp_path: str = PnmConfigManager.get_tftp_path()) -> None:
+    def __init__(
+        self,
+        cable_modem: CableModem,
+        tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+    ) -> None:
         super().__init__(
             DocsPnmCmCtlTest.DS_OFDM_CHAN_EST_COEF,
             cable_modem,
             tftp_servers,
             tftp_path,
-            cable_modem.getWriteCommunity()
+            cable_modem.getWriteCommunity(),
         )
         self.logger = logging.getLogger(self.__class__.__name__)

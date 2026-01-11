@@ -7,4 +7,4 @@ from typing import Any, NewType
 
 from pypnm.lib.types import ChannelId
 
-MultiBasicAnalysis = NewType("MultiBasicAnalysis",dict[ChannelId, Any])
+MultiBasicAnalysis = NewType("MultiBasicAnalysis", dict[ChannelId, Any])

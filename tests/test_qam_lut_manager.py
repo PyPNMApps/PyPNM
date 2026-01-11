@@ -20,9 +20,9 @@ def mgr_qam4() -> QamLutManager:
             # codeword -> (I, Q)
             "code_words": {
                 0: (-1.0, -1.0),
-                1: (-1.0,  1.0),
-                2: ( 1.0, -1.0),
-                3: ( 1.0,  1.0),
+                1: (-1.0, 1.0),
+                2: (1.0, -1.0),
+                3: (1.0, 1.0),
             },
             "scale_factor": 0.5,
         }
@@ -51,8 +51,12 @@ def test_get_codeword_symbol_multi_symbol_msb_vs_lsb(mgr_qam4: QamLutManager) ->
     # MSB-first:   [01, 10] -> [1, 2] -> [(-1,1), (1,-1)]
     # LSB-first:   [10, 01] -> [2, 1] -> [(1,-1), (-1,1)]
     code_word = 0b0110
-    msb_syms = mgr_qam4.get_codeword_symbol(QamModulation.QAM_4, code_word, bit_order="msb")
-    lsb_syms = mgr_qam4.get_codeword_symbol(QamModulation.QAM_4, code_word, bit_order="lsb")
+    msb_syms = mgr_qam4.get_codeword_symbol(
+        QamModulation.QAM_4, code_word, bit_order="msb"
+    )
+    lsb_syms = mgr_qam4.get_codeword_symbol(
+        QamModulation.QAM_4, code_word, bit_order="lsb"
+    )
     assert msb_syms == [(-1.0, 1.0), (1.0, -1.0)]
     assert lsb_syms == [(1.0, -1.0), (-1.0, 1.0)]
 
@@ -88,7 +92,7 @@ def test_get_symbol_codeword_exact_and_nearest(mgr_qam4: QamLutManager) -> None:
 def test_infer_modulation_order_qam4(mgr_qam4: QamLutManager) -> None:
     # Build a small cloud around the 4 hard points
     rng = np.random.default_rng(0)
-    base = np.array([(-1,-1), (-1,1), (1,-1), (1,1)], dtype=float)
+    base = np.array([(-1, -1), (-1, 1), (1, -1), (1, 1)], dtype=float)
     samples = (base + 0.02 * rng.standard_normal(base.shape)).tolist()
     est = mgr_qam4.infer_modulation_order(samples, threshold=0.15)
     assert est == QamModulation.QAM_4

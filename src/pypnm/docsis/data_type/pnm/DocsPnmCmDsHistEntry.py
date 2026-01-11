@@ -15,15 +15,25 @@ from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class DocsPnmCmDsHistEntryFields(BaseModel):
-    docsPnmCmDsHistEnable: bool        = Field(..., description="Histogram file capture enable state")
-    docsPnmCmDsHistTimeOut: int        = Field(..., description="Histogram measurement timeout in seconds")
-    docsPnmCmDsHistMeasStatus: str     = Field(..., description="Measurement status (enum string)")
-    docsPnmCmDsHistFileName: str       = Field(..., description="Result filename on the TFTP server")
+    docsPnmCmDsHistEnable: bool = Field(
+        ..., description="Histogram file capture enable state"
+    )
+    docsPnmCmDsHistTimeOut: int = Field(
+        ..., description="Histogram measurement timeout in seconds"
+    )
+    docsPnmCmDsHistMeasStatus: str = Field(
+        ..., description="Measurement status (enum string)"
+    )
+    docsPnmCmDsHistFileName: str = Field(
+        ..., description="Result filename on the TFTP server"
+    )
 
 
 class DocsPnmCmDsHistEntry(BaseModel):
-    index: int                         = Field(..., description="SNMP row index (device-specific)")
-    entry: DocsPnmCmDsHistEntryFields  = Field(..., description="Flattened histogram control/status fields")
+    index: int = Field(..., description="SNMP row index (device-specific)")
+    entry: DocsPnmCmDsHistEntryFields = Field(
+        ..., description="Flattened histogram control/status fields"
+    )
 
     DEBUG: ClassVar[bool] = False
 
@@ -51,8 +61,9 @@ class DocsPnmCmDsHistEntry(BaseModel):
         """
         log = logging.getLogger(cls.__name__)
 
-        async def fetch(sym: str, caster: Callable[[Any], Any] | None = None
-                        ) -> str | int | float | bool | None:
+        async def fetch(
+            sym: str, caster: Callable[[Any], Any] | None = None
+        ) -> str | int | float | bool | None:
             try:
                 res = await snmp.get(f"{sym}.{index}")
                 raw = Snmp_v2c.get_result_value(res)
@@ -65,16 +76,25 @@ class DocsPnmCmDsHistEntry(BaseModel):
                     log.debug("idx=%s %s error=%r", index, sym, e)
                 return None
 
-        enable          = cast(bool, await fetch("docsPnmCmDsHistEnable", as_bool))
-        timeout         = cast(int,  await fetch("docsPnmCmDsHistTimeOut", as_int))
-        meas_status_i   = cast(int,  await fetch("docsPnmCmDsHistMeasStatus", as_int))
-        file_name       = cast(str,  await fetch("docsPnmCmDsHistFileName", as_str))
+        enable = cast(bool, await fetch("docsPnmCmDsHistEnable", as_bool))
+        timeout = cast(int, await fetch("docsPnmCmDsHistTimeOut", as_int))
+        meas_status_i = cast(int, await fetch("docsPnmCmDsHistMeasStatus", as_int))
+        file_name = cast(str, await fetch("docsPnmCmDsHistFileName", as_str))
 
-        missing = {k: v for k, v in dict(
-            enable=enable, timeout=timeout, meas_status_i=meas_status_i, file_name=file_name
-        ).items() if v is None}
+        missing = {
+            k: v
+            for k, v in dict(
+                enable=enable,
+                timeout=timeout,
+                meas_status_i=meas_status_i,
+                file_name=file_name,
+            ).items()
+            if v is None
+        }
         if missing:
-            raise ValueError(f"Histogram idx={index}: missing required fields: {', '.join(missing.keys())}")
+            raise ValueError(
+                f"Histogram idx={index}: missing required fields: {', '.join(missing.keys())}"
+            )
 
         try:
             meas_status_s = str(MeasStatusType(meas_status_i))
@@ -82,15 +102,17 @@ class DocsPnmCmDsHistEntry(BaseModel):
             meas_status_s = str(MeasStatusType.OTHER)
 
         entry = DocsPnmCmDsHistEntryFields(
-            docsPnmCmDsHistEnable     = bool(enable),
-            docsPnmCmDsHistTimeOut    = int(timeout),
-            docsPnmCmDsHistMeasStatus = meas_status_s,
-            docsPnmCmDsHistFileName   = str(file_name),
+            docsPnmCmDsHistEnable=bool(enable),
+            docsPnmCmDsHistTimeOut=int(timeout),
+            docsPnmCmDsHistMeasStatus=meas_status_s,
+            docsPnmCmDsHistFileName=str(file_name),
         )
         return cls(index=index, entry=entry)
 
     @classmethod
-    async def get(cls, snmp: Snmp_v2c, indices: list[int]) -> list[DocsPnmCmDsHistEntry]:
+    async def get(
+        cls, snmp: Snmp_v2c, indices: list[int]
+    ) -> list[DocsPnmCmDsHistEntry]:
         """
         Batch fetch multiple histogram rows.
 

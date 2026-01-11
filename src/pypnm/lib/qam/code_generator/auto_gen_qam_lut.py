@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -18,9 +17,9 @@ from pypnm.lib.qam.code_generator.codeword_gen_lut import CodeWordLutGenerator
 from pypnm.lib.qam.types import QamModulation
 from pypnm.lib.types import Complex, ComplexArray, PathArray, PathLike
 
-BitLoad         = int
-QamScale        = float
-QamLutDict      = dict[str, dict[Any, Any]]
+BitLoad = int
+QamScale = float
+QamLutDict = dict[str, dict[Any, Any]]
 QamScaleLutDict = dict[BitLoad, QamScale]
 
 Hard = list[tuple[float, float]]
@@ -52,10 +51,14 @@ class GenerateQamLut:
             The path to the generated LUT file on success; otherwise None.
         """
         if not self.path_to_qam_table.exists():
-            self.logger.error("QAM table path does not exist: %s", self.path_to_qam_table)
+            self.logger.error(
+                "QAM table path does not exist: %s", self.path_to_qam_table
+            )
             return None
 
-        lut = QamLut(src_qam_table=self.path_to_qam_table, dst_qam_lut=self.path_to_qam_lut)
+        lut = QamLut(
+            src_qam_table=self.path_to_qam_table, dst_qam_lut=self.path_to_qam_lut
+        )
         out_path = lut.write()
         self.logger.debug("QAM LUT generated successfully at %s", out_path)
         return out_path
@@ -74,10 +77,12 @@ class QamLutDb(BaseModel):
     code_words : Dict[int, Complex]
         Mapping of encoded codeword integers to constellation coordinates.
     """
+
     symbol_count: int
     hard: ComplexArray
     code_words: dict[int, Complex]
     scale_factor: float
+
 
 class QamLut:
     """
@@ -87,8 +92,8 @@ class QamLut:
     ConstellationScalingFactors.txt, and emits a Python module with the LUT.
     """
 
-    QAM_LUT_FNAME       = "qam_lut.py"
-    QAM_SCALE_LUT_FNAME = 'qam_scale_lut.py'
+    QAM_LUT_FNAME = "qam_lut.py"
+    QAM_SCALE_LUT_FNAME = "qam_scale_lut.py"
 
     def __init__(self, src_qam_table: PathLike, dst_qam_lut: PathLike) -> None:
         self.logger = logging.getLogger("QamLut")
@@ -154,7 +159,10 @@ class QamLut:
         factors_path = self._path_to_qam_table / "ConstellationScalingFactors.txt"
         factors: dict[int, float] = {}
         if not factors_path.exists():
-            self.logger.warning("Scaling factors file not found: %s (defaulting to no scaling)", factors_path)
+            self.logger.warning(
+                "Scaling factors file not found: %s (defaulting to no scaling)",
+                factors_path,
+            )
             return factors
 
         with open(factors_path) as f:
@@ -175,7 +183,9 @@ class QamLut:
                     continue
         return factors
 
-    def _load_table(self, path_to_qam_table: Path) -> tuple[ComplexCollector, QamModulation]:
+    def _load_table(
+        self, path_to_qam_table: Path
+    ) -> tuple[ComplexCollector, QamModulation]:
         """
         Load a single QAM table file and scale points per ConstellationScalingFactors.txt.
 
@@ -191,8 +201,7 @@ class QamLut:
                 parts = s.split()
                 if len(parts) != 2:
                     self.logger.warning(
-                        "Malformed line in QAM table %s: %s",
-                        path_to_qam_table.name, s
+                        "Malformed line in QAM table %s: %s", path_to_qam_table.name, s
                     )
                     continue
                 r, i = map(float, parts)
@@ -210,7 +219,9 @@ class QamLut:
         bps = int(math.log2(symbol_count))
         Es = self._scaling_factors.get(bps)
         if Es is None:
-            self.logger.debug("No scaling factor for %d bits/symbol; leaving points unscaled.", bps)
+            self.logger.debug(
+                "No scaling factor for %d bits/symbol; leaving points unscaled.", bps
+            )
             return raw_cc, qm
 
         scale = 1.0 / math.sqrt(Es)
@@ -221,12 +232,15 @@ class QamLut:
 
         self.logger.debug(
             "Loaded %s with %d symbols from %s (scaled by 1/sqrt(%s))",
-            qm, symbol_count, path_to_qam_table, Es
+            qm,
+            symbol_count,
+            path_to_qam_table,
+            Es,
         )
         return scaled_cc, qm
 
     def _get_scale_factor(self, order: QamModulation) -> QamScale:
-        return (1.0 / math.sqrt(self._scaling_factors[order.get_bit_per_symbol()]))
+        return 1.0 / math.sqrt(self._scaling_factors[order.get_bit_per_symbol()])
 
     # ---------------- LUT Assembly & Emission ----------------
 
@@ -253,7 +267,8 @@ class QamLut:
                 symbol_count=len(cc),
                 hard=cc.to_complex_array(),
                 code_words=cw_lut,
-                scale_factor=self._get_scale_factor(order))
+                scale_factor=self._get_scale_factor(order),
+            )
 
             self._qam_lut[order.name] = qld.model_dump()
 
@@ -267,9 +282,10 @@ class QamLut:
         """
         formatted = pprint.pformat(self._qam_lut, indent=2, width=100, sort_dicts=True)
 
-        header = ( "# SPDX-License-Identifier: Apache-2.0\n"
-                  f"# Do not modify manually. AutoGenerated: {datetime.now(timezone.utc).isoformat()}\n"
-                   "# Generated by QamLut compiler\n\n")
+        header = (
+            "# SPDX-License-Identifier: Apache-2.0\n"
+            f"# Do not modify manually. AutoGenerated: {datetime.now(timezone.utc).isoformat()}\n"
+            "# Generated by QamLut compiler\n\n"
+        )
 
         return f"{header}QAM_SYMBOL_CODEWORD_LUT = {formatted}\n"
-

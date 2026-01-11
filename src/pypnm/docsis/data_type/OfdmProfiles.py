@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -10,6 +9,7 @@ class OfdmProfile(Enum):
     """
     Enum representing OFDM downstream profile identifiers.
     """
+
     profile0 = 0
     profile1 = 1
     profile2 = 2
@@ -84,7 +84,7 @@ class OfdmProfiles:
             OfdmProfiles: Parsed instance.
         """
         if isinstance(raw, bytes):
-            value = int.from_bytes(raw, byteorder='big')  # DOCSIS is MSB-first
+            value = int.from_bytes(raw, byteorder="big")  # DOCSIS is MSB-first
         elif isinstance(raw, str):
             raw = raw.strip()
             value = int(raw, 16) if raw.startswith("0x") else int(raw)

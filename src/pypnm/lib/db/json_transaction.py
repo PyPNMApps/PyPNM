@@ -58,9 +58,9 @@ class JsonTransactionDb:
         DB file path and JSON payload directory are taken as-is from these
         settings; no additional base-directory inference is performed.
         """
-        self._json_db   = Path(SystemConfigSettings.json_db())
-        self._json_dir  = Path(SystemConfigSettings.json_dir())
-        self.logger     = logging.getLogger(f"{self.__class__.__name__}")
+        self._json_db = Path(SystemConfigSettings.json_db())
+        self._json_dir = Path(SystemConfigSettings.json_dir())
+        self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self.logger.debug(
             f"Initialized JSON Transaction DB Manager with json_db={self._json_db}, json_dir={self._json_dir}"
         )
@@ -100,25 +100,27 @@ class JsonTransactionDb:
         if not record:
             self.logger.error(f"Transaction '{transaction_id}' not found in JSON DB")
             return JsonReturnModel(
-                timestamp   =   TimeStamp(0),
-                filename    =   "",
-                byte_size   =   0,
-                sha256      =   cast(HashStr, ""),
-                data        =   "",
+                timestamp=TimeStamp(0),
+                filename="",
+                byte_size=0,
+                sha256=cast(HashStr, ""),
+                data="",
             )
 
-        payload_path      = self._json_dir / str(record.filename)
+        payload_path = self._json_dir / str(record.filename)
         payload_processor = FileProcessor(payload_path)
-        raw_bytes         = payload_processor.read_file()
+        raw_bytes = payload_processor.read_file()
 
         if not raw_bytes:
-            self.logger.error(f"Failed to read payload for transaction '{transaction_id}' at {payload_path}")
+            self.logger.error(
+                f"Failed to read payload for transaction '{transaction_id}' at {payload_path}"
+            )
             return JsonReturnModel(
-                timestamp   =   TimeStamp(0),
-                filename    =   record.filename,
-                byte_size   =   0,
-                sha256      =   record.sha256,
-                data        =   "",
+                timestamp=TimeStamp(0),
+                filename=record.filename,
+                byte_size=0,
+                sha256=record.sha256,
+                data="",
             )
 
         recalculated_hash = self._calculate_file_hash(payload_path, record.timestamp)
@@ -128,11 +130,11 @@ class JsonTransactionDb:
                 f"expected={record.sha256}, got={recalculated_hash}"
             )
             return JsonReturnModel(
-                timestamp   =   record.timestamp,
-                filename    =   record.filename,
-                byte_size   =   record.byte_size,
-                sha256      =   record.sha256,
-                data        =   "",
+                timestamp=record.timestamp,
+                filename=record.filename,
+                byte_size=record.byte_size,
+                sha256=record.sha256,
+                data="",
             )
 
         try:
@@ -142,22 +144,24 @@ class JsonTransactionDb:
                 f"Failed to decode JSON payload for transaction '{transaction_id}' at {payload_path}: {exc}"
             )
             return JsonReturnModel(
-                timestamp   =   record.timestamp,
-                filename    =   record.filename,
-                byte_size   =   record.byte_size,
-                sha256      =   record.sha256,
-                data        =   "",
+                timestamp=record.timestamp,
+                filename=record.filename,
+                byte_size=record.byte_size,
+                sha256=record.sha256,
+                data="",
             )
 
         return JsonReturnModel(
-            timestamp   =   record.timestamp,
-            filename    =   record.filename,
-            byte_size   =   record.byte_size,
-            sha256      =   record.sha256,
-            data        =   payload_text,
+            timestamp=record.timestamp,
+            filename=record.filename,
+            byte_size=record.byte_size,
+            sha256=record.sha256,
+            data=payload_text,
         )
 
-    def write_json(self, data: JsonPayload, fname: PathLike, extension: str = "") -> JsonTransactionDbModel:
+    def write_json(
+        self, data: JsonPayload, fname: PathLike, extension: str = ""
+    ) -> JsonTransactionDbModel:
         """
         Persist A New Transaction Payload And Update The JSON Transaction Database.
 
@@ -207,11 +211,11 @@ class JsonTransactionDb:
         if extension:
             fname = f"{fname}.{extension.lstrip('.')}"
 
-        timestamp: TimeStamp    = TimeStamp(int(time.time()))
-        transaction_id          = self._transaction_id()
-        filename: PathLike      = fname
-        payload_path            = self._json_dir / filename
-        payload_processor       = FileProcessor(payload_path)
+        timestamp: TimeStamp = TimeStamp(int(time.time()))
+        transaction_id = self._transaction_id()
+        filename: PathLike = fname
+        payload_path = self._json_dir / filename
+        payload_processor = FileProcessor(payload_path)
 
         write_ok = payload_processor.write_file(dict(data), append=False)
         if not write_ok:
@@ -220,17 +224,21 @@ class JsonTransactionDb:
         try:
             byte_size = payload_path.stat().st_size
         except OSError as exc:
-            raise RuntimeError(f"Failed to stat payload file at {payload_path}: {exc}") from exc
+            raise RuntimeError(
+                f"Failed to stat payload file at {payload_path}: {exc}"
+            ) from exc
 
         sha256_hash = self._calculate_file_hash(payload_path, timestamp)
         if not sha256_hash:
-            raise RuntimeError(f"Failed to calculate hash for payload file at {payload_path}")
+            raise RuntimeError(
+                f"Failed to calculate hash for payload file at {payload_path}"
+            )
 
         record = JsonTransactionRecordModel(
-            timestamp   =   timestamp,
-            filename    =   filename,
-            byte_size   =   byte_size,
-            sha256      =   sha256_hash,
+            timestamp=timestamp,
+            filename=filename,
+            byte_size=byte_size,
+            sha256=sha256_hash,
         )
 
         db_model = self._load_db_model()
@@ -282,7 +290,9 @@ class JsonTransactionDb:
                 for chunk in iter(lambda: handle.read(8192), b""):
                     digest.update(chunk)
         except OSError as exc:
-            self.logger.error(f"Failed to read file while calculating hash for {path}: {exc}")
+            self.logger.error(
+                f"Failed to read file while calculating hash for {path}: {exc}"
+            )
             return cast(HashStr, "")
 
         digest.update(str(timestamp).encode("utf-8"))
@@ -330,9 +340,9 @@ class JsonTransactionDb:
             Parsed JSON transaction database model, or an empty model when the
             DB file is missing or invalid.
         """
-        db_path    = self._json_db
-        processor  = FileProcessor(db_path)
-        raw_bytes  = processor.read_file()
+        db_path = self._json_db
+        processor = FileProcessor(db_path)
+        raw_bytes = processor.read_file()
 
         if not raw_bytes:
             self.logger.warning(f"No data available to decode JSON DB from {db_path}")
@@ -341,7 +351,9 @@ class JsonTransactionDb:
         try:
             text = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
-            self.logger.error(f"Failed to decode JSON DB file {db_path} as UTF-8: {exc}")
+            self.logger.error(
+                f"Failed to decode JSON DB file {db_path} as UTF-8: {exc}"
+            )
             return JsonTransactionDbModel()
 
         try:
@@ -351,18 +363,24 @@ class JsonTransactionDb:
             return JsonTransactionDbModel()
 
         if not isinstance(obj, dict):
-            self.logger.error(f"JSON DB root in {db_path} is not an object, got {type(obj).__name__}")
+            self.logger.error(
+                f"JSON DB root in {db_path} is not an object, got {type(obj).__name__}"
+            )
             return JsonTransactionDbModel()
 
         records: dict[TransactionId, JsonTransactionRecordModel] = {}
         for tx_id, payload in obj.items():
             if not isinstance(payload, dict):
-                self.logger.error(f"Transaction '{tx_id}' in {db_path} is not an object; skipping")
+                self.logger.error(
+                    f"Transaction '{tx_id}' in {db_path} is not an object; skipping"
+                )
                 continue
             try:
                 record = JsonTransactionRecordModel(**payload)
             except ValidationError as exc:
-                self.logger.error(f"Invalid transaction record for '{tx_id}' in {db_path}: {exc}")
+                self.logger.error(
+                    f"Invalid transaction record for '{tx_id}' in {db_path}: {exc}"
+                )
                 continue
             records[TransactionId(tx_id)] = record
 
@@ -382,12 +400,11 @@ class JsonTransactionDb:
         RuntimeError
             If the underlying file write operation fails.
         """
-        db_path   = self._json_db
+        db_path = self._json_db
         processor = FileProcessor(db_path)
 
         payload = {
-            tx_id: record.model_dump()
-            for tx_id, record in model.records.items()
+            tx_id: record.model_dump() for tx_id, record in model.records.items()
         }
 
         success = processor.write_file(payload, append=False)

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
@@ -39,7 +38,7 @@ class DocsFddCmFddBandEdgeCapabilities:
         self.docsFddDiplexerDsLowerBandEdgeCapability: int | None = None
         self.docsFddDiplexerDsUpperBandEdgeCapability: int | None = None
 
-        self._started:bool = False
+        self._started: bool = False
 
     async def start(self) -> bool:
         """
@@ -84,7 +83,9 @@ class DocsFddCmFddBandEdgeCapabilities:
 
             return True
         except Exception as e:
-            self.logger.exception(f"Unexpected error during SNMP population, error: {e}")
+            self.logger.exception(
+                f"Unexpected error during SNMP population, error: {e}"
+            )
             return False
 
     def is_start(self) -> bool:
@@ -108,9 +109,8 @@ class DocsFddCmFddBandEdgeCapabilities:
 
         if any(v is None for v in entry.values()):
             missing = [k for k, v in entry.items() if v is None]
-            raise ValueError(f"Attributes not populated (call start() first): {missing}")
+            raise ValueError(
+                f"Attributes not populated (call start() first): {missing}"
+            )
 
-        return {
-            "index": self.index,
-            "entry": entry
-        }
+        return {"index": self.index, "entry": entry}

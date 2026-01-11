@@ -27,9 +27,9 @@ class OfdmProfileStatsService:
     """
 
     @staticmethod
-    async def fetch_profile_stats(mac_address: MacAddressStr,
-                                  ip_address: InetAddressStr,
-                                  snmp_config: SNMPConfig) -> list[dict[str, Any]]:
+    async def fetch_profile_stats(
+        mac_address: MacAddressStr, ip_address: InetAddressStr, snmp_config: SNMPConfig
+    ) -> list[dict[str, Any]]:
         """
         Fetches OFDM downstream profile statistics from the cable modem.
 
@@ -48,7 +48,7 @@ class OfdmProfileStatsService:
             cm = CableModem(
                 mac_address=MacAddress(mac_address),
                 inet=Inet(ip_address),
-                write_community=snmp_config.snmp_v2c.community
+                write_community=snmp_config.snmp_v2c.community,
             )
             entries = await cm.getDocsIf31CmDsOfdmProfileStatsEntry()
             stats = [entry.to_dict(nested=False) for entry in entries]
