@@ -8,10 +8,12 @@ A concise, implementation-ready reference for orchestrating downstream OFDM chan
 * [Workflow](#workflow)
 * [Endpoints](#endpoints)
   * [1) Start Capture](#1-start-capture)
-  * [2) Status Check](#2-status-check)
-  * [3) Download Results](#3-download-results)
-  * [4) Stop Capture Early](#4-stop-capture-early)
-  * [5) Analysis](#5-analysis)
+  * [2) Status (Operation Registry)](#2-status-operation-registry)
+  * [3) Result (Operation Registry)](#3-result-operation-registry)
+  * [4) Cancel (Operation Registry)](#4-cancel-operation-registry)
+  * [5) Download Results (Legacy ZIP)](#5-download-results-legacy-zip)
+  * [6) Stop Capture Early (Legacy)](#6-stop-capture-early-legacy)
+  * [7) Analysis](#7-analysis)
 * [Timing & Polling](#timing--polling)
 * [Plot Examples](#plot-examples)
   * [Min-Avg-Max Magnitude Plot](#min-avg-max-magnitude-plot)
@@ -25,13 +27,18 @@ A concise, implementation-ready reference for orchestrating downstream OFDM chan
 
 ## At a Glance
 
-| Step | HTTP   | Path                                                       | Purpose                                        |
-| ---: | :----- | :--------------------------------------------------------- | :--------------------------------------------- |
-|    1 | POST   | `/advance/multiChannelEstimation/start`                    | Begin a multi-sample ChannelEstimation capture |
-|    2 | GET    | `/advance/multiChannelEstimation/status/{operation_id}`    | Poll capture progress                          |
-|    3 | GET    | `/advance/multiChannelEstimation/results/{operation_id}`   | Download a ZIP of captured PNM files           |
-|    4 | DELETE | `/advance/multiChannelEstimation/stop/{operation_id}`      | Stop the capture after current iteration       |
-|    5 | POST   | `/advance/multiChannelEstimation/analysis`                 | Run post-capture signal analysis               |
+| Step | HTTP | Path                                       | Purpose                                        |
+| ---: | :--- | :----------------------------------------- | :--------------------------------------------- |
+|    1 | POST | `/advance/multiChannelEstimation/start`    | Begin a multi-sample ChannelEstimation capture |
+|    2 | POST | `/advance/multiChannelEstimation/status`   | Poll capture progress                          |
+|    3 | POST | `/advance/multiChannelEstimation/result`   | Retrieve final results once completed          |
+|    4 | POST | `/advance/multiChannelEstimation/cancel`   | Cancel the capture after current work          |
+|    5 | POST | `/advance/multiChannelEstimation/analysis` | Run post-capture signal analysis               |
+
+Legacy endpoints remain available:
+* `GET /advance/multiChannelEstimation/status/{operation_id}`
+* `GET /advance/multiChannelEstimation/results/{operation_id}`
+* `DELETE /advance/multiChannelEstimation/stop/{operation_id}`
 
 ### Identifiers
 
@@ -41,9 +48,9 @@ A concise, implementation-ready reference for orchestrating downstream OFDM chan
 ## Workflow
 
 1. **Start Capture** → receive `group_id` and `operation_id`.
-2. **Poll Status** until `state ∈ ["completed","stopped"]`.
-3. **Download Results** once finished or stopped.
-4. **(Optional)** **Stop Early** to end after the current iteration.
+2. **Poll Status** until `state == "completed"`.
+3. **Retrieve Results** once finished.
+4. **(Optional)** **Cancel** to end after the current iteration.
 5. **Run Analysis** on the finished capture using `operation_id` + analysis type.
 
 ## Endpoints
@@ -85,11 +92,18 @@ Starts a background multi-sample ChannelEstimation capture with a fixed duration
 }
 ```
 
-### 2) Status Check
+### 2) Status (Operation Registry)
 
-**Request** `GET /advance/multiChannelEstimation/status/{operation_id}`
+**Request** `POST /advance/multiChannelEstimation/status`  
+**Body**:
 
-#### Response (MultiChanEstStatusResponse)
+```json
+{
+  "operation_id": "3df9f479d7a549b7"
+}
+```
+
+#### Response
 
 ```json
 {
@@ -99,14 +113,88 @@ Starts a background multi-sample ChannelEstimation capture with a fixed duration
   "operation": {
     "operation_id": "3df9f479d7a549b7",
     "state": "running",
-    "collected": 3,
-    "time_remaining": 105,
-    "message": null
+    "created_ts": 1730000000,
+    "updated_ts": 1730000015,
+    "progress_current": 1,
+    "progress_total": 8,
+    "message": "Operation running",
+    "error": null,
+    "artifact_paths": [
+      "ds_ofdm_chan_estimate_coef_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+    ]
   }
 }
 ```
 
-### 3) Download Results
+### 3) Result (Operation Registry)
+
+**Request** `POST /advance/multiChannelEstimation/result`  
+**Body**:
+
+```json
+{
+  "operation_id": "3df9f479d7a549b7"
+}
+```
+
+#### Response
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "status": "success",
+  "message": null,
+  "operation": {
+    "operation_id": "3df9f479d7a549b7",
+    "state": "completed",
+    "created_ts": 1730000000,
+    "updated_ts": 1730000120,
+    "progress_current": 8,
+    "progress_total": 8,
+    "message": "Operation completed",
+    "error": null,
+    "artifact_paths": [
+      "ds_ofdm_chan_estimate_coef_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+    ]
+  }
+}
+```
+
+If the operation is not completed, the endpoint returns HTTP 409.
+
+### 4) Cancel (Operation Registry)
+
+**Request** `POST /advance/multiChannelEstimation/cancel`  
+**Body**:
+
+```json
+{
+  "operation_id": "3df9f479d7a549b7"
+}
+```
+
+#### Response
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "status": "success",
+  "message": null,
+  "operation": {
+    "operation_id": "3df9f479d7a549b7",
+    "state": "canceled",
+    "created_ts": 1730000000,
+    "updated_ts": 1730000040,
+    "progress_current": 2,
+    "progress_total": 8,
+    "message": "Operation canceled",
+    "error": null,
+    "artifact_paths": []
+  }
+}
+```
+
+### 5) Download Results (Legacy ZIP)
 
 **Request** `GET /advance/multiChannelEstimation/results/{operation_id}`
 
@@ -122,7 +210,7 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762629.bin
 ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 ```
 
-### 4) Stop Capture Early
+### 6) Stop Capture Early (Legacy)
 
 **Request** `DELETE /advance/multiChannelEstimation/stop/{operation_id}`
 
@@ -143,7 +231,7 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 }
 ```
 
-### 5) Analysis
+### 7) Analysis
 
 **Request** `POST /advance/multiChannelEstimation/analysis`  
 **Body** (`MultiChanEstAnalysisRequest` - preferred string enums):
@@ -234,6 +322,15 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 
 
 ## Response Field Reference
+
+### Operation Registry Responses
+
+`POST /status`, `POST /result`, and `POST /cancel` return the same `operation` shape:
+
+* `state`: `created`, `running`, `completed`, `failed`, `canceled`
+* `created_ts` / `updated_ts`: epoch seconds
+* `progress_current` / `progress_total`: capture progress counters
+* `artifact_paths`: relative artifact paths (when available)
 
 ### Start / Status / Stop {#start--status--stop}
 

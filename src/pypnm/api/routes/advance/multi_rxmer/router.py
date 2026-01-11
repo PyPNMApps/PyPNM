@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -21,8 +21,18 @@ from pypnm.api.routes.advance.common.abstract.service import AbstractService
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
+from pypnm.api.routes.advance.common.operation_workflow_service import (
+    OperationWorkflowService,
+)
+from pypnm.api.routes.advance.common.schema.operation_schema import (
+    OperationCancelResponse,
+    OperationRequest,
+    OperationResultResponse,
+    OperationStatusResponse,
+)
 from pypnm.api.routes.advance.multi_rxmer.schemas import (
     MultiRxMerAnalysisRequest,
     MultiRxMerAnalysisResponse,
@@ -256,6 +266,25 @@ class MultiRxMerRouter(AbstractService):
                 ),
             )
 
+        @self.router.post(
+            "/status",
+            response_model=OperationStatusResponse,
+            summary="Get status of a Multi-RxMER capture (operation registry)",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_status_post(request: OperationRequest) -> OperationStatusResponse:
+            try:
+                status = OperationWorkflowService.get_status(request.operation_id)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            return OperationStatusResponse(
+                status="success",
+                message=None,
+                operation=status,
+            )
+
         @self.router.get(
             "/results/{operation_id}",
             summary="Download a ZIP archive of all RxMER capture files",
@@ -368,6 +397,50 @@ class MultiRxMerRouter(AbstractService):
                     time_remaining=status["time_remaining"],
                     message=None,
                 ),
+            )
+
+        @self.router.post(
+            "/cancel",
+            response_model=OperationCancelResponse,
+            summary="Cancel a running Multi-RxMER capture",
+            responses=FAST_API_RESPONSE,
+        )
+        def cancel_capture(request: OperationRequest) -> OperationCancelResponse:
+            try:
+                service: AbstractCaptureService = self.getService(request.operation_id)
+            except KeyError:
+                service = None
+            try:
+                status = OperationWorkflowService.cancel(request.operation_id, service)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            return OperationCancelResponse(
+                status="success",
+                message=None,
+                operation=status,
+            )
+
+        @self.router.post(
+            "/result",
+            response_model=OperationResultResponse,
+            summary="Get Multi-RxMER results once the operation completes",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_result(request: OperationRequest) -> OperationResultResponse:
+            try:
+                status = OperationWorkflowService.get_result(request.operation_id)
+            except KeyError as err:
+                raise HTTPException(
+                    status_code=404, detail="Operation not found"
+                ) from err
+            except ValueError as err:
+                raise HTTPException(status_code=409, detail=str(err)) from err
+            return OperationResultResponse(
+                status="success",
+                message=None,
+                operation=status,
             )
 
         @self.router.post(

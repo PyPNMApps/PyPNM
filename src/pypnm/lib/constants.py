@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -76,6 +76,18 @@ class MediaType(StringEnum):
     TEXT_CSV = "text/csv"
 
 
+class OperationExecutionState(StringEnum):
+    """
+    Canonical operation lifecycle state for async workflows.
+    """
+
+    CREATED = "created"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
 T = TypeVar("T")
 
 DEFAULT_SPECTRUM_ANALYZER_INDICES: Final[list[int]] = [0]
@@ -115,4 +127,5 @@ __all__ = [
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS",
     "FEC_SUMMARY_TYPE_LABEL",
+    "OperationExecutionState",
 ]

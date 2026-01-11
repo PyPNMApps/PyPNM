@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +20,8 @@ from pypnm.api.routes.common.extended.common_messaging_service import (
     MessageResponseType,
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.operations.operation_store import OperationStore
 from pypnm.lib.types import GroupId, OperationId, TimeStamp
 from pypnm.lib.utils import Generate
 
@@ -69,6 +71,7 @@ class AbstractCaptureService(ABC):
 
         self._capture_group_id: GroupId = GroupId("")
         self._operation_id: OperationId = OperationId("")
+        self._operation_store = OperationStore()
 
     async def start(self) -> tuple[GroupId, OperationId]:
         """
@@ -104,6 +107,9 @@ class AbstractCaptureService(ABC):
             raise
 
         start_time = time.time()
+        progress_total = OperationStore.estimate_progress_total(
+            self.duration, self.interval
+        )
         self._ops[operation_id] = {
             "group_id": group_id,
             "state": OperationState.RUNNING,
@@ -112,9 +118,24 @@ class AbstractCaptureService(ABC):
             "interval": self.interval,
             "time_remaining": self.time_remaining,
             "samples": [],
+            "progress_total": progress_total,
         }
 
         self.setOperationFinalInvocation(operation_id, False)
+        self._operation_store.create_operation(
+            operation_id=operation_id,
+            progress_total=progress_total,
+            message="Operation created",
+        )
+        self._operation_store.update_operation(
+            operation_id=operation_id,
+            state=OperationExecutionState.RUNNING,
+            progress_current=0,
+            progress_total=progress_total,
+            message="Operation running",
+            error=None,
+            artifact_paths=None,
+        )
 
         self.logger.info(
             f"CaptureGroup={group_id} / Operation={operation_id} started "
@@ -123,10 +144,23 @@ class AbstractCaptureService(ABC):
 
         async def _runner() -> None:
             end_time = start_time + self.duration
+            progress_current = 0
 
             while (time.time() < end_time) and self._ops[operation_id][
                 "state"
             ] == OperationState.RUNNING:
+                if self._operation_store.is_canceled(operation_id):
+                    self._ops[operation_id]["state"] = OperationState.STOPPED
+                    self._operation_store.update_operation(
+                        operation_id=operation_id,
+                        state=OperationExecutionState.CANCELED,
+                        progress_current=progress_current,
+                        progress_total=progress_total,
+                        message="Operation canceled",
+                        error=None,
+                        artifact_paths=self._artifact_paths(operation_id),
+                    )
+                    return
                 now = time.time()
                 remaining = max(0, int(end_time - now))
                 self._ops[operation_id]["time_remaining"] = remaining
@@ -144,6 +178,16 @@ class AbstractCaptureService(ABC):
                         self.logger.debug(
                             f"[{operation_id}] Captured sample txn={sample.transaction_id}"
                         )
+                    progress_current += 1
+                    self._operation_store.update_operation(
+                        operation_id=operation_id,
+                        state=OperationExecutionState.RUNNING,
+                        progress_current=progress_current,
+                        progress_total=progress_total,
+                        message="Operation running",
+                        error=None,
+                        artifact_paths=self._artifact_paths(operation_id),
+                    )
 
                 except Exception as exc:
                     error_msg = str(exc)
@@ -157,6 +201,16 @@ class AbstractCaptureService(ABC):
                             filename="",
                             error=error_msg,
                         )
+                    )
+                    progress_current += 1
+                    self._operation_store.update_operation(
+                        operation_id=operation_id,
+                        state=OperationExecutionState.RUNNING,
+                        progress_current=progress_current,
+                        progress_total=progress_total,
+                        message="Operation running with errors",
+                        error=error_msg,
+                        artifact_paths=self._artifact_paths(operation_id),
                     )
 
             # Complete if still running
@@ -185,6 +239,7 @@ class AbstractCaptureService(ABC):
                             self.logger.info(
                                 f"[{operation_id}] Captured sample txn={sample.transaction_id}"
                             )
+                        progress_current += 1
 
                 except Exception as exc:
                     error_msg = str(exc)
@@ -199,9 +254,33 @@ class AbstractCaptureService(ABC):
                             error=error_msg,
                         )
                     )
+                    progress_current += 1
+                    self._operation_store.update_operation(
+                        operation_id=operation_id,
+                        state=OperationExecutionState.RUNNING,
+                        progress_current=progress_current,
+                        progress_total=progress_total,
+                        message="Operation running with errors",
+                        error=error_msg,
+                        artifact_paths=self._artifact_paths(operation_id),
+                    )
 
             self.logger.info(
                 f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}"
+            )
+            final_state = (
+                OperationExecutionState.CANCELED
+                if self._ops[operation_id]["state"] == OperationState.STOPPED
+                else OperationExecutionState.COMPLETED
+            )
+            self._operation_store.update_operation(
+                operation_id=operation_id,
+                state=final_state,
+                progress_current=max(progress_current, progress_total),
+                progress_total=progress_total,
+                message=f"Operation {final_state.value}",
+                error=None,
+                artifact_paths=self._artifact_paths(operation_id),
             )
 
             ###############
@@ -291,6 +370,7 @@ class AbstractCaptureService(ABC):
         op = self._ops.get(operation_id)
         if op and op["state"] == OperationState.RUNNING:
             op["state"] = OperationState.STOPPED
+            self._operation_store.mark_canceled(operation_id, "Operation canceled")
             self.logger.info(f"[{operation_id}] Stopped by user")
 
     def _process_captures(self, msg_rsp: MessageResponse) -> list[CaptureSample]:
@@ -406,6 +486,10 @@ class AbstractCaptureService(ABC):
             ]
 
         return samples
+
+    def _artifact_paths(self, operation_id: OperationId) -> list[str]:
+        samples = self._ops.get(operation_id, {}).get("samples", [])
+        return [sample.filename for sample in samples if sample.filename]
 
     @abstractmethod
     async def _capture_message_response(self) -> MessageResponse:

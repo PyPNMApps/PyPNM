@@ -9,10 +9,12 @@ early termination, and post‑capture analysis.
 * [Workflow](#workflow)
 * [Endpoints](#endpoints)
   * [1) Start Capture](#1-start-capture)
-  * [2) Status Check](#2-status-check)
-  * [3) Download Results](#3-download-results)
-  * [4) Stop Capture Early](#4-stop-capture-early)
-  * [5) Analysis](#5-analysis)
+  * [2) Status (Operation Registry)](#2-status-operation-registry)
+  * [3) Result (Operation Registry)](#3-result-operation-registry)
+  * [4) Cancel (Operation Registry)](#4-cancel-operation-registry)
+  * [5) Download Results (Legacy ZIP)](#5-download-results-legacy-zip)
+  * [6) Stop Capture Early (Legacy)](#6-stop-capture-early-legacy)
+  * [7) Analysis](#7-analysis)
 * [Timing & Polling](#timing--polling)
 * [Plot Examples](#plot-examples)
   * [Min‑Avg‑Max Line Plot](#min-avg-max-line-plot)
@@ -26,13 +28,18 @@ early termination, and post‑capture analysis.
 
 ## At a Glance
 
-| Step | HTTP   | Path                                         | Purpose                                  |
-| ---: | :----- | :------------------------------------------- | :--------------------------------------- |
-|    1 | POST   | `/advance/multiRxMer/start`                  | Begin a background capture               |
-|    2 | GET    | `/advance/multiRxMer/status/{operation_id}`  | Poll capture progress                    |
-|    3 | GET    | `/advance/multiRxMer/results/{operation_id}` | Download a ZIP of captured PNM files     |
-|    4 | DELETE | `/advance/multiRxMer/stop/{operation_id}`    | Stop the capture after current iteration |
-|    5 | POST   | `/advance/multiRxMer/analysis`               | Run post‑capture analytics               |
+| Step | HTTP | Path                          | Purpose                                |
+| ---: | :--- | :---------------------------- | :------------------------------------- |
+|    1 | POST | `/advance/multiRxMer/start`   | Begin a background capture             |
+|    2 | POST | `/advance/multiRxMer/status`  | Poll capture progress                  |
+|    3 | POST | `/advance/multiRxMer/result`  | Retrieve final results once completed  |
+|    4 | POST | `/advance/multiRxMer/cancel`  | Cancel the capture after current work  |
+|    5 | POST | `/advance/multiRxMer/analysis`| Run post‑capture analytics             |
+
+Legacy endpoints remain available:
+* `GET /advance/multiRxMer/status/{operation_id}`
+* `GET /advance/multiRxMer/results/{operation_id}`
+* `DELETE /advance/multiRxMer/stop/{operation_id}`
 
 ### Identifiers
 
@@ -42,9 +49,9 @@ early termination, and post‑capture analysis.
 ## Workflow
 
 1. **Start Capture** → receive `group_id` and `operation_id`.
-2. **Poll Status** until `state ∈ ["completed","stopped"]`.
-3. **Download Results** once finished or stopped.
-4. **(Optional)** **Stop Early** to end after the current iteration.
+2. **Poll Status** until `state == "completed"`.
+3. **Retrieve Results** once finished.
+4. **(Optional)** **Cancel** to end after the current iteration.
 5. **Run Analysis** on the finished capture using `operation_id` + analysis type.
 
 ## Endpoints
@@ -96,11 +103,18 @@ Starts a background RxMER capture with a fixed duration and sample interval.
 }
 ```
 
-### 2) Status Check
+### 2) Status (Operation Registry)
 
-**Request** `GET /advance/multiRxMer/status/{operation_id}`
+**Request** `POST /advance/multiRxMer/status`  
+**Body**:
 
-#### Response (MultiRxMerStatusResponse)
+```json
+{
+  "operation_id": "4aca137c1e9d4eb6"
+}
+```
+
+#### Response
 
 ```json
 {
@@ -110,14 +124,88 @@ Starts a background RxMER capture with a fixed duration and sample interval.
   "operation": {
     "operation_id": "4aca137c1e9d4eb6",
     "state": "running",
-    "collected": 2,
-    "time_remaining": 50,
-    "message": null
+    "created_ts": 1730000000,
+    "updated_ts": 1730000010,
+    "progress_current": 1,
+    "progress_total": 6,
+    "message": "Operation running",
+    "error": null,
+    "artifact_paths": [
+      "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+    ]
   }
 }
 ```
 
-### 3) Download Results
+### 3) Result (Operation Registry)
+
+**Request** `POST /advance/multiRxMer/result`  
+**Body**:
+
+```json
+{
+  "operation_id": "4aca137c1e9d4eb6"
+}
+```
+
+#### Response
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "status": "success",
+  "message": null,
+  "operation": {
+    "operation_id": "4aca137c1e9d4eb6",
+    "state": "completed",
+    "created_ts": 1730000000,
+    "updated_ts": 1730000060,
+    "progress_current": 6,
+    "progress_total": 6,
+    "message": "Operation completed",
+    "error": null,
+    "artifact_paths": [
+      "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_160_1730000000.bin"
+    ]
+  }
+}
+```
+
+If the operation is not completed, the endpoint returns HTTP 409.
+
+### 4) Cancel (Operation Registry)
+
+**Request** `POST /advance/multiRxMer/cancel`  
+**Body**:
+
+```json
+{
+  "operation_id": "4aca137c1e9d4eb6"
+}
+```
+
+#### Response
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "status": "success",
+  "message": null,
+  "operation": {
+    "operation_id": "4aca137c1e9d4eb6",
+    "state": "canceled",
+    "created_ts": 1730000000,
+    "updated_ts": 1730000030,
+    "progress_current": 2,
+    "progress_total": 6,
+    "message": "Operation canceled",
+    "error": null,
+    "artifact_paths": []
+  }
+}
+```
+
+### 5) Download Results (Legacy ZIP)
 
 **Request** `GET /advance/multiRxMer/results/{operation_id}`
 
@@ -139,7 +227,7 @@ aabbccddeeff_lpet3_1763007680_160_rxmer_min_avg_max.png
 aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png 
 ```
 
-### 4) Stop Capture Early
+### 6) Stop Capture Early (Legacy)
 
 **Request** `DELETE /advance/multiRxMer/stop/{operation_id}`
 
@@ -160,7 +248,7 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 }
 ```
 
-### 5) Analysis
+### 7) Analysis
 
 **Request** `POST /advance/multiRxMer/analysis`  
 **Body** (`MultiRxMerAnalysisRequest` - preferred string enums):
@@ -237,6 +325,15 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 | [4K‑QAM](./images/multi-rxmer/160_profile_3_ofdm_profile_perf_1.png)  | `3` | Avg‑RxMER with modulation profile overlay and FEC summary across sample time. |
 
 ## Response Field Reference
+
+### Operation Registry Responses
+
+`POST /status`, `POST /result`, and `POST /cancel` return the same `operation` shape:
+
+* `state`: `created`, `running`, `completed`, `failed`, `canceled`
+* `created_ts` / `updated_ts`: epoch seconds
+* `progress_current` / `progress_total`: capture progress counters
+* `artifact_paths`: relative artifact paths (when available)
 
 ### Start / Status / Stop {#start--status--stop}
 

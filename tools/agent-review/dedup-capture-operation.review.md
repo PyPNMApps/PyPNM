@@ -1,3 +1,23 @@
+### Summary
+Removed the duplicated Workflow Summary block in the multi-capture operation doc to keep a single source of truth.
+
+### Modified Files
+- docs/api/fast-api/multi/capture-operation.md
+
+### Commands Executed And Results
+- None
+
+### Tests
+- pytest → not run (docs-only)
+- ruff → not run (docs-only)
+
+### Notes / Warnings
+- None
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: docs/api/fast-api/multi/capture-operation.md
 # Multi‑Capture Operation Overview
 
 When you initiate a **multi-capture** session (e.g., Multi‑RxMER or Multi‑DS‑Channel‑Estimation), PyPNM maintains a lightweight file‑based tracking system and stages resulting PNM binaries for downstream workflows.
