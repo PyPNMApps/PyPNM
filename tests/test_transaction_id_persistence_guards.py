@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -14,19 +15,31 @@ from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
 from pypnm.api.routes.common.classes.file_capture.session_group import SessionGroup
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import TransactionId
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 
 
 def _configure_transaction_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    db_path = tmp_path / "transactions.json"
+    db_path = tmp_path / "pypnm.sqlite3"
     monkeypatch.setattr(
         SystemConfigSettings,
-        "transaction_db",
-        classmethod(lambda cls: str(db_path)),
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(db_path))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+    DatabaseSchemaManager.from_system_config().initialize_schema()
     return db_path
 
 
@@ -94,11 +107,16 @@ def test_pnm_file_transaction_skips_empty_transaction_id(
     )
 
     assert str(txn_id) == ""
-    assert "Skipping transaction_db insert for empty transaction_id" in caplog.text
+    assert "Skipping transaction insert for empty transaction_id" in caplog.text
 
-    with db_path.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    assert data == {}
+    connection = sqlite3.connect(db_path)
+    try:
+        cursor = connection.execute("SELECT COUNT(1) FROM transaction_records;")
+        row = cursor.fetchone()
+        assert row is not None
+        assert int(row[0]) == 0
+    finally:
+        connection.close()
 
 
 def test_pnm_file_transaction_persists_valid_id(
@@ -117,7 +135,14 @@ def test_pnm_file_transaction_persists_valid_id(
         filename="rxmer.bin",
     )
 
-    with db_path.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-
-    assert TransactionId(str(txn_id)) in {TransactionId(k) for k in data}
+    connection = sqlite3.connect(db_path)
+    try:
+        cursor = connection.execute(
+            "SELECT COUNT(1) FROM transaction_records WHERE transaction_id = ?;",
+            (str(txn_id),),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        assert int(row[0]) == 1
+    finally:
+        connection.close()

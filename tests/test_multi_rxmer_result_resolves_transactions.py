@@ -14,14 +14,80 @@ from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.ds.ofdm.rxmer.multi.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.transaction_repository import (
+    DeviceDetailsRepository,
+    SystemDescriptionRepository,
+    TransactionRepository,
+)
+from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.operations.operation_store import OperationStore
-from pypnm.lib.types import OperationId
+from pypnm.lib.types import (
+    DatabaseBackend,
+    DatabaseDsn,
+    DatabasePath,
+    FileName,
+    OperationId,
+    TimestampSec,
+    TransactionId,
+)
 
 
 def _build_app() -> FastAPI:
     app = FastAPI()
     app.include_router(router)
     return app
+
+
+PNM_TEST_TYPE: str = "DS_OFDM_RXMER_PER_SUBCAR"
+DEFAULT_TIMESTAMP: int = 1
+SYS_DESCR: dict[str, str] = {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+}
+DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
+DEFAULT_FILENAME = FileName("rxmer.bin")
+DEFAULT_MAC = MacAddress("aa:bb:cc:dd:ee:ff")
+
+
+class _DbFixture:
+    @staticmethod
+    def initialize(db_path: Path) -> None:
+        sqlite_path = DatabasePath(str(db_path))
+        postgres_dsn = DatabaseDsn("")
+        manager = DatabaseSchemaManager.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        manager.initialize_schema()
+
+    @staticmethod
+    def insert_transaction(db_path: Path, transaction_id: str) -> None:
+        sqlite_path = DatabasePath(str(db_path))
+        postgres_dsn = DatabaseDsn("")
+        sys_repo = SystemDescriptionRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        device_repo = DeviceDetailsRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        txn_repo = TransactionRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        sysdescr_id = sys_repo.get_or_create_sysdescr_id(SYS_DESCR)
+        device_detail_id = device_repo.get_or_create_device_detail_id(
+            DEVICE_DETAILS, sysdescr_id
+        )
+        txn_repo.insert_transaction(
+            transaction_id=TransactionId(transaction_id),
+            timestamp_epoch=TimestampSec(DEFAULT_TIMESTAMP),
+            mac_address=DEFAULT_MAC,
+            pnm_test_type=PNM_TEST_TYPE,
+            filename=DEFAULT_FILENAME,
+            device_detail_id=device_detail_id,
+        )
 
 
 def _configure_paths(
@@ -35,7 +101,7 @@ def _configure_paths(
 
     capture_group_db = db_dir / "capture_group.json"
     operation_db = db_dir / "operation_capture.json"
-    transaction_db = db_dir / "transactions.json"
+    sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -54,14 +120,25 @@ def _configure_paths(
     )
     monkeypatch.setattr(
         SystemConfigSettings,
-        "transaction_db",
-        classmethod(lambda cls: str(transaction_db)),
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(sqlite_db))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+    _DbFixture.initialize(sqlite_db)
 
     return {
         "capture_group_db": capture_group_db,
         "operation_db": operation_db,
-        "transaction_db": transaction_db,
+        "database_sqlite_path": sqlite_db,
     }
 
 
@@ -99,28 +176,7 @@ def test_result_resolves_transactions(
         ),
         encoding="utf-8",
     )
-    paths["transaction_db"].write_text(
-        json.dumps(
-            {
-                transaction_id: {
-                    "timestamp": 1,
-                    "mac_address": "aa:bb:cc:dd:ee:ff",
-                    "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
-                    "filename": "rxmer.bin",
-                    "device_details": {
-                        "system_description": {
-                            "HW_REV": "1.0",
-                            "VENDOR": "LANCity",
-                            "BOOTR": "NONE",
-                            "SW_REV": "1.0.0",
-                            "MODEL": "LCPET-3",
-                        }
-                    },
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -180,7 +236,7 @@ def test_result_rejects_when_no_transactions_resolve(
         ),
         encoding="utf-8",
     )
-    paths["transaction_db"].write_text(json.dumps({}), encoding="utf-8")
+    # No transaction records seeded.
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -235,28 +291,7 @@ def test_result_resolves_transactions_with_legacy_key(
         ),
         encoding="utf-8",
     )
-    paths["transaction_db"].write_text(
-        json.dumps(
-            {
-                transaction_id: {
-                    "timestamp": 1,
-                    "mac_address": "aa:bb:cc:dd:ee:ff",
-                    "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
-                    "filename": "rxmer.bin",
-                    "device_details": {
-                        "system_description": {
-                            "HW_REV": "1.0",
-                            "VENDOR": "LANCity",
-                            "BOOTR": "NONE",
-                            "SW_REV": "1.0.0",
-                            "MODEL": "LCPET-3",
-                        }
-                    },
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")

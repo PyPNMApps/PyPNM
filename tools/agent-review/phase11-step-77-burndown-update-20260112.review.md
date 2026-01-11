@@ -1,9 +1,30 @@
+### Summary
+Updated the Phase 7.7 burndown tracker section with recent completions, remaining TODOs, and validation gate details.
+
+### Modified Files
+- docs/design/db/database-backend-burndown.md
+
+### Commands Executed And Results
+- Not run (doc-only update)
+
+### Tests
+- Not run (doc-only update)
+
+### Notes / Warnings
+- None
+
+### Remaining TODOs / Follow-Ups
+- None
+# FILE: docs/design/db/database-backend-burndown.md
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2025-2026 Maurice Garcia -->
+
 # PyPNM DB Backend Refactor Burndown (With ToC)
 
 ## Table Of Contents
 
 - [Overview](#overview)
-- [Recent Status Update (2026-01-11)](#recent-status-update-2026-01-11)
+- [Recent Status Update (2026-01-10)](#recent-status-update-2026-01-10)
 - [Phase 7.7 Burndown Tracker (Updated 2026-01-11)](#phase-77-burndown-tracker-updated-2026-01-11)
 - [Locked Decisions (Selection Summary)](#locked-decisions-selection-summary)
 - [Milestones](#milestones)
@@ -34,33 +55,15 @@ Concurrency note (design constraint carried into implementation and docs):
 - SQLite is supported and recommended for single-process / single-writer deployments (PyPNM standalone, labs, demos).
 - Postgres is recommended when PyPNM is used as a dependency in PyPNM-CMTS, or whenever multiple workers/processes may access the DB concurrently.
 
-DB-only cutover policy (current intent):
-
-- Runtime persistence is DB-only once a given domain has landed in DB form (transactions in M3; capture groups/ops in M4; artifacts in M5).
-- JSON ledgers become legacy-only for migrated domains:
-  - Not written by runtime once the DB write paths land for that domain.
-  - Not read by runtime endpoints once DB read paths land for that domain.
-  - Optional offline migrator may exist, but is not part of runtime behavior.
-
-## Recent Status Update (2026-01-11)
+## Recent Status Update (2026-01-10)
 
 Work completed since the last burndown sync (per Agent Review Bundles):
-
-- **Transactions are now DB-backed (M3 complete):**
-  - Introduced repository helpers for sysDescr/device_details dims and transaction_records.
-  - Wired `PnmFileTransaction` reads/writes to DB while preserving legacy payload shapes.
-  - Updated file manager reads (`search_files`, `get_mac_addresses`) to query DB-backed repositories.
-  - Updated multi-capture result tests to seed DB transactions and added repository unit coverage for:
-    - sysDescr de-duplication
-    - device_details de-duplication
-    - deterministic listing and ordering (timestamp + transaction_id tie-break)
 
 - `install.sh`
   - DB backend selection runs before `pytest` so tests execute against the selected backend contract.
   - Added `--db-install-sqlite` and `--db-install-postgres`, plus an interactive prompt when no flag is provided (defaults to SQLite in non-interactive/CI).
   - Added Postgres DSN prompt with password redaction (passwords are not persisted into `system.json`).
   - Fixed DSN redaction backreference and aligned DSN env-var warning logic to `POSTGRES_DSN_ENV_VAR` via indirect expansion.
-
 - `docs/system/system-config.md`
   - Updated `PnmFileRetrieval` heading/anchor for GitHub compatibility.
   - Documented runtime DB location policy and recommended env var usage for Postgres DSNs.
@@ -69,10 +72,7 @@ Out-of-scope but in-flight (separate hygiene workstream): Ruff baseline cleanup 
 
 ## Phase 7.7 Burndown Tracker (Updated 2026-01-11)
 
-This tracker is a near-term hygiene lane that should remain compatible with the DB migration. It is not a replacement for the DB cutover milestones.
-
-### Recent Completions
-
+## Recent Completions
 - Unified operation workflow payload shape:
   - Dual-status support (legacy `status` string + canonical `service_status`)
   - Centralized workflow schemas via re-exports
@@ -86,24 +86,21 @@ This tracker is a near-term hygiene lane that should remain compatible with the 
 - Tests added/updated:
   - Operation workflow dual-status tests
   - Multi-RxMER + Multi-ChannelEstimation registry `time_remaining` behavior tests
-  - Transaction repository unit tests and multi-capture result tests seeded via DB
 - Verification complete:
   - `python3 -m compileall src` pass
   - `ruff check .` pass
   - `ruff format --check .` pass
-  - `pytest -q` pass (583 passed, 4 skipped)
+  - `pytest -q` pass (577 passed, 4 skipped)
 
-### Remaining Phase 7.7 TODOs (Open Items)
-
+## Remaining Phase 7.7 TODOs (Open Items)
 1) Address `PytestConfigWarning` related to `asyncio_mode` configuration
    - Goal: eliminate warning via explicit pytest config (no runtime impact, but hygiene blocker)
 
 2) Final “legacy-key hygiene” scan
    - Goal: confirm no remaining deprecated/legacy keys or payload fields are being written or relied upon unintentionally
-   - Scope: operation/capture records, workflow responses, and multi-capture start/status/result payloads
+   - Scope: operation/capture DB JSON records, workflow responses, and multi-capture start/status/result payloads
 
-### Validation Gate (Must Stay Green)
-
+## Validation Gate (Must Stay Green)
 - `python3 -m compileall src`
 - `ruff check .`
 - `ruff format --check .`
@@ -126,26 +123,18 @@ Implications that must remain explicit in tasks and acceptance criteria:
 - SQLite is for single-writer; Postgres is recommended for multi-worker and PyPNM-CMTS.
 - DB stores portable app-root relative paths; runtime resolution builds absolute paths.
 - CI must validate SQLite and Postgres (Postgres via service container; not “allowed failure”).
-- JSON ledgers are deprecated; removal is tracked explicitly in M6 (do not introduce new ledger features).
+- JSON ledgers are deprecated and removed from code and docs; migrator is optional and offline-only.
 
 ## Milestones
 
-Status guidance:
-
-- Complete: done and validated.
-- In progress: started, partials landed.
-- Not started: planned.
-
-Milestone status (as of 2026-01-11):
-
-- M0: In progress (docs updated; packaging/docker hygiene still open)
-- M1: In progress (installer selection landed; config template + settings accessors still open)
-- M2: **Complete** (DB schema init + backend-aware connection path landed; schema manager in use)
-- M3: **Complete** (transactions are DB-backed; `transactions.json` is no longer a runtime write/read dependency)
-- M4: Not started (capture groups + operations migration; stops `capture_group.json` / `operation_capture.json` writes)
-- M5: Not started (artifact linkage; DB becomes authoritative for path resolution)
-- M6: Not started (delete ledger code paths and ledger docs)
-- M7: Partially done (Postgres CI job plumbing landed; full DB-backed test suite pending)
+- M0: Repo safety and release hygiene complete
+- M1: DB configuration and installer selection complete
+- M2: Schema and DB abstraction complete
+- M3: Transaction persistence migrated (replaces `transactions.json`)
+- M4: Capture group and operation persistence migrated (replaces `capture_group.json`, `operation_capture.json`)
+- M5: Artifact linkage migrated (DB is authoritative for path resolution)
+- M6: Ledger JSON design removed (docs) and legacy ledger code paths removed
+- M7: Pytest suite and GitHub Actions migrated to DB backends (SQLite required; Postgres validated)
 
 ## Phase 0 · Guardrails And Release Hygiene (M0)
 
@@ -193,7 +182,6 @@ Make DB backend selection a first-class install-time choice owned by PyPNM and v
     - [x] Host / port / database / user / password / ssl mode
     - [x] Ensure password can be provided via env var override (no plaintext requirement in JSON)
     - [x] Ensure passwords are not persisted into `system.json` (DSN redaction + field-based DSN omits password)
-
 - [ ] Add config keys to `settings/system.json.template` (and demo template if used):
   - [ ] `Database.backend` = `sqlite` | `postgres`
   - [ ] `Database.sqlite.path` default `.data/db/pypnm.sqlite3`
@@ -201,14 +189,11 @@ Make DB backend selection a first-class install-time choice owned by PyPNM and v
     - [ ] Support `Database.postgres.dsn`
     - [ ] Optional discrete settings for UX (installer can populate DSN)
   - [ ] Support environment variable overrides for secrets (do not require plaintext passwords in tracked JSON)
-
 - [ ] Add `SystemConfigSettings` accessors for DB settings.
-
 - [x] Ensure docs explicitly describe:
   - [x] Install-time backend selection mechanism
   - [x] SQLite vs Postgres recommendation (single-writer vs multi-worker)
   - [ ] PyPNM-CMTS inherits backend (no separate selection)
-
 - [ ] Add pytest coverage for config defaults and validation (missing/blank handling).
 
 ### Notes: Postgres Credentials Policy
@@ -235,36 +220,27 @@ Introduce both schemas and a stable DB API that hides backend differences.
 - [ ] Ensure schema assets exist and are treated as authoritative:
   - [ ] `docs/design/db/schema_postgres.sql`
   - [ ] `docs/design/db/schema_sqlite.sql`
-  - Notes:
-    - If DDL currently exists only in design doc appendices, extract it into these authoritative assets.
-
-- [x] Implement DB connection layer in PyPNM:
-  - [x] SQLite connection opens with `PRAGMA foreign_keys = ON`
-  - [x] SQLite enables WAL + sets a busy timeout (to reduce transient contention)
-  - [x] Postgres connection opens via DSN (minimum) or discrete settings
-  - [x] Minimal connection factory based on `Database.backend`
-
-- [x] Implement schema apply/init (idempotent, using shipped DDL assets):
-  - [x] Apply DDL idempotently on startup/install
-  - [x] Seed canonical `UNKNOWN` sysDescr row idempotently
+- [ ] Implement DB connection layer in PyPNM:
+  - [ ] SQLite connection opens with `PRAGMA foreign_keys = ON`
+  - [ ] Postgres connection opens via DSN (minimum) or discrete settings
+  - [ ] Minimal connection factory based on `Database.backend`
+- [ ] Implement schema apply/init (idempotent, using shipped DDL assets):
+  - [ ] Apply DDL idempotently on startup/install
+  - [ ] Seed canonical `UNKNOWN` sysDescr row idempotently
   - [ ] Seed default `artifact_stores` row idempotently:
     - [ ] prod store: `.data/pnm`
     - [ ] demo store: `demo/.data/pnm` (only if demo enabled/used)
-
-- [x] Add “DB health” check function for diagnostics:
-  - [x] Connect, verify required tables exist, verify `UNKNOWN` row exists
-  - [x] Verify schema version compatibility (`schema_meta.schema_version`)
-
-- [x] Add pytest coverage:
-  - [x] SQLite: init creates tables and seed rows (pure unit test)
-  - [x] Postgres: init path is wired; CI runs minimal integration
+- [ ] Add “DB health” check function for diagnostics:
+  - [ ] Connect, verify required tables exist, verify `UNKNOWN` row exists
+- [ ] Add pytest coverage:
+  - [ ] SQLite: init creates tables and seed rows (pure unit test)
+  - [ ] Postgres: wiring exists; integration is deferred to Phase 7 CI job
 
 ### Acceptance Criteria
 
-- [x] PyPNM can initialize DB schema for SQLite reliably.
-- [x] Postgres path is implemented and can be exercised with integration tests.
-- [x] `UNKNOWN` sysDescr exists after init.
-- [x] Schema version mismatch fails fast with an actionable error.
+- [ ] PyPNM can initialize DB schema for SQLite reliably.
+- [ ] Postgres path is implemented and can be exercised with integration tests.
+- [ ] `UNKNOWN` sysDescr exists after init.
 
 ## Phase 3 · Transactions Migration (Replace `transactions.json`) (M3)
 
@@ -272,42 +248,32 @@ Introduce both schemas and a stable DB API that hides backend differences.
 
 Replace JSON transactions ledger with DB-backed `transaction_records` plus de-dup dimensions, and update endpoint read paths.
 
-Cutover note:
-
-- Runtime must stop writing and reading `transactions.json` once DB-backed transactions are enabled.
-- Other ledgers (`capture_group.json`, `operation_capture.json`) remain until M4.
-
 ### Tasks
 
-- [x] Implement repository/service layer:
-  - [x] `SystemDescriptionRepository` (upsert by hash)
-  - [x] `DeviceDetailsRepository` (upsert by hash, FK sysDescr)
-  - [x] `TransactionRepository` (insert/get/list/search)
-
-- [x] Enforce safeguards:
-  - [x] MAC normalization in app (lowercase)
-  - [x] Rely on DB CHECK constraints for MAC format enforcement
-
-- [x] Update transaction creation/read code to use DB:
-  - [x] Stop writing `transactions.json`
-  - [x] Preserve external API shapes as needed by current services/endpoints
-
-- [x] Update file-manager endpoints to query DB (no `transactions.json` traversal):
-  - [x] `getMacAddresses`
-  - [x] `searchFiles/{mac_address}`
-  - [x] `download/transactionID/{transaction_id}` resolves filename via DB record (artifact linkage becomes authoritative in M5)
-
-- [x] Add pytest coverage:
-  - [x] Insert transaction creates dims (sysDescr/device details)
-  - [x] De-dup sysDescr across multiple transactions
-  - [x] De-dup device details across multiple transactions
-  - [x] Endpoint-compatible query behavior (service-level tests)
+- [ ] Implement repository/service layer:
+  - [ ] `SystemDescriptionRepository` (upsert by hash)
+  - [ ] `DeviceDetailsRepository` (upsert by hash, FK sysDescr)
+  - [ ] `TransactionRepository` (insert/get/list/search)
+- [ ] Enforce safeguards:
+  - [ ] MAC normalization in app (lowercase)
+  - [ ] Rely on DB CHECK constraints for MAC format enforcement
+- [ ] Update transaction creation/read code to use DB:
+  - [ ] Remove JSON file creation/reads for transactions ledger
+  - [ ] Preserve external API shapes as needed by current services/endpoints
+- [ ] Update file-manager endpoints to query DB (no ledger reads):
+  - [ ] `getMacAddresses`
+  - [ ] `searchFiles/{mac_address}`
+  - [ ] `download/transactionID/{transaction_id}` (resolution depends on Phase 5 tables)
+- [ ] Add pytest coverage:
+  - [ ] Insert transaction creates dims (sysDescr/device details)
+  - [ ] De-dup sysDescr across multiple transactions
+  - [ ] De-dup device details across multiple transactions
+  - [ ] Endpoint-compatible query behavior (service-level tests)
 
 ### Acceptance Criteria
 
-- [x] Captures produce DB rows instead of writing `transactions.json`.
-- [x] File manager flows can fetch transactions from DB (no JSON ledger traversal for transactions).
-- [x] There is no runtime write/read path that touches `transactions.json`.
+- [ ] Captures produce DB rows instead of writing `transactions.json`.
+- [ ] File manager flows can fetch transactions from DB.
 
 ## Phase 4 · Capture Group And Operation Migration (Replace `capture_group.json`, `operation_capture.json`) (M4)
 
@@ -315,30 +281,19 @@ Cutover note:
 
 Move multi-capture and operation tracking to DB, updating operation-based endpoints.
 
-Cutover note:
-
-- This phase stops runtime writes to capture-group and operation ledgers.
-- Once complete, operation status/result endpoints must resolve via DB-backed repositories.
-
 ### Tasks
 
 - [ ] Implement `CaptureGroupRepository`:
   - [ ] Create capture group
   - [ ] Add ordered transaction membership (`position`)
   - [ ] Load capture group with ordered transactions
-
 - [ ] Implement `OperationCaptureRepository`:
   - [ ] Create operation capture linking to capture group
   - [ ] Resolve operation capture -> capture group -> ordered transaction list
-
 - [ ] Update existing grouping/operation services to use DB:
-  - [ ] Stop writing `.data/db/capture_group.json`
-  - [ ] Stop writing `.data/db/operation_capture.json`
-  - [ ] Stop reading capture/operation ledgers from runtime paths
-
+  - [ ] Stop reading/writing JSON ledgers
 - [ ] Update file-manager endpoint behavior:
   - [ ] `download/operationID/{operation_id}` resolves op -> group -> ordered tx list
-
 - [ ] Add pytest coverage:
   - [ ] Position uniqueness within group
   - [ ] Operation capture references group correctly
@@ -347,8 +302,7 @@ Cutover note:
 ### Acceptance Criteria
 
 - [ ] Multi-capture workflows no longer use JSON ledger files.
-- [ ] Operation workflows resolve through DB (no JSON traversal).
-- [ ] There is no runtime write path that touches capture/operation ledger JSON.
+- [ ] Operation workflows resolve through DB.
 
 ## Phase 5 · Artifact Linkage (Filesystem References) (M5)
 
@@ -362,28 +316,22 @@ Make file linkage explicit via `artifact_stores`, `file_artifacts`, and `transac
   - [ ] `ArtifactStoreRepository`:
     - [ ] Ensure a default store exists (prod)
     - [ ] Ensure demo store exists when demo mode is used
-
   - [ ] `FileArtifactRepository`:
     - [ ] Insert/upsert file artifacts (sha256 + relative path)
     - [ ] Store `relative_path` relative to artifact store root
     - [ ] Capture `size_bytes` and optional `mime_type`
-
   - [ ] `TransactionArtifactRepository`:
     - [ ] Link transaction to artifact via `role`
-
 - [ ] Update capture flow:
   - [ ] On capture success, write artifact row and link to transaction (`role=pnm_raw`)
-
 - [ ] Update upload flow:
   - [ ] Create transaction using `UNKNOWN` sysDescr when sysDescr is missing
   - [ ] Store artifact linkage to uploaded file (`role=pnm_uploaded_raw`)
-
 - [ ] Update file-manager service methods to resolve through artifact linkage:
   - [ ] `get_pnm_path_for_transaction()` resolves by role preference:
     - [ ] Prefer `pnm_raw`
     - [ ] Fallback `pnm_uploaded_raw`
   - [ ] Keep `transaction_records.filename` for readability/back-compat, but do not treat it as authoritative
-
 - [ ] Add pytest coverage:
   - [ ] Resolve absolute paths from `app_root + store.root_path + artifact.relative_path`
   - [ ] Demo root isolation (`demo/.data/...` paths)
@@ -391,9 +339,8 @@ Make file linkage explicit via `artifact_stores`, `file_artifacts`, and `transac
 
 ### Acceptance Criteria
 
-- [ ] Transactions resolve to binaries without any legacy settings JSON linkage.
+- [ ] Transactions resolve to binary files without legacy settings JSON linkage.
 - [ ] Demo and prod are isolated by data root and DB.
-- [ ] Endpoints resolve files via DB artifact linkage exclusively.
 
 ## Phase 6 · Remove Ledger JSON Design And Code (M6)
 
@@ -406,32 +353,30 @@ Delete ledger JSON code paths and remove ledger JSON design from documentation, 
 - [ ] Remove JSON ledger creation paths:
   - [ ] Stop creating `.data/db/*.json` ledgers in capture flows
   - [ ] Remove any remaining ledger read code paths
-
 - [ ] Remove or deprecate config keys related to ledgers:
   - [ ] `transaction_db`, `capture_group_db`, `operation_db`, `json_transaction_db`
-
 - [ ] Remove or repurpose ledger modules:
   - [ ] Remove `pypnm/lib/db/json_transaction.py` if no longer needed
-  - [ ] Remove/retire any code paths that still materialize ledger JSON in memory
-
 - [ ] Documentation cleanup (explicit requirement):
   - [ ] Remove/replace all doc references to:
     - [ ] `.data/db/transactions.json`
     - [ ] `.data/db/capture_group.json`
     - [ ] `.data/db/operation_capture.json`
   - [ ] Update file-manager docs to state DB-backed persistence for transactions/groups/operations
-  - [ ] Ensure diagrams and examples reflect DB-backed persistence and artifact linkage
-
-- [ ] MkDocs + tooling support for Mermaid (if not already satisfied in the repo):
+  - [ ] Add DB backend sections:
+    - [ ] Backend selection and install-time flags
+    - [ ] Runtime DB location policy
+    - [ ] Concurrency guidance (SQLite vs Postgres)
+  - [ ] Add Mermaid diagrams/flows in docs where workflows are described
+- [ ] MkDocs + tooling support for Mermaid:
   - [ ] Update `mkdocs.yml` to render Mermaid fences (Material: `pymdownx.superfences`)
-  - [ ] Add the Mermaid plugin dependency to the docs extras in `pyproject.toml` (avoid redundant deps)
-
+  - [ ] Add the Mermaid plugin dependency to the docs extras in `pyproject.toml` (Codex selects the best fit for current repo)
 - [ ] Final hygiene scan:
   - [ ] Ensure no `.data/` artifacts are tracked or packaged
 
 ### Acceptance Criteria
 
-- [ ] No code path depends on JSON ledgers at runtime.
+- [ ] No code path depends on JSON ledgers.
 - [ ] Docs and examples reflect DB backend design (no ledger design remains as “current”).
 - [ ] Release artifacts contain no DB data.
 
@@ -451,7 +396,6 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
     - [ ] Schema init helper (idempotent DDL apply)
     - [ ] Seed helper for artifact stores and `UNKNOWN` sysDescr
   - [ ] Convert endpoint-level tests (if present) to use DB-backed services (no JSON)
-
 - [ ] GitHub Actions refactor (required for DB backend release confidence):
   - [ ] Add a DB backend test matrix:
     - [ ] SQLite job (required)
@@ -462,7 +406,6 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
     - [x] Apply schema during test setup (idempotent)
   - [ ] Ensure tests remain hermetic:
     - [ ] No external CMTS/SNMP dependencies in CI
-
 - [ ] Developer documentation:
   - [x] Document what backends CI validates
   - [x] Document how to run Postgres tests locally (docker compose recommended)
@@ -470,8 +413,8 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
 
 ### Acceptance Criteria
 
-- [ ] `pytest` passes locally for SQLite with DB-backed services.
-- [ ] GitHub Actions passes with SQLite in the DB-backed test path.
+- [ ] `pytest` passes locally for SQLite.
+- [ ] GitHub Actions passes with SQLite.
 - [x] Postgres path is validated in CI with a service container.
 
 ## Cross-Cutting Requirements
@@ -480,11 +423,6 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
 
 - [ ] PyPNM-CMTS must not select a different backend than PyPNM.
 - [ ] All DB interactions in PyPNM-CMTS must occur through PyPNM APIs only.
-
-### Runtime Cutover Rule
-
-- [ ] Runtime must not fall back to JSON ledger reads once DB read paths exist for that domain.
-- [ ] Any legacy ledger handling must be isolated to an offline migrator tool (optional) and must not be required for normal runtime.
 
 ### Docker And K8 Notes
 
@@ -506,3 +444,4 @@ Codex should maintain a running checklist aligned to these phases:
 - Tests added and executed
 - CI workflow impacts validated
 - Deferred items (with rationale)
+

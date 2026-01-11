@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 
 import pytest
@@ -20,8 +19,10 @@ from pypnm.api.routes.common.extended.common_messaging_service import (
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.operations.operation_store import OperationStore
-from pypnm.lib.types import OperationId
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath, OperationId
 
 
 class _FakeCaptureService(AbstractCaptureService):
@@ -68,6 +69,7 @@ def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
     capture_group_db = db_dir / "capture_group.json"
     operation_db = db_dir / "operation_capture.json"
+    sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -84,6 +86,22 @@ def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         "operation_db",
         classmethod(lambda cls: str(operation_db)),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(sqlite_db))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+    DatabaseSchemaManager.from_system_config().initialize_schema()
 
 
 @pytest.mark.asyncio
@@ -168,10 +186,8 @@ async def test_capture_service_skips_empty_transaction_id_linking(
 
     await asyncio.sleep(0)
 
-    db_path = Path(SystemConfigSettings.capture_group_db())
-    with db_path.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    assert data[group_id]["transactions"] == []
+    repo = CaptureGroupRepository.from_system_config()
+    assert repo.list_transactions(group_id) == []
     assert "Skipping capture_group link for empty transaction_id" in caplog.text
 
 
@@ -186,8 +202,6 @@ async def test_capture_service_skips_whitespace_transaction_id_linking(
 
     await asyncio.sleep(0)
 
-    db_path = Path(SystemConfigSettings.capture_group_db())
-    with db_path.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    assert data[group_id]["transactions"] == []
+    repo = CaptureGroupRepository.from_system_config()
+    assert repo.list_transactions(group_id) == []
     assert "Skipping capture_group link for empty transaction_id" in caplog.text

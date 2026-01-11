@@ -107,9 +107,9 @@ CREATE INDEX IF NOT EXISTS idx_cg_tx_transaction_id
 ON capture_group_transactions (transaction_id);
 
 CREATE TABLE IF NOT EXISTS operation_captures (
-    operation_capture_id  TEXT   PRIMARY KEY,
-    capture_group_id      TEXT   NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
-    created_epoch         BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+    operation_id     TEXT   PRIMARY KEY,
+    capture_group_id TEXT   NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
+    created_epoch    BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
 );
 
 CREATE INDEX IF NOT EXISTS idx_operation_captures_capture_group_id

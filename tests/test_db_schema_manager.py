@@ -15,6 +15,8 @@ from pypnm.lib.db.db_schema_manager import (
     COMMIT_STATEMENT,
     DEFAULT_ARTIFACT_STORE_NAME,
     SCHEMA_VERSION,
+    SQLITE_BUSY_TIMEOUT_MS,
+    SQLITE_JOURNAL_MODE,
     UNKNOWN_SYSDESCR_HASH,
     DatabaseSchemaManager,
 )
@@ -23,6 +25,8 @@ from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
 SCHEMA_META_ID: int = 1
 EXPECTED_UNKNOWN_COUNT: int = 1
 EXPECTED_SCHEMA_STATEMENTS_MIN: int = 1
+EXPECTED_SQLITE_JOURNAL_MODE: str = SQLITE_JOURNAL_MODE.lower()
+UNSUPPORTED_SCHEMA_VERSION: int = SCHEMA_VERSION + 1
 
 
 def test_sqlite_schema_init_and_health(tmp_path: Path) -> None:
@@ -70,6 +74,53 @@ def test_sqlite_schema_init_and_health(tmp_path: Path) -> None:
         assert str(row[0]).strip() != ""
     finally:
         connection.close()
+
+
+def test_sqlite_pragmas_applied(tmp_path: Path) -> None:
+    db_path = tmp_path / "pypnm_schema.sqlite3"
+    sqlite_path = cast(DatabasePath, str(db_path))
+    postgres_dsn = cast(DatabaseDsn, "")
+    manager = DatabaseSchemaManager.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+
+    connection = manager.connect()
+    try:
+        cursor = connection.execute("PRAGMA journal_mode;")
+        row = cursor.fetchone()
+        assert row is not None
+        assert str(row[0]).lower() == EXPECTED_SQLITE_JOURNAL_MODE
+
+        cursor = connection.execute("PRAGMA busy_timeout;")
+        row = cursor.fetchone()
+        assert row is not None
+        assert int(row[0]) == SQLITE_BUSY_TIMEOUT_MS
+    finally:
+        connection.close()
+
+
+def test_schema_version_mismatch_raises(tmp_path: Path) -> None:
+    db_path = tmp_path / "pypnm_schema.sqlite3"
+    sqlite_path = cast(DatabasePath, str(db_path))
+    postgres_dsn = cast(DatabaseDsn, "")
+    manager = DatabaseSchemaManager.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+
+    manager.initialize_schema()
+
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute(
+            "UPDATE schema_meta SET schema_version = ? WHERE schema_meta_id = ?;",
+            (UNSUPPORTED_SCHEMA_VERSION, SCHEMA_META_ID),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(RuntimeError, match="Unsupported schema_version"):
+        manager.initialize_schema()
 
 
 def test_split_sql_statements_handles_quotes_and_comments() -> None:

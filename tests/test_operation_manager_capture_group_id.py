@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +10,9 @@ import pytest
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.db.capture_group_repository import OperationCaptureRepository
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
 
 
 def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -20,6 +22,7 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     capture_group_db = db_dir / "capture_group.json"
     operation_db = db_dir / "operation_capture.json"
+    sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -31,6 +34,22 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "operation_db",
         classmethod(lambda cls: str(operation_db)),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(sqlite_db))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+    DatabaseSchemaManager.from_system_config().initialize_schema()
 
     return operation_db
 
@@ -38,14 +57,13 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_operation_manager_writes_capture_group_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    operation_db = _configure_paths(tmp_path, monkeypatch)
+    _configure_paths(tmp_path, monkeypatch)
     group = CaptureGroup()
     group_id = group.create_group()
 
     manager = OperationManager(capture_group_id=group_id)
     operation_id = manager.register()
 
-    data = json.loads(operation_db.read_text(encoding="utf-8"))
-    record = data[str(operation_id)]
-    assert "capture_group_id" in record
-    assert "capture_group" not in record
+    operation_repo = OperationCaptureRepository.from_system_config()
+    resolved = operation_repo.get_capture_group_id(operation_id)
+    assert resolved == group_id

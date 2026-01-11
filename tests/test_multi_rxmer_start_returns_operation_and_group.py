@@ -15,7 +15,8 @@ from pypnm.api.routes.advance.multi_rxmer.service import MultiRxMerService
 from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.types import OperationId
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath, OperationId
 
 
 def _build_app() -> FastAPI:
@@ -33,7 +34,7 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     capture_group_db = db_dir / "capture_group.json"
     operation_db = db_dir / "operation_capture.json"
-    transaction_db = db_dir / "transactions.json"
+    sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -52,9 +53,20 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         SystemConfigSettings,
-        "transaction_db",
-        classmethod(lambda cls: str(transaction_db)),
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(sqlite_db))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+    DatabaseSchemaManager.from_system_config().initialize_schema()
 
 
 @pytest.mark.asyncio

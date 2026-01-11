@@ -5,6 +5,7 @@
 
 ## Table Of Contents
 
+- [0. Status Snapshot (2026-01-11)](#0-status-snapshot-2026-01-11)
 - [1. Purpose](#1-purpose)
 - [2. Scope](#2-scope)
 - [3. Non-Goals](#3-non-goals)
@@ -49,6 +50,7 @@
 - [14. Migration Strategy](#14-migration-strategy)
   - [14.1 Cutover Philosophy](#141-cutover-philosophy)
   - [14.2 Legacy Ledger Data](#142-legacy-ledger-data)
+  - [14.3 Implementation Milestones And Cutover Moment](#143-implementation-milestones-and-cutover-moment)
 - [15. Testing Requirements](#15-testing-requirements)
   - [15.1 CI And GitHub Workflow Considerations](#151-ci-and-github-workflow-considerations)
 - [16. Concurrency Model And Backend Guidance](#16-concurrency-model-and-backend-guidance)
@@ -57,6 +59,25 @@
 - [17. Appendix A: Mermaid ER Diagram](#17-appendix-a-mermaid-er-diagram)
 - [18. Appendix B: PostgreSQL DDL](#18-appendix-b-postgresql-ddl)
 - [19. Appendix C: SQLite DDL](#19-appendix-c-sqlite-ddl)
+
+## 0. Status Snapshot (2026-01-11)
+
+This section is a working marker so you can see progress against the design while the implementation is still ledger-backed.
+
+Work completed that supports DB cutover stability (but does not yet change persistence):
+
+- Unified operation workflow payload shape across newer registry-style endpoints:
+  - Dual-status support (legacy `status` string plus canonical `service_status`)
+  - Shared `time_remaining` contract on registry status endpoints, including safe coercion and default fallback behavior
+- Multi-capture registry status endpoints aligned to the shared `time_remaining` contract:
+  - Multi-RxMER `/advance/multiRxMer/status` (POST)
+  - Multi-ChannelEstimation `/advance/multiChannelEstimation/status` (POST)
+- Test coverage added to lock in the above contract behavior and keep the validation gate green.
+
+Cutover statement:
+
+- The JSON ledgers remain in use until Phase 3 through Phase 5 complete (transactions, groups/operations, artifact linkage).
+- The cutover moment is defined explicitly in [14.3 Implementation Milestones And Cutover Moment](#143-implementation-milestones-and-cutover-moment).
 
 ## 1. Purpose
 
@@ -206,6 +227,11 @@ If neither flag is provided, the installer must prompt:
 
 Selection is written into the generated settings file (for example `settings/system.json`), and PyPNM uses it at runtime.
 
+Implementation status (2026-01-10):
+
+- Flags and interactive selection have been implemented, and selection occurs before pytest so the suite runs against the chosen backend contract.
+- Postgres DSN capture supports password redaction and recommends env var injection rather than plaintext persistence.
+
 ### 7.2 Configuration Keys
 
 A single configuration contract, applicable to both prod and demo datasets:
@@ -241,6 +267,10 @@ Recommended environment variable keys (contract):
 
 - `PYPNM_DB_BACKEND` (optional override for dev and CI)
 - `PYPNM_DB_POSTGRES_DSN` (preferred secret injection mechanism for Postgres DSN)
+
+Implementation note:
+
+- As of 2026-01-11, the design contract is stable, but `settings/system.json.template` and `SystemConfigSettings` accessors still need to be updated to fully reflect this configuration surface.
 
 ### 7.3 DB Location Policy
 
@@ -573,6 +603,22 @@ If you want to preserve legacy ledger data:
 
 If you do not need legacy migration, remove the ledgers and start fresh for new installs.
 
+### 14.3 Implementation Milestones And Cutover Moment
+
+Milestone mapping to the burndown:
+
+- Phase 1: Installer/config contract is complete (backend selection, template keys, settings accessors).
+- Phase 2: DB abstraction exists and schema init is idempotent for SQLite and wired for Postgres.
+- Phase 3: Transactions write and read paths are DB-backed (ledger is no longer authoritative for transactions).
+- Phase 4: Capture group and operation persistence is DB-backed (ledger group and operation files are no longer authoritative).
+- Phase 5: Artifact linkage exists and file resolution is DB-driven (DB becomes authoritative for locating binaries).
+- Phase 6: Ledger JSON code paths and config keys are removed and docs are updated accordingly.
+
+Cutover definition (authoritative):
+
+- PyPNM is considered “DB-only” only after Phase 3 through Phase 6 are complete.
+- Until then, any DB work is preparatory and must not introduce behavior that depends on ledgers being present, except for optional offline migration tooling.
+
 ## 15. Testing Requirements
 
 - SQLite: unit tests must validate schema init and CRUD without external services
@@ -695,7 +741,7 @@ erDiagram
     }
 
     OPERATION_CAPTURES {
-        TEXT       operation_capture_id PK
+        TEXT       operation_id PK
         TEXT       capture_group_id FK
         BIGINT     created_epoch
     }
@@ -846,9 +892,9 @@ CREATE INDEX IF NOT EXISTS idx_cg_tx_transaction_id
 ON capture_group_transactions (transaction_id);
 
 CREATE TABLE IF NOT EXISTS operation_captures (
-    operation_capture_id  TEXT   PRIMARY KEY,
-    capture_group_id      TEXT   NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
-    created_epoch         BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+    operation_id     TEXT   PRIMARY KEY,
+    capture_group_id TEXT   NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
+    created_epoch    BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
 );
 
 CREATE INDEX IF NOT EXISTS idx_operation_captures_capture_group_id
@@ -1022,9 +1068,9 @@ CREATE INDEX IF NOT EXISTS idx_cg_tx_transaction_id
 ON capture_group_transactions (transaction_id);
 
 CREATE TABLE IF NOT EXISTS operation_captures (
-    operation_capture_id  TEXT    PRIMARY KEY,
-    capture_group_id      TEXT    NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
-    created_epoch         INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
+    operation_id     TEXT    PRIMARY KEY,
+    capture_group_id TEXT    NOT NULL REFERENCES capture_groups(capture_group_id) ON DELETE RESTRICT,
+    created_epoch    INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
 );
 
 CREATE INDEX IF NOT EXISTS idx_operation_captures_capture_group_id

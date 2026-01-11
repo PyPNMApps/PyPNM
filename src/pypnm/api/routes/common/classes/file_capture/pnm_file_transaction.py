@@ -4,20 +4,23 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
-from pathlib import Path
 
-from pypnm.api.routes.common.classes.file_capture.transaction_record_parser import (
-    TransactionRecordParser,
+from pypnm.api.routes.common.classes.file_capture.types import (
+    DeviceDetailsModel,
+    TransactionRecordModel,
 )
-from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
-from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.db.transaction_repository import (
+    DeviceDetailsRepository,
+    SystemDescriptionRepository,
+    TransactionRecordRow,
+    TransactionRepository,
+)
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import FileName, TransactionId
+from pypnm.lib.types import FileName, TimestampSec, TransactionId
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 
 
@@ -35,27 +38,22 @@ class PnmFileTransaction:
         - PNM test type (e.g., DS_RXMER, SPECTRUM_ANALYZER)
         - Filename of the associated binary data file
 
-    Transactions are stored in a central JSON file defined in system config at:
-    `PnmFileRetrieval.transaction_db`.
+    Transactions are stored in the configured database backend (SQLite/Postgres)
+    using the DB schema defined under docs/design/db/.
 
     Usage Scenarios:
         - When a measurement test completes and produces a file.
         - When a user uploads a file manually via the REST API.
         - When retrieving metadata about previously captured test files.
 
-    Attributes:
-        transaction_db_path (Path): Path to the JSON file where all transactions are recorded.
-
-    Record:
+    Record structure mirrors the legacy JSON layout so downstream parsers stay stable:
         {
-            "<transaction_id>": {
-                "timestamp": int,
-                "mac_address": "<cable modem mac address>",
-                "pnm_test_type": "<PNM Test Type>",
-                "filename": "<FileName>",
-                "device_details": {
-                    "system_description": { ... }
-                }
+            "timestamp": int,
+            "mac_address": "<cable modem mac address>",
+            "pnm_test_type": "<PNM Test Type>",
+            "filename": "<FileName>",
+            "device_details": {
+                "system_description": { ... }
             }
         }
     """
@@ -67,10 +65,9 @@ class PnmFileTransaction:
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.transaction_db_path = Path(SystemConfigSettings.transaction_db())
-        self.transaction_db_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.transaction_db_path.exists():
-            self.transaction_db_path.write_text(json.dumps({}))
+        self._sysdescr_repo = SystemDescriptionRepository.from_system_config()
+        self._device_details_repo = DeviceDetailsRepository.from_system_config()
+        self._transaction_repo = TransactionRepository.from_system_config()
 
     async def insert(
         self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str
@@ -145,32 +142,6 @@ class PnmFileTransaction:
             filename=filename,
         )
 
-    # ---------------------------
-    # Safe read helpers (no recursion)
-    # ---------------------------
-
-    def _load_record_dict(self, transaction_id: TransactionId) -> dict | None:
-        """
-        Load The Raw JSON Record For A Transaction Identifier.
-
-        This helper reads the on-disk transaction database and returns the
-        underlying dictionary for the requested transaction identifier, if
-        present. It does not perform any schema normalization or conversion.
-
-        Parameters
-        ----------
-        transaction_id:
-            Unique transaction identifier to resolve.
-
-        Returns
-        -------
-        dict | None
-            Raw JSON-compatible dictionary for the transaction when present,
-            or `None` if no record exists for the supplied identifier.
-        """
-        db = self._load_db()
-        return db.get(transaction_id)
-
     def get_record(self, transaction_id: TransactionId) -> dict | None:
         """
         Fetch A Plain Dictionary Representation Of A Transaction Record.
@@ -190,8 +161,10 @@ class PnmFileTransaction:
             The underlying transaction record as a dictionary, or `None` when
             the identifier does not exist in the database.
         """
-        rec = self._load_record_dict(transaction_id)
-        return rec if rec else None
+        record = self._transaction_repo.get_transaction_record(transaction_id)
+        if record is None:
+            return None
+        return self._record_to_payload(record)
 
     def get(self, transaction_id: TransactionId) -> dict | None:
         return self.get_record(transaction_id)
@@ -200,9 +173,9 @@ class PnmFileTransaction:
         """
         Build A Canonical TransactionRecordModel For A Transaction Identifier.
 
-        This convenience wrapper resolves the raw JSON record and delegates to
-        `TransactionRecordParser` to construct the normalized Pydantic model.
-        If the record does not exist, a `null()` sentinel model is returned.
+        This convenience wrapper resolves the DB-backed record and constructs
+        the normalized Pydantic model. If the record does not exist, a
+        `null()` sentinel model is returned.
 
         Parameters
         ----------
@@ -216,10 +189,10 @@ class PnmFileTransaction:
             Canonical, fully-normalized transaction model, or the sentinel
             `TransactionRecordModel.null()` instance for missing records.
         """
-        rec = self._load_record_dict(transaction_id)
-        if not rec:
+        record = self._transaction_repo.get_transaction_record(transaction_id)
+        if record is None:
             return TransactionRecordModel.null()
-        return TransactionRecordParser.from_id(transaction_id)
+        return self._record_to_model(record)
 
     def get_file_info_via_macaddress(
         self, mac_address: MacAddress
@@ -251,20 +224,12 @@ class PnmFileTransaction:
             transactions associated with the given MAC address. The list is
             empty when no matching records are found.
         """
-        db = self._load_db()
-        mac_str = str(mac_address).lower()
-        self.logger.info(f"Searching for files with MAC address: {mac_str}")
-        records: list[TransactionRecordModel] = []
-
-        for txn_id, record in db.items():
-            if record.get(self.MAC_ADDRESS, "").lower() != mac_str:
-                self.logger.info(
-                    f"Skipping file with MAC address: {record.get(self.MAC_ADDRESS, '').lower()}"
-                )
-                continue
-            records.append(TransactionRecordParser.from_id(txn_id))
-
-        return records
+        records = self._transaction_repo.list_transactions_for_mac(mac_address)
+        models: list[TransactionRecordModel] = []
+        for record in records:
+            model = self._record_to_model(record)
+            models.append(model)
+        return models
 
     def get_all_record_models(self) -> list[TransactionRecordModel]:
         """
@@ -280,38 +245,25 @@ class PnmFileTransaction:
             List of all transaction models currently stored in the transaction
             database. The list is empty when no records exist.
         """
-        db = self._load_db()
-        if not db:
+        records = self._transaction_repo.list_all_transactions()
+        if not records:
             return []
 
-        records: list[TransactionRecordModel] = []
-        for txn_id in db:
-            record = self._safe_parse_record(txn_id)
-            if record is not None:
-                records.append(record)
+        models: list[TransactionRecordModel] = []
+        for record in records:
+            model = self._safe_record_model(record)
+            if model is not None:
+                models.append(model)
 
-        return records
+        return models
 
-    def _safe_parse_record(self, txn_id: str) -> TransactionRecordModel | None:
-        """
-        Safely Parse A Single Transaction Record.
-
-        Parameters
-        ----------
-        txn_id:
-            Transaction identifier to parse.
-
-        Returns
-        -------
-        TransactionRecordModel | None
-            Parsed record model or None if parsing fails.
-        """
+    def _safe_record_model(
+        self, record: TransactionRecordRow
+    ) -> TransactionRecordModel | None:
         try:
-            return TransactionRecordParser.from_id(TransactionId(txn_id))
-        except Exception as e:
-            self.logger.warning(
-                "Skipping transaction %s due to parse error: %s", txn_id, e
-            )
+            return self._record_to_model(record)
+        except Exception as exc:
+            self.logger.warning("Skipping transaction due to parse error: %s", exc)
             return None
 
     # ---------------------------
@@ -329,8 +281,8 @@ class PnmFileTransaction:
         Common Logic For Creating And Persisting A Transaction Record.
 
         This internal helper generates a new transaction identifier, assembles
-        the JSON-serializable record structure, and writes the updated
-        transaction database back to disk.
+        the DB-backed record structure, and persists the transaction to the
+        configured database backend.
 
         Parameters
         ----------
@@ -357,69 +309,56 @@ class PnmFileTransaction:
         tx_id = str(transaction_id)
         if not tx_id.strip():
             self.logger.warning(
-                "Skipping transaction_db insert for empty transaction_id (filename=%s, mac=%s)",
+                "Skipping transaction insert for empty transaction_id (filename=%s, mac=%s)",
                 filename,
                 mac_address,
             )
             return TransactionId("")
 
-        db = self._load_db()
-        db[transaction_id] = {
-            "timestamp": timestamp,
-            "mac_address": str(mac_address),
-            "pnm_test_type": pnm_test_type.name,
-            "filename": filename,
-            "device_details": {
-                "system_description": system_description or {},
-            },
-        }
-        self._save_db(db)
+        normalized_sd = self._normalize_system_description(system_description)
+        device_details = {"system_description": normalized_sd}
+        sysdescr_payload = normalized_sd if normalized_sd else None
+        sysdescr_id = self._sysdescr_repo.get_or_create_sysdescr_id(sysdescr_payload)
+        device_detail_id = self._device_details_repo.get_or_create_device_detail_id(
+            device_details, sysdescr_id
+        )
+        self._transaction_repo.insert_transaction(
+            transaction_id=transaction_id,
+            timestamp_epoch=TimestampSec(timestamp),
+            mac_address=mac_address,
+            pnm_test_type=pnm_test_type.name,
+            filename=filename,
+            device_detail_id=device_detail_id,
+        )
         return transaction_id
 
-    def _load_db(self) -> dict:
-        """
-        Load The Transaction Database From JSON Storage.
-
-        This helper reads the transaction database file configured by
-        `SystemConfigSettings.transaction_db` and returns its contents as a
-        dictionary. If JSON parsing fails, an empty dictionary is returned to
-        avoid propagating the error to callers.
-
-        Returns
-        -------
-        dict
-            Dictionary of all transaction records keyed by transaction
-            identifier. An empty dictionary is returned on parse errors.
-        """
-        try:
-            with self.transaction_db_path.open("r") as f:
-                data = json.load(f)
-        except json.JSONDecodeError:
+    @staticmethod
+    def _normalize_system_description(
+        system_description: dict[str, str] | None,
+    ) -> dict[str, str]:
+        if not system_description:
             return {}
-        if not isinstance(data, dict):
-            self.logger.error(
-                "Transaction DB root is not an object: %s",
-                type(data).__name__,
-            )
-            return {}
+        return SystemDescriptor.load_from_dict(system_description).to_dict()
 
-        cleaned: dict = {}
-        for key, value in data.items():
-            if not str(key).strip():
-                self.logger.warning("Skipping empty transaction_id in transaction_db")
-                continue
-            cleaned[key] = value
-        return cleaned
+    def _record_to_payload(self, record: TransactionRecordRow) -> dict:
+        return {
+            "timestamp": int(record.timestamp_epoch),
+            "mac_address": str(record.mac_address),
+            "pnm_test_type": record.pnm_test_type,
+            "filename": str(record.filename),
+            "device_details": {
+                "system_description": record.system_description or {},
+            },
+        }
 
-    def _save_db(self, db: dict) -> None:
-        """
-        Persist The Transaction Database To Disk.
-
-        Parameters
-        ----------
-        db:
-            Fully realized transaction database dictionary to be serialized and
-            written to the configured JSON file.
-        """
-        with self.transaction_db_path.open("w") as f:
-            json.dump(db, f, indent=4)
+    def _record_to_model(self, record: TransactionRecordRow) -> TransactionRecordModel:
+        sysdesc = record.system_description or {}
+        system_description = SystemDescriptor.load_from_dict(sysdesc).to_model()
+        return TransactionRecordModel(
+            transaction_id=record.transaction_id,
+            timestamp=TimestampSec(int(record.timestamp_epoch)),
+            mac_address=record.mac_address,
+            pnm_test_type=record.pnm_test_type,
+            filename=record.filename,
+            device_details=DeviceDetailsModel(system_description=system_description),
+        )

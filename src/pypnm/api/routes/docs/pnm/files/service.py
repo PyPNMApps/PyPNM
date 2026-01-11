@@ -47,6 +47,7 @@ from pypnm.api.routes.docs.pnm.files.schemas import (
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.archive.manager import ArchiveManager
 from pypnm.lib.constants import MediaType
+from pypnm.lib.db.transaction_repository import TransactionRepository
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.types import (
@@ -634,64 +635,16 @@ class PnmFileService:
         MacAddressSystemDescriptorResponse
             Unique MAC address list with optional system descriptor per MAC.
         """
-        records = PnmFileTransaction().get_all_record_models()
-        if not records:
+        entries = TransactionRepository.from_system_config().list_macs()
+        if not entries:
             return MacAddressSystemDescriptorResponse(mac_addresses=[])
 
-        latest_by_mac: dict[str, tuple[int, dict[str, str] | None]] = {}
-
-        for rec in records:
-            mac_value = getattr(rec, "mac_address", "")
-            mac_str = str(mac_value).lower().strip()
-            if not mac_str:
-                continue
-
-            ts_value = getattr(rec, "timestamp", 0)
-            try:
-                ts_int = int(ts_value)
-            except Exception:
-                ts_int = 0
-
-            system_description: dict[str, str] | None = None
-
-            device_details = getattr(rec, "device_details", None)
-            if device_details is not None:
-                if hasattr(device_details, "system_description"):
-                    sd_value = getattr(device_details, "system_description", None)
-                    if sd_value is not None:
-                        if hasattr(sd_value, "model_dump"):
-                            system_description = sd_value.model_dump()
-                        elif isinstance(sd_value, dict):
-                            system_description = sd_value
-
-                elif hasattr(device_details, "model_dump"):
-                    dd_dump = device_details.model_dump()
-                    if isinstance(dd_dump, dict):
-                        sd_value = dd_dump.get("system_description")
-                        if isinstance(sd_value, dict):
-                            system_description = sd_value
-
-                elif isinstance(device_details, dict):
-                    sd_value = device_details.get("system_description")
-                    if isinstance(sd_value, dict):
-                        system_description = sd_value
-
-            existing = latest_by_mac.get(mac_str)
-            if existing is None:
-                latest_by_mac[mac_str] = (ts_int, system_description)
-                continue
-
-            existing_ts, _existing_sd = existing
-            if ts_int >= existing_ts:
-                latest_by_mac[mac_str] = (ts_int, system_description)
-
-        entries: list[MacAddressSystemDescriptorEntry] = []
-        for mac_str, (_ts, sd) in sorted(latest_by_mac.items(), key=lambda x: x[0]):
-            entries.append(
-                MacAddressSystemDescriptorEntry(
-                    mac_address=mac_str,
-                    system_description=sd,
-                )
+        response_entries = [
+            MacAddressSystemDescriptorEntry(
+                mac_address=entry.mac_address,
+                system_description=entry.system_description,
             )
+            for entry in entries
+        ]
 
-        return MacAddressSystemDescriptorResponse(mac_addresses=entries)
+        return MacAddressSystemDescriptorResponse(mac_addresses=response_entries)

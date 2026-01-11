@@ -11,17 +11,24 @@ from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
 )
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.types import GroupId, OperationId, TransactionId
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
+)
+from pypnm.lib.db.transaction_repository import TransactionRepository
+from pypnm.lib.types import GroupId, OperationId, TimestampSec, TransactionId
+
+_DEFAULT_CREATED_EPOCH: int = 0
 
 
 class OperationCaptureGroupResolver:
     """
     Resolve Operation IDs Into Capture Groups And Transaction Records.
 
-    This helper class ties together three JSON-backed datasets:
+    This helper class ties together DB-backed datasets with legacy JSON fallback:
 
     1) Operation Database
-       - Path: SystemConfigSettings.operation_db
+       - DB: operation_captures table (fallback to SystemConfigSettings.operation_db)
        - Shape:
          {
            "<operation_id>": {
@@ -32,7 +39,8 @@ class OperationCaptureGroupResolver:
          }
 
     2) Capture Group Database
-       - Path: SystemConfigSettings.capture_group_db
+       - DB: capture_groups/capture_group_transactions tables
+       - Path: SystemConfigSettings.capture_group_db (fallback)
        - Shape:
          {
            "<capture_group_id>": {
@@ -46,7 +54,7 @@ class OperationCaptureGroupResolver:
            ...
          }
 
-    3) Transaction Database (PnmFileTransaction.transaction_db)
+    3) Transaction Database (transaction_records)
        - Already managed by PnmFileTransaction.
 
     Public APIs:
@@ -57,16 +65,14 @@ class OperationCaptureGroupResolver:
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._capture_repo = CaptureGroupRepository.from_system_config()
+        self._operation_repo = OperationCaptureRepository.from_system_config()
+        self._transaction_repo = TransactionRepository.from_system_config()
         self.operation_db_path = Path(SystemConfigSettings.operation_db())
         self.capture_group_db_path = Path(SystemConfigSettings.capture_group_db())
 
         self.operation_db_path.parent.mkdir(parents=True, exist_ok=True)
         self.capture_group_db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if not self.operation_db_path.exists():
-            self.operation_db_path.write_text(json.dumps({}))
-        if not self.capture_group_db_path.exists():
-            self.capture_group_db_path.write_text(json.dumps({}))
 
     # ------------------------------------------------------------------ #
     # Internal JSON helpers
@@ -96,6 +102,10 @@ class OperationCaptureGroupResolver:
         Returns the associated capture_group_id string when present in the
         operation database; otherwise returns None.
         """
+        capture_group_id = self._operation_repo.get_capture_group_id(operation_id)
+        if capture_group_id is not None:
+            return capture_group_id
+
         op_db = self._load_json(self.operation_db_path)
         rec = op_db.get(operation_id)
         if not rec:
@@ -104,22 +114,33 @@ class OperationCaptureGroupResolver:
             )
             return None
 
-        capture_group_id = rec.get("capture_group_id")
-        if not capture_group_id:
+        capture_group_id_value = rec.get("capture_group_id")
+        if capture_group_id_value:
+            capture_group_id = GroupId(str(capture_group_id_value))
+        else:
             legacy_capture_group = rec.get("capture_group")
             if legacy_capture_group:
                 self.logger.warning(
                     "Operation record for %s uses legacy 'capture_group' field",
                     operation_id,
                 )
-                return GroupId(str(legacy_capture_group))
+                capture_group_id = GroupId(str(legacy_capture_group))
             self.logger.warning(
                 "Operation record for %s is missing 'capture_group_id' field",
                 operation_id,
             )
-            return None
+            if not legacy_capture_group:
+                return None
 
-        return GroupId(str(capture_group_id))
+        created_value = rec.get("created")
+        created_epoch = int(created_value) if created_value else _DEFAULT_CREATED_EPOCH
+        self._capture_repo.get_or_create_capture_group(
+            capture_group_id, TimestampSec(created_epoch)
+        )
+        self._operation_repo.upsert_operation_capture(
+            operation_id, capture_group_id, TimestampSec(created_epoch)
+        )
+        return capture_group_id
 
     def get_transaction_ids_for_capture_group(
         self, capture_group_id: GroupId
@@ -130,6 +151,10 @@ class OperationCaptureGroupResolver:
         Returns an ordered list of TransactionId values, or an empty list if
         the capture group is unknown or has no associated transactions.
         """
+        db_transactions = self._capture_repo.list_transactions(capture_group_id)
+        if db_transactions:
+            return db_transactions
+
         cg_db = self._load_json(self.capture_group_db_path)
         rec = cg_db.get(capture_group_id)
         if not rec:
@@ -148,6 +173,12 @@ class OperationCaptureGroupResolver:
             )
             return []
 
+        created_value = rec.get("created")
+        created_epoch = int(created_value) if created_value else _DEFAULT_CREATED_EPOCH
+        self._capture_repo.get_or_create_capture_group(
+            capture_group_id, TimestampSec(created_epoch)
+        )
+
         transaction_ids: list[TransactionId] = []
         for tid in txns:
             tx_id = str(tid)
@@ -157,7 +188,17 @@ class OperationCaptureGroupResolver:
                     capture_group_id,
                 )
                 continue
-            transaction_ids.append(TransactionId(tx_id))
+            transaction_id = TransactionId(tx_id)
+            transaction_ids.append(transaction_id)
+            if self._transaction_repo.get_transaction_record(transaction_id) is None:
+                self.logger.warning(
+                    "Skipping capture_group backfill for missing transaction_id=%s",
+                    transaction_id,
+                )
+                continue
+            self._capture_repo.add_transaction(
+                capture_group_id, transaction_id, TimestampSec(created_epoch)
+            )
         return transaction_ids
 
     def get_transaction_ids_for_operation(

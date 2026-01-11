@@ -13,3 +13,12 @@ entries, and configuration files related to your issue. This script helps
 sanitize sensitive information before sharing it with the PyPNM support team.
 
 [Support Bundle Builder](support-bundle.md)
+
+## FAQ
+
+### Multi-capture results return 404 with legacy operation_capture.json
+
+If multi-capture result endpoints return 404 while `operation_capture.json`
+stores `capture_group` instead of `capture_group_id`, upgrade to a build that
+accepts the legacy key and backfills the operation-to-capture-group mapping
+into the DB.
