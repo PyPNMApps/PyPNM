@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -15,6 +16,10 @@ from pypnm.api.routes.advance.common.capture_data_aggregator import (
 )
 from pypnm.api.routes.advance.common.transactionsCollection import (
     TransactionCollectionModel,
+)
+from pypnm.api.routes.common.classes.analysis.model.schema import (
+    DsModulationProfileAnalysisModel,
+    ProfileAnalysisEntryModel,
 )
 from pypnm.api.routes.common.classes.collection.ds_modulation_profile_aggregator import (
     DsModulationProfileAggregator,
@@ -186,7 +191,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             self._model = MultiRxMerAnalysisResult(
                 mac_address=mac,
                 analysis_type=self.analysis_type,
-                data=None,
+                data={},
                 error=str(e),
             )
 
@@ -408,42 +413,12 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             start, stop = TimeStamp(capture_times[0]), TimeStamp(capture_times[-1])
             fec_summary = fec_sum_agg.get_summary_totals(ch_id, start, stop)
 
-            profile_entries: list[ProfileEntryModel] = []
-
-            for mod_analysis in mod_analysis_list:
-                # Each DsModulationProfileAnalysisModel corresponds to a snapshot
-                capture_time = CaptureTime(getattr(mod_analysis, "capture_time", start))
-                for profile_entry in mod_analysis.profiles:
-                    pid = profile_entry.profile_id
-                    shannon_min = profile_entry.carrier_values.shannon_min_mer
-                    capacity_delta = [
-                        float(a - b) for a, b in zip(mam.avg, shannon_min, strict=False)
-                    ]
-
-                    # Match corresponding FEC summary per profile
-                    fec_entry = next(
-                        (p for p in fec_summary.summary if p.profile_id == pid), None
-                    )
-                    fec_payload = (
-                        fec_summary
-                        if fec_entry is None
-                        else FecSummaryTotalsModel(
-                            start=fec_summary.start,
-                            end=fec_summary.end,
-                            channel_id=fec_summary.channel_id,
-                            summary=[fec_entry],
-                        )
-                    )
-
-                    profile_entries.append(
-                        ProfileEntryModel(
-                            capture_time=capture_time,
-                            profile_id=pid,
-                            profile_min_mer=shannon_min,
-                            capacity_delta=capacity_delta,
-                            fec_summary=fec_payload,
-                        )
-                    )
+            profile_entries = self._build_profile_entries(
+                mod_analysis_list=mod_analysis_list,
+                mam=mam,
+                start=start,
+                fec_summary=fec_summary,
+            )
 
             models[ch_id] = ChannelOfdmProfilePerf01Model(
                 channel_id=ch_id,
@@ -454,6 +429,65 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             )
 
         return models
+
+    def _build_profile_entries(
+        self,
+        mod_analysis_list: list[DsModulationProfileAnalysisModel],
+        mam: MinAvgMax,
+        start: TimeStamp,
+        fec_summary: FecSummaryTotalsModel,
+    ) -> list[ProfileEntryModel]:
+        profile_entries: list[ProfileEntryModel] = []
+        for mod_analysis in mod_analysis_list:
+            capture_time = CaptureTime(getattr(mod_analysis, "capture_time", start))
+            profile_entries.extend(
+                self._build_profile_entries_for_analysis(
+                    capture_time=capture_time,
+                    profiles=mod_analysis.profiles,
+                    mam=mam,
+                    fec_summary=fec_summary,
+                )
+            )
+        return profile_entries
+
+    def _build_profile_entries_for_analysis(
+        self,
+        capture_time: CaptureTime,
+        profiles: list[ProfileAnalysisEntryModel],
+        mam: MinAvgMax,
+        fec_summary: FecSummaryTotalsModel,
+    ) -> list[ProfileEntryModel]:
+        entries: list[ProfileEntryModel] = []
+        for profile_entry in profiles:
+            pid = profile_entry.profile_id
+            shannon_min = profile_entry.carrier_values.shannon_min_mer
+            capacity_delta = [
+                float(a - b) for a, b in zip(mam.avg, shannon_min, strict=False)
+            ]
+            fec_entry = next(
+                (p for p in fec_summary.summary if p.profile_id == pid), None
+            )
+            fec_payload = (
+                fec_summary
+                if fec_entry is None
+                else FecSummaryTotalsModel(
+                    start=fec_summary.start,
+                    end=fec_summary.end,
+                    channel_id=fec_summary.channel_id,
+                    summary=[fec_entry],
+                )
+            )
+
+            entries.append(
+                ProfileEntryModel(
+                    capture_time=capture_time,
+                    profile_id=pid,
+                    profile_min_mer=shannon_min,
+                    capacity_delta=capacity_delta,
+                    fec_summary=fec_payload,
+                )
+            )
+        return entries
 
     """Abstract Required methods"""
 
@@ -618,16 +652,17 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                     corr = fec_e.summary.corrected if fec_e else 0
                     uncor = fec_e.summary.uncorrectable if fec_e else 0
 
-                    for freq, avg_mer, prof_lim, delta in zip(
-                        ch_model.frequency,
-                        ch_model.avg_mer,
-                        profile_model.profile_min_mer,
-                        profile_model.capacity_delta,
-                        strict=False,
-                    ):
-                        csv_mgr.insert_row(
-                            [pid, freq, avg_mer, prof_lim, delta, total, corr, uncor]
-                        )
+                    self._write_profile_perf_rows(
+                        csv_mgr=csv_mgr,
+                        profile_id=pid,
+                        total=total,
+                        corr=corr,
+                        uncor=uncor,
+                        frequencies=ch_model.frequency,
+                        avg_mer=ch_model.avg_mer,
+                        profile_min_mer=profile_model.profile_min_mer,
+                        capacity_delta=profile_model.capacity_delta,
+                    )
 
                     csv_fname = self.create_csv_fname(
                         tags=["ofdm_profile_perf_1", f"ch{ch_id}", f"pid{pid}"]
@@ -662,6 +697,29 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 out.append(csv_mgr)
 
         return out
+
+    def _write_profile_perf_rows(
+        self,
+        csv_mgr: CSVManager,
+        profile_id: ProfileId,
+        total: int,
+        corr: int,
+        uncor: int,
+        frequencies: FrequencySeriesHz,
+        avg_mer: FloatSeries,
+        profile_min_mer: FloatSeries,
+        capacity_delta: FloatSeries,
+    ) -> None:
+        for freq, avg_value, prof_lim, delta in zip(
+            frequencies,
+            avg_mer,
+            profile_min_mer,
+            capacity_delta,
+            strict=False,
+        ):
+            csv_mgr.insert_row(
+                [profile_id, freq, avg_value, prof_lim, delta, total, corr, uncor]
+            )
 
     def create_matplot(self, **kwargs: object) -> list[MatplotManager]:
         """

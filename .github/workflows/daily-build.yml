@@ -3,6 +3,8 @@ name: Build
 on:
   push:
     branches: [main]         # Run on every commit to main
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "0 8 * * *"      # Every day at 08:00 UTC
   workflow_dispatch:          # Allow manual triggering from GitHub UI
@@ -30,9 +32,67 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run tests
+      - name: Run checks
         run: |
-          pytest
+          pypnm-software-qa-checker
+
+  postgres-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pypnm
+          POSTGRES_PASSWORD: pypnm
+          POSTGRES_DB: pypnm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pypnm -d pypnm"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PYPNM_DB_BACKEND: postgres
+      PYPNM_DB_POSTGRES_DSN: postgresql://pypnm:pypnm@localhost:5432/pypnm
+      PGPASSWORD: pypnm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install "psycopg[binary]"
+
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U pypnm -d pypnm; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready"
+          exit 1
+
+      - name: Run checks
+        run: |
+          pypnm-software-qa-checker
 
   docker-compose:
     runs-on: ubuntu-latest

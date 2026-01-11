@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 """
 Ensure each .py file has:
@@ -32,7 +32,7 @@ DOCSTRING_NOT_FOUND = -1
 MAX_HEADER_SCAN_LINES = 12
 COPYRIGHT_INSERT_SCAN_LINES = 5
 
-COPYRIGHT_RE = re.compile(r"^#\s*Copyright\s*\(c\)\s*(\d{4})\s+(.*)$")
+COPYRIGHT_RE = re.compile(r"^#\s*Copyright\s*\(c\)\s*(\d{4})(?:-(\d{4}))?\s+(.*)$")
 ENCODING_RE = re.compile(r"^#.*coding[:=]\s*([-\w.]+)")
 SPDX_RE = re.compile(r"^#\s*SPDX-License-Identifier:\s*(.+)$")
 
@@ -123,13 +123,24 @@ class HeaderUpdater:
             if copyright_idx is not None:
                 match = COPYRIGHT_RE.match(lines[copyright_idx])
                 if match is not None:
-                    old_year = int(match.group(1))
-                    old_author = match.group(2).strip()
-                    if old_year != self.year:
-                        lines[copyright_idx] = self._copyright_line(
-                            author=old_author or self.author,
-                        )
-                        header_updated = True
+                    start_year = int(match.group(1))
+                    end_year_text = match.group(2)
+                    old_author = match.group(3).strip()
+                    if end_year_text is None:
+                        if start_year != self.year:
+                            lines[copyright_idx] = self._copyright_line(
+                                author=old_author or self.author,
+                                start_year=start_year,
+                            )
+                            header_updated = True
+                    else:
+                        end_year = int(end_year_text)
+                        if end_year != self.year:
+                            lines[copyright_idx] = self._copyright_line(
+                                author=old_author or self.author,
+                                start_year=start_year,
+                            )
+                            header_updated = True
             else:
                 rem_copy = remainder[:]
                 inserted = False
@@ -181,9 +192,12 @@ class HeaderUpdater:
             if self.verbose:
                 print(f"⏭ No changes: {path}")
 
-    def _copyright_line(self, author: str | None = None) -> str:
+    def _copyright_line(self, author: str | None = None, start_year: int | None = None) -> str:
+        year_text = str(self.year)
+        if start_year is not None and start_year != self.year:
+            year_text = f"{start_year}-{self.year}"
         return COPYRIGHT_TEMPLATE.format(
-            year=self.year,
+            year=year_text,
             author=author or self.author,
         )
 

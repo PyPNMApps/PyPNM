@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -275,10 +276,16 @@ class FecSummaryAnalysisReport(AnalysisReport):
                         tags=[str(channel_id), profile, self.FNAME_TAG]
                     )
                     csv_mgr.set_path_fname(csv_fname)
-                    for i in range(n):
-                        csv_mgr.insert_row(
-                            [channel_id, profile, ts[i], tc[i], cc[i], uc[i]]
-                        )
+                    self._append_csv_rows(
+                        csv_mgr=csv_mgr,
+                        channel_id=channel_id,
+                        profile=profile,
+                        ts=ts,
+                        tc=tc,
+                        cc=cc,
+                        uc=uc,
+                        count=n,
+                    )
                     self._log_preview(channel_id, profile, ts, tc, cc, uc)
                     self.logger.debug(
                         "CSV created ch=%s prof=%s -> %s (rows=%d)",
@@ -296,6 +303,22 @@ class FecSummaryAnalysisReport(AnalysisReport):
                         exc,
                     )
         return mgr_out
+
+    def _append_csv_rows(
+        self,
+        csv_mgr: CSVManager,
+        channel_id: int,
+        profile: str,
+        ts: Sequence[ScalarValue],
+        tc: Sequence[int],
+        cc: Sequence[int],
+        uc: Sequence[int],
+        count: int,
+    ) -> None:
+        for idx in range(count):
+            csv_mgr.insert_row(
+                [channel_id, profile, ts[idx], tc[idx], cc[idx], uc[idx]]
+            )
 
     def create_matplot(self, **kwargs: object) -> list[MatplotManager]:
         """

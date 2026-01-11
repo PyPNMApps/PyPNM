@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import logging
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_state import OperationState
@@ -53,8 +54,8 @@ class AbstractService:
         self.__SERVICE_STORE[operation_id] = service
 
     async def loadService(
-        self, service_cls: type[T], *args: Any, **kwargs: Any
-    ) -> tuple[GroupId, OperationId]:  # noqa: ANN401
+        self, service_cls: type[T], *args: object, **kwargs: object
+    ) -> tuple[GroupId, OperationId]:
         """
         Instantiate, start, and register a capture service.
 

@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import subprocess
 import sys
-from typing import List, Sequence, Tuple
 
 
-Command = Tuple[str, Sequence[str]]
+Command = tuple[str, list[str]]
 
 
-def _run_command(label: str, cmd: Sequence[str]) -> int:
+def _run_command(label: str, cmd: list[str]) -> int:
     """
     Run A Single QA Tool Command And Stream Its Output.
 
@@ -40,7 +40,7 @@ def _run_command(label: str, cmd: Sequence[str]) -> int:
         return 127
 
 
-def _build_commands(include_pyright: bool, pytest_args: Sequence[str]) -> List[Command]:
+def _build_commands(include_pyright: bool, pytest_args: list[str]) -> list[Command]:
     """
     Build The Ordered List Of QA Commands To Run.
 
@@ -57,18 +57,21 @@ def _build_commands(include_pyright: bool, pytest_args: Sequence[str]) -> List[C
     list[Command]
         Ordered list of (label, cmd) tuples to execute.
     """
-    commands: List[Command] = [
+    python_cmd = sys.executable or "python"
+    commands: list[Command] = [
         ("secrets", ["./tools/security/scan-secrets.sh"]),
-        ("enc-secrets", ["python", "./tools/security/scan-enc-secrets.py"]),
+        ("enc-secrets", [python_cmd, "./tools/security/scan-enc-secrets.py"]),
         ("macs", ["./tools/security/scan-mac-addresses.py", "--fail-on-found"]),
-        ("headers", ["./tools/build/add-required-python-headers.py"]),
+        ("headers", [python_cmd, "./tools/maintenance/add-required-python-headers.py"]),
         ("ruff", ["ruff", "check", "src"]),
-        ("pytest", ["pytest", *pytest_args]),
     ]
 
     if include_pyright:
-        # Insert Pyright after Ruff but before pytest for faster feedback.
-        commands.insert(3, ("pyright", ["pyright"]))
+        # Insert Pyright after Ruff but before loop nesting and pytest for faster feedback.
+        commands.append(("pyright", ["pyright"]))
+
+    commands.append(("loop-nesting", [python_cmd, "-m", "pypnm.tools.loop_nesting_checker", "src"]))
+    commands.append(("pytest", ["pytest", *pytest_args]))
 
     return commands
 
@@ -86,9 +89,10 @@ def main() -> None:
                              (gitleaks + .gitleaks.toml if available).
     2) enc-secrets         - encrypted password pattern scan (ENC[v1] + password_enc).
     3) macs                - repository scan for non-approved MAC addresses.
-    4) headers             - ensure SPDX/license headers (./tools/build/add-required-python-headers.py).
+    4) headers             - ensure SPDX/license headers (./tools/maintenance/add-required-python-headers.py).
     5) ruff check src      - syntax, style, and common bug patterns.
-    6) pytest              - unit tests (pytest options from pyproject.toml).
+    6) loop nesting        - ensure no function exceeds 3+ nested loops.
+    7) pytest              - unit tests (pytest options from pyproject.toml).
 
     Optional Pyright
     ----------------
@@ -99,7 +103,7 @@ def main() -> None:
     This will run an additional step:
 
     - pyright              - static type analysis using [tool.pyright] settings,
-                             executed after Ruff but before pytest.
+                             executed after Ruff but before loop nesting and pytest.
 
     Passing Extra Pytest Arguments
     ------------------------------
@@ -116,8 +120,8 @@ def main() -> None:
     """
     raw_args = sys.argv[1:]
 
-    pytest_args: List[str] = []
-    qa_args: List[str] = raw_args
+    pytest_args: list[str] = []
+    qa_args: list[str] = raw_args
 
     if "--" in raw_args:
         sep_index = raw_args.index("--")

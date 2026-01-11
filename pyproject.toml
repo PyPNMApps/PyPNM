@@ -41,6 +41,7 @@ dependencies = [
   "pysmi==1.6.1",
   "pysnmp==7.1.17",
   "python-dotenv>=1.0.0",
+  "psycopg[binary]==3.2.3",
   "requests==2.32.3",
   "pandas==2.2.3",
   "paramiko==3.5.1",

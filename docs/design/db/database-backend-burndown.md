@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- Copyright (c) 2026 Maurice Garcia -->
+<!-- Copyright (c) 2025-2026 Maurice Garcia -->
 
 # PyPNM DB Backend Refactor Burndown (With ToC)
 
@@ -342,23 +342,23 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
 - [ ] GitHub Actions refactor (required for DB backend release confidence):
   - [ ] Add a DB backend test matrix:
     - [ ] SQLite job (required)
-    - [ ] Postgres job (required; not “allowed failure”)
-  - [ ] Postgres service container job:
-    - [ ] Use `postgres` service with `POSTGRES_USER=pypnm`, `POSTGRES_PASSWORD=pypnm`, `POSTGRES_DB=pypnm`
-    - [ ] Provide DSN via env var to tests (no committed secrets)
-    - [ ] Apply schema during test setup (idempotent)
+    - [x] Postgres job (required; not “allowed failure”)
+  - [x] Postgres service container job:
+    - [x] Use `postgres` service with `POSTGRES_USER=pypnm`, `POSTGRES_PASSWORD=pypnm`, `POSTGRES_DB=pypnm`
+    - [x] Provide DSN via env var to tests (no committed secrets)
+    - [x] Apply schema during test setup (idempotent)
   - [ ] Ensure tests remain hermetic:
     - [ ] No external CMTS/SNMP dependencies in CI
 - [ ] Developer documentation:
-  - [ ] Document what backends CI validates
-  - [ ] Document how to run Postgres tests locally (docker compose recommended)
-  - [ ] Document DSN override via environment variables
+  - [x] Document what backends CI validates
+  - [x] Document how to run Postgres tests locally (docker compose recommended)
+  - [x] Document DSN override via environment variables
 
 ### Acceptance Criteria
 
 - [ ] `pytest` passes locally for SQLite.
 - [ ] GitHub Actions passes with SQLite.
-- [ ] Postgres path is validated in CI with a service container.
+- [x] Postgres path is validated in CI with a service container.
 
 ## Cross-Cutting Requirements
 

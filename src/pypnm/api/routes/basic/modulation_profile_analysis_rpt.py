@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -117,19 +118,15 @@ class ModulationProfileReport(AnalysisReport):
                     bps = self._align_len(profile.bits_per_symbol, n, fill=0)
                     mer = self._align_len(profile.shannon_min_mer, n, fill=float("nan"))
 
-                    rows_written = 0
-                    for i in range(n):
-                        csv_mgr.insert_row(
-                            [
-                                channel_id,
-                                profile.profile_id,
-                                freq[i],
-                                mod[i],
-                                int(bps[i]),
-                                float(mer[i]),
-                            ]
-                        )
-                        rows_written += 1
+                    rows_written = self._append_profile_rows(
+                        csv_mgr=csv_mgr,
+                        channel_id=channel_id,
+                        profile_id=profile.profile_id,
+                        freq=freq,
+                        mod=mod,
+                        bps=bps,
+                        mer=mer,
+                    )
 
                     self.logger.info(
                         f"CSV rows for channel {channel_id} profile {profile.profile_id}: {rows_written}"
@@ -194,9 +191,7 @@ class ModulationProfileReport(AnalysisReport):
                     mod_lbls: StringArray = self._align_len(
                         profile.modulation, n, fill="UNKNOWN"
                     )
-                    mod_order: list[int] = [
-                        self._derive_qam_order(lbl) for lbl in mod_lbls
-                    ]
+                    mod_order = self._derive_qam_orders(mod_lbls)
                 except Exception as exc:
                     self.logger.exception(
                         f"Failed to align arrays for channel {channel_id} profile {profile_id}: {exc}",
@@ -277,31 +272,12 @@ class ModulationProfileReport(AnalysisReport):
 
                 # 3) Modulation vs Frequency with preloaded M-QAM scale (linear spacing via log₂(M), labels show M)
                 try:
-                    from math import isfinite, log2
-
-                    # Convert M to positions (bits per symbol) for linear spacing
-                    mod_bits: list[int] = []
-                    for m in mod_order:
-                        if m and m > 0:
-                            try:
-                                v = log2(m)
-                                mod_bits.append(int(v) if isfinite(v) else 0)
-                            except Exception:
-                                mod_bits.append(0)
-                        else:
-                            mod_bits.append(0)
-
-                    # Predefine a comprehensive M-QAM ladder and its bit positions
-                    ladder_M = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
-                    ladder_bits = [int(log2(m)) for m in ladder_M]
-
-                    max_bits_seen = max(mod_bits) if mod_bits else 8
-                    max_bits_cap = max(2, min(max_bits_seen, ladder_bits[-1]))
-
-                    y_ticks_bits = [b for b in ladder_bits if b <= max_bits_cap]
-                    y_labels_M = [
-                        str(2**b) for b in y_ticks_bits
-                    ]  # labels: "4","8","16","32",...
+                    (
+                        mod_bits,
+                        y_ticks_bits,
+                        y_labels_M,
+                        max_bits_cap,
+                    ) = self._build_modulation_plot_axes(mod_order)
 
                     mod_cfg = PlotConfig(
                         title=f"Modulation vs Frequency · OFDM · Channel ({channel_id}) · Profile ({profile_id})",
@@ -346,6 +322,64 @@ class ModulationProfileReport(AnalysisReport):
             self.logger.info("No analysis data available; no plots created.")
 
         return out
+
+    def _append_profile_rows(
+        self,
+        csv_mgr: CSVManager,
+        channel_id: int,
+        profile_id: int,
+        freq: FrequencySeriesHz,
+        mod: list[str],
+        bps: FloatSeries,
+        mer: FloatSeries,
+    ) -> int:
+        rows_written = 0
+        for idx in range(len(freq)):
+            csv_mgr.insert_row(
+                [
+                    channel_id,
+                    profile_id,
+                    freq[idx],
+                    mod[idx],
+                    int(bps[idx]),
+                    float(mer[idx]),
+                ]
+            )
+            rows_written += 1
+        return rows_written
+
+    def _derive_qam_orders(self, labels: StringArray) -> list[int]:
+        return list(map(self._derive_qam_order, labels))
+
+    def _derive_bits_per_symbol_list(self, mod: list[str]) -> list[int]:
+        return list(map(self._derive_bits_per_symbol, mod))
+
+    def _build_modulation_plot_axes(
+        self, mod_order: list[int]
+    ) -> tuple[list[int], list[int], list[str], int]:
+        from math import isfinite, log2
+
+        mod_bits: list[int] = []
+        for value in mod_order:
+            if value and value > 0:
+                try:
+                    bits = log2(value)
+                    mod_bits.append(int(bits) if isfinite(bits) else 0)
+                except Exception:
+                    mod_bits.append(0)
+            else:
+                mod_bits.append(0)
+
+        ladder_M = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+        ladder_bits = [int(log2(item)) for item in ladder_M]
+
+        max_bits_seen = max(mod_bits) if mod_bits else 8
+        max_bits_cap = max(2, min(max_bits_seen, ladder_bits[-1]))
+
+        y_ticks_bits = [bits for bits in ladder_bits if bits <= max_bits_cap]
+        y_labels_M = [str(2**bits) for bits in y_ticks_bits]
+
+        return mod_bits, y_ticks_bits, y_labels_M, max_bits_cap
 
     def _process(self) -> None:
         """
@@ -398,7 +432,7 @@ class ModulationProfileReport(AnalysisReport):
                     )
 
                     if not bps and mod:
-                        bps = [self._derive_bits_per_symbol(m) for m in mod]
+                        bps = self._derive_bits_per_symbol_list(mod)
 
                     if not freq_array and freqs:
                         freq_array = freqs

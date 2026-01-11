@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Any
 
 import numpy as np
 
@@ -75,37 +75,17 @@ class HeatmapAnomalyDetector:
         rows, cols = self.data.shape
         boxes: list[tuple[int, int, int, int]] = []
 
-        def neighbors(r: int, c: int) -> Generator[tuple[int, int], Any, None]:
-            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nr, nc = r + dr, c + dc
-                if 0 <= nr < rows and 0 <= nc < cols:
-                    yield nr, nc
-
-        for i in range(rows):
-            for j in range(cols):
-                if self.mask[i, j] and not visited[i, j]:
-                    rmin = rmax = i
-                    cmin = cmax = j
-                    stack = [(i, j)]
-                    visited[i, j] = True
-
-                    while stack:
-                        r, c = stack.pop()
-                        rmin = min(rmin, r)
-                        rmax = max(rmax, r)
-                        cmin = min(cmin, c)
-                        cmax = max(cmax, c)
-                        for nr, nc in neighbors(r, c):
-                            if self.mask[nr, nc] and not visited[nr, nc]:
-                                visited[nr, nc] = True
-                                stack.append((nr, nc))
-
-                    boxes.append((rmin, cmin, rmax, cmax))
+        boxes = [
+            self._walk_component(i, j, visited)
+            for i in range(rows)
+            for j in range(cols)
+            if self.mask[i, j] and not visited[i, j]
+        ]
 
         self.boxes = boxes
         return boxes
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> dict[str, object]:
         """
         Convert the detected boxes into a JSON-friendly dictionary.
 
@@ -119,3 +99,33 @@ class HeatmapAnomalyDetector:
                 for r0, c0, r1, c1 in self.boxes
             ],
         }
+
+    def _neighbors(
+        self, row: int, col: int, rows: int, cols: int
+    ) -> Generator[tuple[int, int], None, None]:
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = row + dr, col + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                yield nr, nc
+
+    def _walk_component(
+        self, start_row: int, start_col: int, visited: np.ndarray
+    ) -> tuple[int, int, int, int]:
+        rmin = rmax = start_row
+        cmin = cmax = start_col
+        stack = [(start_row, start_col)]
+        visited[start_row, start_col] = True
+        rows, cols = self.data.shape
+
+        while stack:
+            row, col = stack.pop()
+            rmin = min(rmin, row)
+            rmax = max(rmax, row)
+            cmin = min(cmin, col)
+            cmax = max(cmax, col)
+            for nr, nc in self._neighbors(row, col, rows, cols):
+                if self.mask[nr, nc] and not visited[nr, nc]:
+                    visited[nr, nc] = True
+                    stack.append((nr, nc))
+
+        return rmin, cmin, rmax, cmax

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # Scan the repository for non-approved MAC addresses.
 
@@ -10,7 +11,7 @@ import argparse
 import os
 import re
 import sys
-from typing import Iterable, List, Set, Tuple
+from collections.abc import Iterable
 
 
 # -----------------------------------------------------------------------------
@@ -24,7 +25,7 @@ from typing import Iterable, List, Set, Tuple
 #   "aa:bb:cc:dd:ee:ff"  - generic example MAC (preferred default).
 #   "00:11:22:33:44:55"  - alternate generic example, if ever needed in docs.
 #
-APPROVED_MACS: Set[str] = {
+APPROVED_MACS: set[str] = {
     "aa:bb:cc:dd:ee:ff",
     "00:11:22:33:44:55",
     "00:00:00:00:00:01",
@@ -43,7 +44,7 @@ APPROVED_MACS: Set[str] = {
 # -----------------------------------------------------------------------------
 # Configuration: Directory Ignore List
 # -----------------------------------------------------------------------------
-IGNORE_DIRS: Set[str] = {
+IGNORE_DIRS: set[str] = {
     ".git",
     ".env",
     ".venv",
@@ -53,12 +54,13 @@ IGNORE_DIRS: Set[str] = {
     "build",
     ".mypy_cache",
     ".ruff_cache",
+    ".data",
 }
 
 
 MAC_REGEX = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 
-MACMatch = Tuple[str, int, int, str]  # (path, line_no, col, mac)
+MACMatch = tuple[str, int, int, str]  # (path, line_no, col, mac)
 
 
 def _normalize_mac(mac: str) -> str:
@@ -72,7 +74,7 @@ def _normalize_mac(mac: str) -> str:
 
 
 # Precompute normalized allowlist once
-APPROVED_MACS_NORMALIZED: Set[str] = {_normalize_mac(m) for m in APPROVED_MACS}
+APPROVED_MACS_NORMALIZED: set[str] = {_normalize_mac(m) for m in APPROVED_MACS}
 
 
 def _is_approved(mac: str) -> bool:
@@ -96,7 +98,7 @@ def _iter_files(root: str) -> Iterable[str]:
             yield path
 
 
-def _scan_file(path: str) -> List[MACMatch]:
+def _scan_file(path: str) -> list[MACMatch]:
     """
     Scan A Single File For Non-Approved MAC Addresses.
 
@@ -105,7 +107,7 @@ def _scan_file(path: str) -> List[MACMatch]:
     list[MACMatch]
         A list of (path, line_number, column, mac_string) tuples.
     """
-    matches: List[MACMatch] = []
+    matches: list[MACMatch] = []
 
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as fh:
@@ -122,7 +124,7 @@ def _scan_file(path: str) -> List[MACMatch]:
     return matches
 
 
-def _parse_args(argv: List[str]) -> argparse.Namespace:
+def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Scan the repository tree for non-approved MAC addresses."
     )
@@ -139,7 +141,7 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: List[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     """
     Scan Repository For Non-Approved MAC Addresses And Report Any Findings.
 
@@ -157,7 +159,7 @@ def main(argv: List[str] | None = None) -> None:
     print(f"Scanning for MAC addresses under: {root}")
     print(f"Approved MACs: {sorted(APPROVED_MACS_NORMALIZED)}")
 
-    all_matches: List[MACMatch] = []
+    all_matches: list[MACMatch] = []
 
     for path in _iter_files(root):
         file_matches = _scan_file(path)

@@ -1,3 +1,178 @@
+### Summary
+Aligned CI checks to use the QA checker command in daily-test and postgres-test, and tightened the Postgres validation sentence in the QA guide.
+
+### Modified Files
+- .github/workflows/daily-build.yml
+- docs/tests/pypnm-software-qa.md
+
+### Commands Executed And Results
+- `python3 -m compileall src` → pass
+- `pytest` → pass (520 passed, 4 skipped)
+- `ruff check .` → pass
+- `ruff format --check .` → pass (342 files already formatted)
+
+### Tests
+- `pytest` → pass (4 skipped: 3 hardware integration, 1 Postgres DSN not set)
+- `ruff` → pass
+- `python3 -m compileall src` → pass
+
+### Notes / Warnings
+- Postgres integration test skipped locally because `PYPNM_DB_POSTGRES_DSN` is not set.
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: .github/workflows/daily-build.yml
+name: Build
+
+on:
+  push:
+    branches: [main]         # Run on every commit to main
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * *"      # Every day at 08:00 UTC
+  workflow_dispatch:          # Allow manual triggering from GitHub UI
+
+jobs:
+  daily-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run checks
+        run: |
+          pypnm-software-qa-checker
+
+  postgres-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pypnm
+          POSTGRES_PASSWORD: pypnm
+          POSTGRES_DB: pypnm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pypnm -d pypnm"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PYPNM_DB_BACKEND: postgres
+      PYPNM_DB_POSTGRES_DSN: postgresql://pypnm:pypnm@localhost:5432/pypnm
+      PGPASSWORD: pypnm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install "psycopg[binary]"
+
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U pypnm -d pypnm; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready"
+          exit 1
+
+      - name: Run checks
+        run: |
+          pypnm-software-qa-checker
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Seed demo config for container build
+        run: |
+          cp demo/settings/system.json deploy/docker/config/system.json
+          cp demo/settings/system.json deploy/docker/config/system.json.template
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker compose build --progress plain
+
+      - name: Start stack
+        run: |
+          docker compose up -d
+
+      - name: Wait for API health
+        run: |
+          container_id="$(docker compose ps -q pypnm-api)"
+          if [ -z "$container_id" ]; then
+            echo "API container was not created"
+            docker compose ps
+            exit 1
+          fi
+
+          for attempt in $(seq 1 30); do
+            status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            echo "Container not healthy yet (status: $status); waiting..."
+            sleep 5
+          done
+
+          echo "Container failed to become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down --volumes
+
+# FILE: docs/tests/pypnm-software-qa.md
 # pypnm-software-qa-checker User Guide
 
 A lightweight command-line helper that runs a standard set of **software quality checks** for the PyPNM
@@ -17,6 +192,7 @@ This ensures the following tools are available (as defined in `pyproject.toml`):
 
 - `ruff` - linting and unused-code detection
 - `pytest` - unit and integration tests
+- `pycycle` - import cycle detection
 - `pyright` - optional static type checking (when enabled via CLI flag)
 
 ## 2. Command Overview
@@ -32,13 +208,13 @@ By default (with no options), it runs a **standard QA sweep** over your project:
 1. `./tools/security/scan-secrets.sh`
 2. `python ./tools/security/scan-enc-secrets.py`
 3. `./tools/security/scan-mac-addresses.py --fail-on-found`
-4. `python ./tools/maintenance/add-required-python-headers.py`
+4. `./tools/build/add-required-python-headers.py`
 5. `ruff check src`
-6. `python -m pypnm.tools.loop_nesting_checker src`
-7. `pytest`
+6. `pytest`
+7. `pycycle --here` (from the project root)
 
-Each step is run in sequence; the checker continues through all steps and returns the first non-zero exit
-code encountered. It prints the failing command(s) as they run.
+Each step is run in sequence; if any step fails (non-zero exit code), the script exits with that code and
+prints the failing command.
 
 If you enable the optional Pyright step (see below), it will run **after Ruff** and **before pytest**.
 
@@ -66,11 +242,11 @@ This is effectively equivalent to:
 1. `./tools/security/scan-secrets.sh`
 2. `python ./tools/security/scan-enc-secrets.py`
 3. `./tools/security/scan-mac-addresses.py --fail-on-found`
-4. `python ./tools/maintenance/add-required-python-headers.py`
+4. `./tools/build/add-required-python-headers.py`
 5. `ruff check src`
 6. `pyright`
-7. `python -m pypnm.tools.loop_nesting_checker src`
-8. `pytest`
+7. `pytest`
+8. `pycycle --here`
 
 If Pyright is not installed or not on `PATH`, the QA checker will report it as “NOT FOUND” and continue
 based on Pyright’s exit status.
@@ -89,8 +265,8 @@ pypnm-software-qa-checker
 Effectively runs:
 
 - Lint (style / unused / basic correctness via `ruff`)
-- Loop nesting guard (`python -m pypnm.tools.loop_nesting_checker src`)
 - Tests (`pytest`)
+- Import cycle detection (`pycycle --here`)
 
 ### 4.2 Full QA including Pyright
 
@@ -106,11 +282,11 @@ Effectively runs:
 - Secret scanning (`./tools/security/scan-secrets.sh`)
 - Encrypted password scan (`python ./tools/security/scan-enc-secrets.py`)
 - MAC address scan (`./tools/security/scan-mac-addresses.py --fail-on-found`)
-- SPDX/license header scan (`python ./tools/maintenance/add-required-python-headers.py`)
+- SPDX/license header scan (`./tools/build/add-required-python-headers.py`)
 - Lint (`ruff check src`)
 - Static type checking (`pyright`)
-- Loop nesting guard (`python -m pypnm.tools.loop_nesting_checker src`)
 - Tests (`pytest`)
+- Import cycle detection (`pycycle --here`)
 
 ### 4.3 Running individual tools directly
 
@@ -120,10 +296,10 @@ You can still run each tool directly when you need fine-grained control:
 ./tools/security/scan-secrets.sh
 python ./tools/security/scan-enc-secrets.py
 ./tools/security/scan-mac-addresses.py --fail-on-found
-python ./tools/maintenance/add-required-python-headers.py
+./tools/build/add-required-python-headers.py
 ruff check src
-python -m pypnm.tools.loop_nesting_checker src
 pytest -m 'not slow'
+pycycle --here
 pyright
 ```
 
@@ -182,9 +358,9 @@ The `pypnm` credentials are intended for local and CI use only.
   pip show pypnm
   ```
 
-### 6.2 Ruff, Pyright, or pytest not installed
+### 6.2 Ruff, Pyright, pytest, or pycycle not installed
 
-If the script reports that it cannot find `ruff`, `pyright`, or `pytest`, verify that:
+If the script reports that it cannot find `ruff`, `pyright`, `pytest`, or `pycycle`, verify that:
 
 - You are in the environment where `.[dev]` was installed.
 - The tools appear in `pip list` for that environment.

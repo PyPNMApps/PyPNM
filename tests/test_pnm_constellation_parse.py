@@ -1,5 +1,6 @@
 # tests/test_pnm_constellation_parse.py
 # SPDX-License-Identifier: Apache-2.0
+
 # Copyright (c) 2025-2026 Maurice Garcia
 
 
