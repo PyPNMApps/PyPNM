@@ -18,7 +18,8 @@ sanitize sensitive information before sharing it with the PyPNM support team.
 
 ### Multi-capture results return 404 with legacy operation_capture.json
 
-If multi-capture result endpoints return 404 while `operation_capture.json`
-stores `capture_group` instead of `capture_group_id`, upgrade to a build that
-accepts the legacy key and backfills the operation-to-capture-group mapping
-into the DB.
+The canonical key is `capture_group_id`, but `capture_group` is still accepted
+as a fallback for existing persisted JSON during this transition. If multi-
+capture result endpoints return 404 while `operation_capture.json` stores the
+legacy key, upgrade to a build that accepts it and backfills the mapping into
+the DB.
