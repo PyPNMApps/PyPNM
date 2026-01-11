@@ -27,6 +27,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure AGENTS.md is not tracked
+        run: |
+          if git ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then
+            echo "AGENTS.md is tracked; it must remain local-only."
+            exit 1
+          fi
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:

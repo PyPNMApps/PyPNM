@@ -1,0 +1,8 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Maurice Garcia -->
+
+# AGENTS.md (Local Only)
+
+`AGENTS.md` is local-only and must NOT be committed or tracked.
+
+Copy this template to `AGENTS.md` locally and add your full agent rules, or obtain the official local version from the maintainer.

@@ -1,12 +1,13 @@
 # tests/test_pnm_constellation_parse.py
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 
 from __future__ import annotations
 
-from pathlib import Path
 import math
+from pathlib import Path
+
 import pytest
 
 from pypnm.pnm.parser.CmDsConstDispMeas import CmDsConstDispMeas
@@ -22,7 +23,7 @@ def const_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_constellation_file_parses_and_model_shape(const_bytes):
+def test_constellation_file_parses_and_model_shape(const_bytes: bytes) -> None:
     cm = CmDsConstDispMeas(const_bytes)
     m = cm.to_model()
 
@@ -51,7 +52,7 @@ def test_constellation_file_parses_and_model_shape(const_bytes):
 
 
 @pytest.mark.pnm
-def test_constellation_samples_decoded_nonempty_and_reasonable_range():
+def test_constellation_samples_decoded_nonempty_and_reasonable_range() -> None:
     cm = CmDsConstDispMeas(CONST_PATH.read_bytes())
     m = cm.to_model()
 
@@ -67,7 +68,7 @@ def test_constellation_samples_decoded_nonempty_and_reasonable_range():
 
 
 @pytest.mark.pnm
-def test_constellation_serialization_roundtrip():
+def test_constellation_serialization_roundtrip() -> None:
     cm = CmDsConstDispMeas(CONST_PATH.read_bytes())
 
     d = cm.to_dict()
@@ -83,6 +84,6 @@ def test_constellation_serialization_roundtrip():
 
 
 @pytest.mark.pnm
-def test_non_constellation_file_is_rejected():
+def test_non_constellation_file_is_rejected() -> None:
     with pytest.raises(ValueError):
         _ = CmDsConstDispMeas(NON_CONST_PATH.read_bytes())

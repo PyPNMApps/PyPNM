@@ -8,7 +8,7 @@ import hashlib
 import pytest
 
 from pypnm.lib.types import TransactionId
-from pypnm.lib.utils import TimeUnit, Generate
+from pypnm.lib.utils import Generate, TimeUnit
 
 
 def _patch_time_stamp(monkeypatch: pytest.MonkeyPatch, fixed_value: int) -> None:

@@ -4,13 +4,11 @@
 from __future__ import annotations
 
 import re
-from typing import List
 
 import pytest
 
 from pypnm.lib.types import TimeStamp, TransactionId
 from pypnm.lib.utils import Generate, TimeUnit
-
 
 HEX_RE = re.compile(r"^[0-9a-f]+$")
 
@@ -102,8 +100,8 @@ def test_group_id_generates_series_with_seed(monkeypatch: pytest.MonkeyPatch) ->
     count: int = 5
     seed: int = 100
 
-    group1: List[TransactionId] = Generate.group_id(count=count, seed=seed, length=16)
-    group2: List[TransactionId] = Generate.group_id(count=count, seed=seed, length=16)
+    group1: list[TransactionId] = Generate.group_id(count=count, seed=seed, length=16)
+    group2: list[TransactionId] = Generate.group_id(count=count, seed=seed, length=16)
 
     assert len(group1) == count
     assert len(group2) == count
@@ -130,7 +128,7 @@ def test_group_id_without_seed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("pypnm.lib.utils.time.time", lambda: fixed_s)
 
     count: int = 3
-    group: List[TransactionId] = Generate.group_id(count=count, seed=None, length=20)
+    group: list[TransactionId] = Generate.group_id(count=count, seed=None, length=20)
 
     assert len(group) == count
     for tid in group:

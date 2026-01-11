@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import List
-
 import csv
+from pathlib import Path
+
 import pytest
 
 from pypnm.lib.csv.manager import (
@@ -27,7 +26,7 @@ def test_set_header_once_and_reset() -> None:
 
 
 @pytest.mark.parametrize("bad", [[], [""], ["  ", "ok"], [1, 2]])
-def test_set_header_validation_errors(bad: List[object]) -> None:
+def test_set_header_validation_errors(bad: list[object]) -> None:
     mgr = CSVManager()
     with pytest.raises(CSVValidationError):
         mgr.set_header(bad)  # type: ignore[arg-type]

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
-from pathlib import Path
 import json
+from pathlib import Path
+
 import pytest
 
 from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalysis
@@ -19,7 +20,7 @@ def spectrum_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes):
+def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes: bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
     m = sa.to_model()
 
@@ -49,7 +50,7 @@ def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes):
 
 
 @pytest.mark.pnm
-def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes):
+def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes: bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
 
     d = sa.to_dict()
@@ -66,7 +67,7 @@ def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes):
 
 
 @pytest.mark.pnm
-def test_bin_frequency_spacing_consistency(spectrum_bytes):
+def test_bin_frequency_spacing_consistency(spectrum_bytes: bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
     m = sa.to_model()
 

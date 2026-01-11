@@ -16,11 +16,11 @@ from pypnm.api.routes.common.classes.analysis.analysis import Analysis, Analysis
 from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import (
     OutputType,
 )
-from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
-    PnmAnalysisResponse,
-)
 from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults import (
     RequestDefaultsResolver,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
+    PnmAnalysisResponse,
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import (
     SnmpResponse,
@@ -29,7 +29,9 @@ from pypnm.api.routes.common.classes.file_capture.file_type import FileType
 from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
     CableModemServicePreCheck,
 )
-from pypnm.api.routes.common.extended.common_measure_schema import DownstreamOfdmParameters
+from pypnm.api.routes.common.extended.common_measure_schema import (
+    DownstreamOfdmParameters,
+)
 from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
 from pypnm.api.routes.common.extended.common_process_service import CommonProcessService
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode

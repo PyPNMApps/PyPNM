@@ -6,8 +6,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pypnm.lib.qam.types import QamModulation
 from pypnm.lib.qam.lut_mgr import QamLutManager  # adjust import if your path differs
+from pypnm.lib.qam.types import QamModulation
 
 
 @pytest.fixture()

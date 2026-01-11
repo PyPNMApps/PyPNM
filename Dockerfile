@@ -25,7 +25,8 @@ RUN python -m pip install --upgrade pip \
  && python -m pip install . \
  && useradd -m -u 10001 -s /usr/sbin/nologin pypnm \
  && chmod +x /app/entrypoint.sh \
- && if [ -f /app/deploy/config/system.json.template ] && [ ! -f /app/deploy/config/system.json ]; then cp /app/deploy/config/system.json.template /app/deploy/config/system.json; fi
+ && if [ -f /app/deploy/config/system.json.template ] && [ ! -f /app/deploy/config/system.json ]; then cp /app/deploy/config/system.json.template /app/deploy/config/system.json; fi \
+ && rm -rf /app/.data
 
 EXPOSE 8000
 

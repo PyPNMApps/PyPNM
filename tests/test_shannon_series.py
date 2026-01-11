@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # tests/test_shannon_series.py
 from __future__ import annotations
 
-import math
 import json
+import math
 
 import pytest
 
@@ -60,7 +60,7 @@ def test_supported_modulation_counts_and_model() -> None:
     # build a list sorted by bits (ascending)
     bits_sorted = sorted(Shannon.QAM_MODULATIONS.items(), key=lambda kv: kv[0])
     prev = math.inf
-    for bits, name in bits_sorted:
+    for _bits, name in bits_sorted:
         c = counts[name]
         assert isinstance(c, int) and 0 <= c <= len(snrs)
         assert c <= prev
@@ -78,7 +78,7 @@ def test_supported_modulation_counts_and_model() -> None:
     assert set(model.supported_modulation_counts.keys()) == known_mods
     assert d["bits_per_symbol"] == series.bits_list
     assert set(d["supported_modulation_counts"].keys()) == known_mods
-    assert j_obj["avg"] if "avg" in j_obj else True  # tolerate additional fields if present
+    assert j_obj.get("avg", True)  # tolerate additional fields if present
 
 
 def test_repr_and_str() -> None:

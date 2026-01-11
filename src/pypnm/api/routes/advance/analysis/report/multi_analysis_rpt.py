@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.db.json_transaction import JsonTransactionDb
 from pypnm.lib.mac_address import MacAddress, cast
 from pypnm.lib.matplot.manager import MatplotManager
-from pypnm.lib.types import ChannelId, JSONScalar, PathArray, PathLike, TimeStamp
+from pypnm.lib.types import ChannelId, JsonScalar, PathArray, PathLike, TimeStamp
 from pypnm.lib.utils import Generate, TimeUnit
 
 
@@ -278,13 +278,13 @@ class MultiAnalysisRpt(ABC):
         pass
 
     @abstractmethod
-    def create_csv(self, **kwargs: JSONScalar) -> list[CSVManager]:
+    def create_csv(self, **kwargs: JsonScalar) -> list[CSVManager]:
         """
         Build one or more `CSVManager` instances ready to `write()`.
 
         Parameters
         ----------
-        **kwargs : JSONScalar
+        **kwargs : JsonScalar
             Optional configuration flags or scalar parameters (ints, floats,
             strings, booleans, or None) used by concrete implementations.
 
@@ -296,13 +296,13 @@ class MultiAnalysisRpt(ABC):
         return []
 
     @abstractmethod
-    def create_matplot(self, **kwargs: JSONScalar) -> list[MatplotManager]:
+    def create_matplot(self, **kwargs: JsonScalar) -> list[MatplotManager]:
         """
         Build one or more `MatplotManager` instances to render PNG figures.
 
         Parameters
         ----------
-        **kwargs : JSONScalar
+        **kwargs : JsonScalar
             Optional configuration flags or scalar parameters (ints, floats,
             strings, booleans, or None) used by concrete implementations.
 
@@ -312,4 +312,3 @@ class MultiAnalysisRpt(ABC):
             List of configured `MatplotManager` instances used to generate plots.
         """
         return []
-

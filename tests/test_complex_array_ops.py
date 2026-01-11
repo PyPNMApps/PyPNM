@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # tests/test_complex_array_ops.py
 from __future__ import annotations
 
 import math
+
 import numpy as np
 import pytest
 
@@ -15,7 +16,7 @@ def pairs(*vals: float) -> list[tuple[float, float]]:
     """Build (re, im) pairs from flat numbers: r1,i1,r2,i2,..."""
     assert len(vals) % 2 == 0
     it = iter(vals)
-    return [(float(r), float(i)) for r, i in zip(it, it)]
+    return [(float(r), float(i)) for r, i in zip(it, it, strict=False)]
 
 
 def test_init_and_len_and_repr() -> None:

@@ -1,22 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
+
 import pytest
 
+from pypnm.docsis.cm_snmp_operation import MeasStatusType
 from pypnm.docsis.data_type.pnm.DocsPnmCmOfdmChanEstCoefEntry import (
     DocsPnmCmOfdmChanEstCoefEntry,
     DocsPnmCmOfdmChanEstCoefFields,
 )
-from pypnm.docsis.cm_snmp_operation import MeasStatusType
 from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class _FakeSnmp:
-    def __init__(self, idx: int, table: dict[str, object]):
+    def __init__(self, idx: int, table: dict[str, object]) -> None:
         self._idx, self._t = idx, table
 
-    async def get(self, oq: str):
+    async def get(self, oq: str) -> object | None:
         sym, _, sfx = oq.rpartition(".")
         assert int(sfx) == self._idx
         # return None if the OID isn't present (simulate missing field)

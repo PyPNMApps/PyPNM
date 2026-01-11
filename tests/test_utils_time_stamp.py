@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
-
+# Copyright (c) 2025-2026 Maurice Garcia
 import time
-from pypnm.lib.utils import TimeUnit, Generate
+
+import pytest
+
+from pypnm.lib.utils import Generate, TimeUnit
+
 
 def test_time_unit_values() -> None:
     """
@@ -16,7 +19,7 @@ def test_time_unit_values() -> None:
     assert TimeUnit.NANOSECONDS.value  == "ns"
 
 
-def test_time_stamp_default_is_seconds(monkeypatch) -> None:
+def test_time_stamp_default_is_seconds(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Ensure the default time_stamp() call uses seconds and int(time.time()).
     """
@@ -39,7 +42,7 @@ def test_time_stamp_default_is_seconds(monkeypatch) -> None:
     assert calls["time_ns"] == 0
 
 
-def test_time_stamp_seconds(monkeypatch) -> None:
+def test_time_stamp_seconds(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Verify explicit TimeUnit.SECONDS returns truncated seconds from time.time().
     """
@@ -62,7 +65,7 @@ def test_time_stamp_seconds(monkeypatch) -> None:
     assert calls["time_ns"] == 0
 
 
-def test_time_stamp_milliseconds(monkeypatch) -> None:
+def test_time_stamp_milliseconds(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Verify TimeUnit.MILLISECONDS uses time.time_ns() and converts to ms.
     """
@@ -86,7 +89,7 @@ def test_time_stamp_milliseconds(monkeypatch) -> None:
     assert calls["time"] == 0
 
 
-def test_time_stamp_nanoseconds(monkeypatch) -> None:
+def test_time_stamp_nanoseconds(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Verify TimeUnit.NANOSECONDS returns the raw value from time.time_ns().
     """

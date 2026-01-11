@@ -3,12 +3,13 @@ from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025 Maurice Garcia
-
 import pydantic
 import pytest
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
-from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import SNMPv3
+from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
+    SNMPv3,
+)
 
 
 def test_pydantic_version_supported() -> None:
@@ -37,7 +38,7 @@ def test_model_validator_after_instance_style() -> None:
         auth_password: str | None = Field(default=None)
 
         @model_validator(mode="after")
-        def _check_auth(self) -> "DemoModel":
+        def _check_auth(self) -> DemoModel:
             if self.security_level.startswith("auth") and not self.auth_password:
                 raise ValueError("auth_password required when using auth* security_level")
             return self

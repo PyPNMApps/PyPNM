@@ -1,28 +1,29 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import DatabaseBackend
 
 
 class FakeConfigManager:
-    def __init__(self, data: dict[str, Any] | None = None) -> None:
-        self._data: dict[str, Any] = data or {}
+    def __init__(self, data: dict[str, object] | None = None) -> None:
+        self._data: dict[str, object] = data or {}
         self.reload_called: bool = False
 
-    def get(self, *path: str) -> Any | None:
+    def get(self, *path: str) -> object | None:
         key = ".".join(path)
         return self._data.get(key)
 
-    def set(self, value: Any, *path: str) -> None:
+    def set(self, value: object, *path: str) -> None:
         key = ".".join(path)
         self._data[key] = value
 
@@ -162,6 +163,85 @@ def test_snmp_retries_int_conversion_and_defaults(
 
     assert retries_invalid == 5
     assert "Invalid integer configuration value for 'SNMP.version.2c.retries'" in caplog.text
+
+
+def test_database_backend_defaults_to_sqlite_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager()
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    backend = SystemConfigSettings.database_backend()
+    assert backend == DatabaseBackend.SQLITE
+
+
+def test_database_settings_env_override_for_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {"Database.backend": "sqlite"}
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+    monkeypatch.setenv("PYPNM_DB_BACKEND", "postgres")
+    monkeypatch.setenv("PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm")
+
+    settings = SystemConfigSettings.database_settings()
+    assert settings.backend == DatabaseBackend.POSTGRES
+
+
+def test_database_settings_rejects_invalid_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {"Database.backend": "oracle"}
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    with pytest.raises(ValidationError):
+        SystemConfigSettings.database_settings()
+
+
+def test_database_settings_rejects_blank_sqlite_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {"Database.sqlite.path": ""}
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    with pytest.raises(ValidationError):
+        SystemConfigSettings.database_settings()
+
+
+def test_database_settings_env_override_for_postgres_dsn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {
+            "Database.backend": "postgres",
+            "Database.postgres.dsn": "",
+        }
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+    monkeypatch.setenv("PYPNM_DB_POSTGRES_DSN", "postgresql://pypnm@localhost:5432/pypnm")
+
+    settings = SystemConfigSettings.database_settings()
+    assert settings.postgres.dsn == "postgresql://pypnm@localhost:5432/pypnm"
+
+
+def test_database_settings_blank_postgres_dsn_without_env_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {
+            "Database.backend": "postgres",
+            "Database.postgres.dsn": "",
+        }
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    with pytest.raises(ValidationError):
+        SystemConfigSettings.database_settings()
 
 
 def test_log_settings_with_defaults_and_overrides(

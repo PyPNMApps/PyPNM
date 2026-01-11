@@ -94,6 +94,15 @@
             }
         }
     },
+    "Database": {
+        "backend": "sqlite",
+        "sqlite": {
+            "path": ".data/db/pypnm.sqlite3"
+        },
+        "postgres": {
+            "dsn": ""
+        }
+    },
     "logging": {
         "log_level": "INFO",
         "log_dir": "logs",

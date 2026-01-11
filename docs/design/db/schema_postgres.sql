@@ -7,6 +7,19 @@
 
 BEGIN;
 
+CREATE TABLE IF NOT EXISTS schema_meta (
+    schema_meta_id  SMALLINT PRIMARY KEY,
+    schema_version  INTEGER  NOT NULL,
+    applied_epoch   BIGINT   NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT),
+
+    CONSTRAINT ck_schema_meta_single_row CHECK (schema_meta_id = 1),
+    CONSTRAINT ck_schema_version_positive CHECK (schema_version >= 1)
+);
+
+INSERT INTO schema_meta (schema_meta_id, schema_version)
+VALUES (1, 1)
+ON CONFLICT (schema_meta_id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS system_description_dim (
     sysdescr_id    BIGSERIAL PRIMARY KEY,
     hw_rev         TEXT      NOT NULL,

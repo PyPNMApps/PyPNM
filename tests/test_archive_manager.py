@@ -5,14 +5,14 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import List, Literal, cast
+from typing import Literal, cast
 
 import pytest
 
 from pypnm.lib.archive.manager import ArchiveManager
 
 
-def write_files(base: Path, files: List[str]) -> None:
+def write_files(base: Path, files: list[str]) -> None:
     for rel in files:
         p = base / rel
         p.parent.mkdir(parents=True, exist_ok=True)

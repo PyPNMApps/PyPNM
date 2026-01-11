@@ -5,11 +5,16 @@ from __future__ import annotations
 
 import json
 import math
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
 from pypnm.lib.signal_processing.groupdelay.ofdm import (
-    SpacedFrequencyAxisHz , OFDMGroupDelay, GroupDelayOptions, SignConvention)
+    GroupDelayOptions,
+    OFDMGroupDelay,
+    SignConvention,
+    SpacedFrequencyAxisHz,
+)
 from pypnm.lib.types import ComplexSeries, FrequencyHz, IntSeries
 
 

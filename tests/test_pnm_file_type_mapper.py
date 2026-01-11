@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
-
+# Copyright (c) 2025-2026 Maurice Garcia
 import pytest
 
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 from pypnm.pnm.parser.pnm_file_type import PnmFileType
 from pypnm.pnm.parser.pnm_type_header_mapper import PnmFileTypeMapper
+
 
 def test_test_to_file_type_mapping_round_trip() -> None:
     """
@@ -23,7 +23,7 @@ def test_all_mapped_tests_are_known_enums() -> None:
     """
     Ensure that all keys in the mapping are valid DocsPnmCmCtlTest members.
     """
-    for test_type in PnmFileTypeMapper._test_to_file_type.keys():
+    for test_type in PnmFileTypeMapper._test_to_file_type:
         assert isinstance(test_type, DocsPnmCmCtlTest)
 
 

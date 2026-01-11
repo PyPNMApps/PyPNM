@@ -25,7 +25,13 @@ from pypnm.config.pnm_config_manager import SystemConfigSettings
 from pypnm.lib.constants import T
 from pypnm.lib.inet import Inet
 from pypnm.lib.inet_utils import InetGenerate
-from pypnm.lib.types import InetAddressStr, InterfaceIndex, SnmpIndex, SnmpReadCommunity, SnmpWriteCommunity
+from pypnm.lib.types import (
+    InetAddressStr,
+    InterfaceIndex,
+    SnmpIndex,
+    SnmpReadCommunity,
+    SnmpWriteCommunity,
+)
 from pypnm.snmp.compiled_oids import COMPILED_OIDS
 from pypnm.snmp.modules import InetAddressType
 

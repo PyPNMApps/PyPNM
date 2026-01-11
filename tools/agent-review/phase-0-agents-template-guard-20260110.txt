@@ -1,0 +1,58 @@
+# FILE: /home/dev01/Projects/PyPNM/AGENTS.md.template
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Maurice Garcia -->
+
+# AGENTS.md (Local Only)
+
+`AGENTS.md` is local-only and must NOT be committed or tracked.
+
+Copy this template to `AGENTS.md` locally and add your full agent rules, or obtain the official local version from the maintainer.
+
+# FILE: /home/dev01/Projects/PyPNM/.github/workflows/codeql.yml
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: "0 8 * * 1"   # Every Monday at 08:00 UTC
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "python" ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure AGENTS.md is not tracked
+        run: |
+          if git ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then
+            echo "AGENTS.md is tracked; it must remain local-only."
+            exit 1
+          fi
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+

@@ -7,7 +7,7 @@ import json
 import tarfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -38,7 +38,7 @@ def test_write_file_str_and_json(tmp_path: Path) -> None:
     assert fp.write_file("hello") is True
     assert p.read_text(encoding="utf-8") == "hello"
 
-    payload: Dict[str, Any] = {"a": 1, "b": "x"}
+    payload: dict[str, Any] = {"a": 1, "b": "x"}
     assert fp.write_file(payload) is True
     # second write overwrote file (append=False default)
     obj = json.loads(p.read_text(encoding="utf-8"))
@@ -79,7 +79,7 @@ def test_write_csv_with_dict_rows_and_archive_zip(tmp_path: Path) -> None:
     arc_path = tmp_path / "out.zip"
     fp = FileProcessor(csv_path)
 
-    rows: List[Dict[str, Any]] = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+    rows: list[dict[str, Any]] = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
     ok = fp.write_csv(rows, archive_path=arc_path, archive_format="zip")
     assert ok is True
     assert csv_path.exists() is True and arc_path.exists() is True
@@ -96,9 +96,9 @@ def test_write_csv_with_list_rows_and_headers_and_append(tmp_path: Path) -> None
     csv_path = tmp_path / "rows.csv"
     fp = FileProcessor(csv_path)
 
-    rows1: List[List[Any]] = [[1, 2], [3, 4]]
+    rows1: list[list[Any]] = [[1, 2], [3, 4]]
     assert fp.write_csv(rows1, headers=["x", "y"]) is True
-    rows2: List[List[Any]] = [[5, 6]]
+    rows2: list[list[Any]] = [[5, 6]]
     assert fp.write_csv(rows2, headers=["ignored", "ignored"], append=True) is True
 
     text = csv_path.read_text(encoding="utf-8").strip().splitlines()

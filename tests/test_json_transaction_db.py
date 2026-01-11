@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any
 
 import pytest
 
@@ -18,7 +19,6 @@ from pypnm.lib.db.model.json_trans_model import (
     JsonTransactionRecordModel,
 )
 from pypnm.lib.types import HashStr, TimeStamp, TransactionId
-
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Model Tests
@@ -161,7 +161,7 @@ def test_write_json_creates_payload_and_updates_db(tmp_path: Path, monkeypatch: 
     assert record.sha256 == expected_hash
 
     db_text: str = db_path.read_text(encoding="utf-8")
-    db_json: Dict[str, Any] = json.loads(db_text)
+    db_json: dict[str, Any] = json.loads(db_text)
     assert list(db_json.keys()) == [tx_id]
 
 
@@ -187,7 +187,7 @@ def test_read_json_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert result.byte_size == record.byte_size
     assert result.sha256    == record.sha256
 
-    parsed_payload: Dict[str, Any] = json.loads(result.data)
+    parsed_payload: dict[str, Any] = json.loads(result.data)
     assert parsed_payload == dict(payload)
 
 

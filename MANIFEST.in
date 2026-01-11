@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
 # MANIFEST.in
 
 # Core top-level files that should always be in the sdist
@@ -17,4 +20,7 @@ exclude tools/release/testpypi_release.py
 exclude tools/pypi_release.py
 
 # Exclude local data
-exclude .data/*
+recursive-exclude .data *
+recursive-exclude demo/.data *
+global-exclude *.sqlite3
+global-exclude *.db

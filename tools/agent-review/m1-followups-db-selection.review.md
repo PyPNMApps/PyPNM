@@ -1,0 +1,1158 @@
+## Agent Review Bundle Summary Template (Standard)
+
+### Summary
+Moved DB backend selection and settings update ahead of pytest in the installer, and prevented password persistence by redacting or omitting credentials in Postgres DSNs. Removed the MkDocs-only anchor from the PnmFileRetrieval heading to keep Markdown GitHub-compatible.
+
+### Modified Files
+- install.sh
+- docs/system/system-config.md
+
+### Commands Executed And Results
+- `python3 -m compileall src` → passed
+- `pytest` → passed (513 passed, 3 skipped)
+- `ruff check .` → not run (pre-existing repo violations)
+- `ruff format --check .` → not run (pre-existing formatting differences)
+
+### Tests
+- `pytest` → passed (513 passed, 3 skipped)
+- `ruff` → not run (pre-existing repo violations)
+- `ruff format --check .` → not run (pre-existing formatting differences)
+
+### Notes / Warnings
+- None.
+
+### Remaining TODOs / Follow-Ups
+- None.
+
+
+# FILE: /home/dev01/Projects/PyPNM/install.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ────────────────────────────────────────────────────────────────────────────────
+# install.sh — Unified OS prerequisite installer and PyPNM bootstrapper
+# Usage: ./install.sh [--demo-mode | --production] [--db-install-sqlite | --db-install-postgres] [--pnm-file-retrieval-setup] [venv_dir]
+# ────────────────────────────────────────────────────────────────────────────────
+
+VENV_DIR=".env"
+DEMO_MODE="0"
+PRODUCTION_MODE="0"
+PNM_FILE_RETRIEVAL_SETUP="0"
+DEVELOPMENT_MODE="0"
+CLEAN_MODE="0"
+PURGE_CACHE="0"
+UNINSTALL_MODE="0"
+DB_INSTALL_SQLITE="0"
+DB_INSTALL_POSTGRES="0"
+GITLEAKS_VERSION="8.18.1"
+POSTGRES_DSN_ENV_VAR="PYPNM_DB_POSTGRES_DSN"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${SCRIPT_DIR}"
+BANNER_PATH="${PROJECT_ROOT}/tools/banner.txt"
+
+if [[ -f "${BANNER_PATH}" ]]; then
+  cat "${BANNER_PATH}"
+  echo
+fi
+
+usage() {
+  cat <<EOF
+PyPNM Installer And Bootstrap Script
+
+Usage:
+  ./install.sh [--demo-mode | --production] [--db-install-sqlite | --db-install-postgres] [--pnm-file-retrieval-setup] [venv_dir]
+  ./install.sh --development
+  ./install.sh --clean [--purge-cache]
+  ./install.sh --uninstall [venv_dir]
+  ./install.sh --help
+
+Options:
+  --development  Install Docker Engine + kind/kubectl + gitleaks for local dev and release workflows.
+  --clean        Remove prior install artifacts (venv/build/dist/cache) before installing.
+  --purge-cache  Clear pip cache after activating the venv (use with --clean when needed).
+  --uninstall    Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
+  --db-install-sqlite
+                 Select SQLite as the DB backend (default when no DB flag is provided).
+  --db-install-postgres
+                 Select Postgres as the DB backend and prompt for a DSN or connection fields.
+                 If no DB flag is provided, the installer prompts in interactive mode
+                 (defaulting to sqlite) and defaults to sqlite in non-interactive or CI runs.
+
+  --demo-mode     Enable demo mode by backing up the default
+                  src/pypnm/settings/system.json into backup/src/pypnm/settings/system.json
+                  and replacing it with demo/settings/system.json. The demo system.json
+                  should point all relevant directories to the demo/ tree.
+
+  --production    Revert to production settings by restoring the backed-up
+                  backup/src/pypnm/settings/system.json back to
+                  src/pypnm/settings/system.json. This assumes a prior backup exists
+                  (created by running with --demo-mode or a normal install).
+
+  --pnm-file-retrieval-setup
+                  After installation completes, attempt to run the interactive
+                  PNM File Retrieval setup helper:
+
+                      tools/pnm/pnm_file_retrieval_setup.py
+
+                  This lets you choose how PyPNM retrieves PNM files:
+                  local / tftp / ftp / scp / sftp / http / https.
+
+                  For CI safety, this step is only executed when:
+                    • stdin is a TTY (real terminal), and
+                    • CI/GITHUB_ACTIONS are not set.
+                  In CI environments, the option is acknowledged but skipped.
+
+  venv_dir        Optional virtual environment directory name. Defaults to ".env".
+
+  --help, -h      Show this help message and exit.
+
+Examples:
+  ./install.sh
+      Create a venv in ".env" and install PyPNM with dev/docs extras.
+
+  ./install.sh .pyenv
+      Create a venv in ".pyenv" instead of ".env".
+
+  ./install.sh --demo-mode
+      Install and then switch system.json to the demo configuration
+      (backing up the current system.json first).
+
+  ./install.sh --development
+      Install Docker Engine + kind/kubectl + gitleaks so release smoke tests can run.
+      Tested on Ubuntu 22.04/24.04.
+
+  ./install.sh --clean
+      Remove previous install artifacts and rebuild the venv (preserves .data/ and
+      src/pypnm/settings/system.json).
+
+  ./install.sh --clean --purge-cache
+      Remove previous install artifacts and clear pip cache before reinstalling.
+
+  ./install.sh --uninstall
+      Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
+
+  ./install.sh --demo-mode .env-demo
+      Create a venv in ".env-demo" and enable demo-mode system.json.
+
+  ./install.sh --production
+      Install and then restore system.json from the backup tree, returning
+      the configuration to production mode.
+
+  ./install.sh --pnm-file-retrieval-setup
+      Install and then invoke the PNM File Retrieval setup helper at the end,
+      when running in an interactive, non-CI environment.
+
+After installation, you can also configure how PyPNM retrieves PNM files
+(local/TFTP/FTP/SCP/SFTP/HTTP/HTTPS) manually by running:
+
+  ./tools/pnm/pnm_file_retrieval_setup.py
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --demo-mode)
+      DEMO_MODE="1"
+      ;;
+    --production)
+      PRODUCTION_MODE="1"
+      ;;
+    --pnm-file-retrieval-setup)
+      PNM_FILE_RETRIEVAL_SETUP="1"
+      ;;
+    --development)
+      DEVELOPMENT_MODE="1"
+      ;;
+    --clean)
+      CLEAN_MODE="1"
+      ;;
+    --purge-cache)
+      PURGE_CACHE="1"
+      ;;
+    --uninstall)
+      UNINSTALL_MODE="1"
+      ;;
+    --db-install-sqlite)
+      DB_INSTALL_SQLITE="1"
+      ;;
+    --db-install-postgres)
+      DB_INSTALL_POSTGRES="1"
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      VENV_DIR="$arg"
+      ;;
+  esac
+done
+
+if [[ "$UNINSTALL_MODE" == "1" ]]; then
+  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" || "$DB_INSTALL_SQLITE" == "1" || "$DB_INSTALL_POSTGRES" == "1" ]]; then
+    echo "❌ --uninstall cannot be combined with other flags."
+    usage
+    exit 1
+  fi
+fi
+
+if [[ "$DEMO_MODE" == "1" && "$PRODUCTION_MODE" == "1" ]]; then
+  echo "❌ Cannot use --demo-mode and --production together."
+  usage
+  exit 1
+fi
+
+if [[ "$DB_INSTALL_SQLITE" == "1" && "$DB_INSTALL_POSTGRES" == "1" ]]; then
+  echo "❌ Cannot use --db-install-sqlite and --db-install-postgres together."
+  usage
+  exit 1
+fi
+
+clean_previous_install() {
+  echo "🧹 Cleaning previous install artifacts..."
+
+  local remove_paths=(
+    "${PROJECT_ROOT}/${VENV_DIR}"
+    "${PROJECT_ROOT}/build"
+    "${PROJECT_ROOT}/dist"
+    "${PROJECT_ROOT}/.pytest_cache"
+    "${PROJECT_ROOT}/.ruff_cache"
+    "${PROJECT_ROOT}/.mypy_cache"
+    "${PROJECT_ROOT}/.pyright"
+    "${PROJECT_ROOT}/.coverage"
+    "${PROJECT_ROOT}/htmlcov"
+    "${PROJECT_ROOT}/test_reports"
+  )
+
+  for path in "${remove_paths[@]}"; do
+    if [[ -e "${path}" ]]; then
+      echo "🗑️  Removing ${path}"
+      rm -rf "${path}"
+    fi
+  done
+
+  find "${PROJECT_ROOT}" -maxdepth 2 -name "*.egg-info" -type d -print0 | while IFS= read -r -d '' item; do
+    echo "🗑️  Removing ${item}"
+    rm -rf "${item}"
+  done
+
+  echo "ℹ️  Preserving ${PROJECT_ROOT}/.data and ${PROJECT_ROOT}/src/pypnm/settings/system.json"
+}
+
+install_gitleaks() {
+  if command -v gitleaks >/dev/null 2>&1; then
+    echo "✅ gitleaks already installed."
+    return
+  fi
+
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  gitleaks not found and no package manager available."
+    echo "    Install manually: https://github.com/gitleaks/gitleaks"
+    return
+  fi
+
+  echo "🔧 Installing gitleaks..."
+  case "$PM" in
+    apt-get) $PM_INSTALL gitleaks || true ;;
+    dnf|yum) $PM_INSTALL gitleaks || true ;;
+    zypper)  $PM_INSTALL gitleaks || true ;;
+    apk)     $PM_INSTALL gitleaks || true ;;
+    brew)    $PM_INSTALL gitleaks || true ;;
+    *)
+      echo "⚠️  Unknown package manager; install gitleaks manually."
+      echo "    https://github.com/gitleaks/gitleaks"
+      return
+      ;;
+  esac
+
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete (curl missing)."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+    if ! command -v tar >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete (tar missing)."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+
+    local os arch filename url tmp_dir target_dir bin_path
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    case "$os" in
+      linux|darwin) ;;
+      *)
+        echo "⚠️  Unsupported OS for gitleaks auto-install: ${os}"
+        echo "    Install manually: https://github.com/gitleaks/gitleaks"
+        return
+        ;;
+    esac
+
+    arch="$(uname -m)"
+    case "$arch" in
+      x86_64|amd64) arch="x64" ;;
+      aarch64|arm64) arch="arm64" ;;
+      *)
+        echo "⚠️  Unsupported architecture for gitleaks auto-install: ${arch}"
+        echo "    Install manually: https://github.com/gitleaks/gitleaks"
+        return
+        ;;
+    esac
+
+    filename="gitleaks_${GITLEAKS_VERSION}_${os}_${arch}.tar.gz"
+    url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${filename}"
+    tmp_dir="$(mktemp -d)"
+    echo "⬇️  Downloading gitleaks ${GITLEAKS_VERSION}..."
+    if ! curl -fsSL "${url}" -o "${tmp_dir}/${filename}"; then
+      echo "⚠️  Failed to download gitleaks from ${url}"
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    if ! tar -xzf "${tmp_dir}/${filename}" -C "${tmp_dir}"; then
+      echo "⚠️  Failed to extract gitleaks archive."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    bin_path="${tmp_dir}/gitleaks"
+    if [[ ! -f "${bin_path}" ]]; then
+      echo "⚠️  gitleaks binary not found after extraction."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      rm -rf "${tmp_dir}"
+      return
+    fi
+
+    target_dir="/usr/local/bin"
+    if [[ -w "${target_dir}" ]]; then
+      install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+    else
+      target_dir="${HOME}/.local/bin"
+      mkdir -p "${target_dir}"
+      install -m 0755 "${bin_path}" "${target_dir}/gitleaks"
+      echo "ℹ️  Added gitleaks to ${target_dir}; ensure it's on PATH."
+    fi
+
+    rm -rf "${tmp_dir}"
+    if ! command -v gitleaks >/dev/null 2>&1; then
+      echo "⚠️  gitleaks install did not complete."
+      echo "    Install manually: https://github.com/gitleaks/gitleaks"
+      return
+    fi
+  fi
+}
+
+remove_secrets_key() {
+  local secrets_key_path
+  secrets_key_path="${HOME}/.ssh/pypnm_secrets.key"
+
+  if [[ -f "${secrets_key_path}" ]]; then
+    echo "🗑️  Removing ${secrets_key_path}"
+    rm -f "${secrets_key_path}"
+  else
+    echo "ℹ️  Secret key not found at ${secrets_key_path}"
+  fi
+}
+
+uninstall_pypnm() {
+  echo "🧹 Uninstalling PyPNM artifacts..."
+  clean_previous_install
+  remove_secrets_key
+  echo "✅ Uninstall complete."
+}
+
+if [[ "$UNINSTALL_MODE" == "1" ]]; then
+  uninstall_pypnm
+  exit 0
+fi
+
+backup_system_settings() {
+  echo "🗂  Creating backup of system settings…"
+  local backup_root
+  backup_root="${PROJECT_ROOT}/backup"
+  local src_path
+  src_path="${PROJECT_ROOT}/src/pypnm/settings/system.json"
+  local dst_path
+  dst_path="${backup_root}/src/pypnm/settings/system.json"
+
+  if [[ ! -f "$src_path" ]]; then
+    echo "⚠️  System settings file not found at '$src_path'; skipping backup."
+    return
+  fi
+
+  mkdir -p "$(dirname "$dst_path")"
+  cp "$src_path" "$dst_path"
+  echo "✅ Backup created at '$dst_path'."
+}
+
+restore_system_settings() {
+  echo "🗂  Restoring system settings from backup…"
+  local backup_root
+  backup_root="${PROJECT_ROOT}/backup"
+  local backup_path
+  backup_path="${backup_root}/src/pypnm/settings/system.json"
+  local target
+  target="${PROJECT_ROOT}/src/pypnm/settings/system.json"
+
+  if [[ ! -f "$backup_path" ]]; then
+    echo "⚠️  Backup system settings not found at '$backup_path'; cannot restore."
+    return
+  fi
+
+  mkdir -p "$(dirname "$target")"
+  cp "$backup_path" "$target"
+  echo "✅ System settings restored from backup to '$target'."
+}
+
+enable_demo_mode() {
+  echo "🎛  Enabling demo mode configuration…"
+  local demo_src
+  demo_src="${PROJECT_ROOT}/demo/settings/system.json"
+  local target
+  target="${PROJECT_ROOT}/src/pypnm/settings/system.json"
+
+  if [[ ! -f "$demo_src" ]]; then
+    echo "⚠️  Demo settings file not found at '$demo_src'; skipping demo mode."
+    return
+  fi
+
+  if [[ -f "$target" ]]; then
+    echo "ℹ️  Overwriting existing system settings at '$target' with demo template."
+  else
+    echo "ℹ️  Creating system settings at '$target' from demo template."
+  fi
+
+  mkdir -p "$(dirname "$target")"
+  cp "$demo_src" "$target"
+  echo "✅ Demo mode system settings applied (directories now point to demo/)."
+}
+
+choose_db_backend() {
+  local selection
+
+  if [[ "$DB_INSTALL_SQLITE" == "1" ]]; then
+    echo "sqlite"
+    return
+  fi
+  if [[ "$DB_INSTALL_POSTGRES" == "1" ]]; then
+    echo "postgres"
+    return
+  fi
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "sqlite"
+    return
+  fi
+
+  echo
+  echo "Database backend selection:"
+  echo "  - SQLite is recommended for standalone/single-writer deployments."
+  echo "  - Postgres is recommended for multi-worker/multi-process deployments."
+  read -r -p "Choose database backend [sqlite]: " selection
+
+  selection="$(echo "$selection" | tr '[:upper:]' '[:lower:]' | xargs)"
+  if [[ "$selection" == "" ]]; then
+    selection="sqlite"
+  fi
+  if [[ "$selection" != "sqlite" && "$selection" != "postgres" ]]; then
+    echo "⚠️  Invalid selection '${selection}'; defaulting to sqlite."
+    selection="sqlite"
+  fi
+
+  echo "$selection"
+}
+
+prompt_postgres_dsn() {
+  local dsn confirm
+  local host port dbname user password sslmode
+
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo ""
+    return
+  fi
+
+  echo
+  echo "Postgres configuration:"
+  echo "  Use ${POSTGRES_DSN_ENV_VAR} to supply secrets at runtime (recommended)."
+  read -r -p "Enter Postgres DSN (leave blank to enter fields or rely on env var): " dsn
+
+  dsn="$(echo "$dsn" | xargs)"
+  if [[ "$dsn" != "" ]]; then
+    local redacted
+    redacted="$(echo "$dsn" | sed -E 's#(postgres(ql)?://[^:/@]+):[^@]*@#\\1@#')"
+    if [[ "$redacted" != "$dsn" ]]; then
+      echo "⚠️  Passwords are not persisted to system.json; use ${POSTGRES_DSN_ENV_VAR}."
+      dsn="$redacted"
+    fi
+    echo "$dsn"
+    return
+  fi
+
+  read -r -p "Enter Postgres connection fields now? [y/N]: " confirm
+  confirm="$(echo "$confirm" | tr '[:upper:]' '[:lower:]' | xargs)"
+  if [[ "$confirm" != "y" && "$confirm" != "yes" ]]; then
+    echo ""
+    return
+  fi
+
+  read -r -p "Host [localhost]: " host
+  read -r -p "Port [5432]: " port
+  read -r -p "Database [pypnm]: " dbname
+  read -r -p "User [pypnm]: " user
+  read -r -p "Password (leave blank to avoid storing): " password
+  read -r -p "SSL mode (disable/allow/prefer/require) [disable]: " sslmode
+
+  host="${host:-localhost}"
+  port="${port:-5432}"
+  dbname="${dbname:-pypnm}"
+  user="${user:-pypnm}"
+  sslmode="${sslmode:-disable}"
+
+  if [[ "$password" != "" ]]; then
+    echo "⚠️  Passwords are not persisted to system.json; use ${POSTGRES_DSN_ENV_VAR}."
+  fi
+  dsn="postgresql://${user}@${host}:${port}/${dbname}"
+  if [[ "$sslmode" != "" ]]; then
+    dsn="${dsn}?sslmode=${sslmode}"
+  fi
+
+  echo "$dsn"
+}
+
+update_database_settings() {
+  local backend
+  local dsn
+  local config_path
+
+  backend="$1"
+  dsn="$2"
+  config_path="${PROJECT_ROOT}/src/pypnm/settings/system.json"
+
+  if [[ ! -f "$config_path" ]]; then
+    echo "⚠️  system.json not found at '${config_path}'; skipping DB configuration."
+    return
+  fi
+
+  "$PYTHON_CMD" - <<PY
+import json
+from pathlib import Path
+
+config_path = Path(r"${config_path}")
+data = json.loads(config_path.read_text())
+
+db = data.get("Database")
+if not isinstance(db, dict):
+    db = {}
+    data["Database"] = db
+
+sqlite_cfg = db.get("sqlite")
+if not isinstance(sqlite_cfg, dict):
+    sqlite_cfg = {}
+    db["sqlite"] = sqlite_cfg
+
+if "path" not in sqlite_cfg or sqlite_cfg["path"] is None:
+    sqlite_cfg["path"] = ".data/db/pypnm.sqlite3"
+
+postgres_cfg = db.get("postgres")
+if not isinstance(postgres_cfg, dict):
+    postgres_cfg = {}
+    db["postgres"] = postgres_cfg
+
+postgres_cfg["dsn"] = r"${dsn}"
+db["backend"] = r"${backend}"
+
+config_path.write_text(json.dumps(data, indent=4) + "\\n")
+PY
+}
+
+echo "🔍 Detecting package manager..."
+PM="none"; PM_UPDATE=""; PM_INSTALL=""
+if command -v apt-get >/dev/null 2>&1; then
+  PM="apt-get"; PM_UPDATE="sudo apt-get update"; PM_INSTALL="sudo apt-get install -y"
+  echo "ℹ️  Debian/Ubuntu (apt-get)"
+elif command -v dnf >/dev/null 2>&1; then
+  PM="dnf"; PM_UPDATE="sudo dnf makecache"; PM_INSTALL="sudo dnf install -y"
+  echo "ℹ️  Fedora/RHEL (dnf)"
+elif command -v yum >/dev/null 2>&1; then
+  PM="yum"; PM_UPDATE="sudo yum makecache"; PM_INSTALL="sudo yum install -y"
+  echo "ℹ️  RHEL/CentOS (yum)"
+elif command -v zypper >/dev/null 2>&1; then
+  PM="zypper"; PM_UPDATE="sudo zypper refresh"; PM_INSTALL="sudo zypper install -y"
+  echo "ℹ️  SUSE/openSUSE (zypper)"
+elif command -v apk >/dev/null 2>&1; then
+  PM="apk"; PM_UPDATE=""; PM_INSTALL="sudo apk add --no-cache"
+  echo "ℹ️  Alpine (apk)"
+elif command -v brew >/dev/null 2>&1; then
+  PM="brew"; PM_UPDATE="brew update"; PM_INSTALL="brew install"
+  echo "ℹ️  macOS (brew)"
+else
+  echo "⚠️  Unsupported OS: please manually install 'ssh', 'sshpass', and Python venv support."
+fi
+
+if [[ "$PM" != "none" && -n "${PM_UPDATE:-}" ]]; then
+  echo "🔄 Updating package cache..."
+  $PM_UPDATE || true
+fi
+
+echo "✅ Installing OS prerequisites..."
+if ! command -v ssh >/dev/null 2>&1; then
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  No package manager; cannot auto-install 'ssh'."
+  else
+    echo "🔧 Installing ssh..."
+    case "$PM" in
+      apt-get) $PM_INSTALL openssh-client ;;
+      dnf|yum) $PM_INSTALL openssh-clients ;;
+      zypper)  $PM_INSTALL openssh ;;
+      apk)     $PM_INSTALL openssh ;;
+      brew)    $PM_INSTALL openssh ;;
+    esac
+  fi
+fi
+
+if ! command -v sshpass >/dev/null 2>&1; then
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  No package manager; cannot auto-install 'sshpass'."
+  else
+    echo "🔧 Installing sshpass..."
+    $PM_INSTALL sshpass || true
+  fi
+fi
+
+echo "🧮 Ensuring SciPy/NumPy build prerequisites (where applicable)..."
+case "$PM" in
+  apt-get)
+    $PM_INSTALL build-essential gfortran libopenblas-dev liblapack-dev || true
+    ;;
+  dnf|yum)
+    $PM_INSTALL gcc gcc-c++ make blas-devel lapack-devel || true
+    ;;
+  zypper)
+    $PM_INSTALL gcc gcc-c++ make libopenblas-devel lapack-devel || true
+    ;;
+  apk)
+    $PM_INSTALL build-base gfortran openblas-dev lapack-dev || true
+    ;;
+  brew)
+    # Homebrew wheels usually bundle BLAS/LAPACK; nothing extra required in most cases.
+    :
+    ;;
+  *)
+    echo "⚠️  Skipping SciPy/NumPy build prerequisites for unknown or manual PM."
+    ;;
+esac
+
+if [[ "$DEVELOPMENT_MODE" == "1" ]]; then
+  echo "🧰 Development setup: Docker + kind/kubectl + gitleaks..."
+  if ! command -v curl >/dev/null 2>&1; then
+    if [[ "$PM" == "none" ]]; then
+      echo "❌ curl not found and no package manager available."
+      exit 1
+    fi
+    echo "🔧 Installing curl..."
+    case "$PM" in
+      apt-get) $PM_INSTALL curl ;;
+      dnf|yum) $PM_INSTALL curl ;;
+      zypper)  $PM_INSTALL curl ;;
+      apk)     $PM_INSTALL curl ;;
+      brew)    $PM_INSTALL curl ;;
+    esac
+  fi
+
+  if [[ "$PM" == "apt-get" ]]; then
+    bash "${PROJECT_ROOT}/tools/docker/install-docker-ubuntu.sh"
+  else
+    echo "⚠️  --development is tested on Ubuntu 22.04/24.04; continuing with kind/kubectl install."
+    echo "    Install Docker manually for your OS, then re-run if needed."
+  fi
+
+  bash "${PROJECT_ROOT}/tools/k8s/pypnm_kind_vm_bootstrap.sh"
+  install_gitleaks
+  echo "ℹ️  Docker may require: sudo systemctl start docker"
+  echo "ℹ️  For non-sudo Docker: sudo usermod -aG docker \"${USER}\" (then log out/in)"
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  if [[ "$PM" == "none" ]]; then
+    echo "❌ Python 3.x not found in PATH."
+    exit 1
+  fi
+  echo "🔧 Installing Python 3..."
+  case "$PM" in
+    apt-get) $PM_INSTALL python3 ;;
+    dnf|yum) $PM_INSTALL python3 ;;
+    zypper)  $PM_INSTALL python3 ;;
+    apk)     $PM_INSTALL python3 ;;
+    brew)    $PM_INSTALL python ;;
+  esac
+fi
+
+PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3")"
+PYTHON_CMD="python${PYTHON_VERSION}"
+if ! command -v "$PYTHON_CMD" >/dev/null 2>&1; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+  else
+    echo "❌ Python 3.x not found in PATH."
+    exit 1
+  fi
+fi
+
+echo "🔧 Ensuring venv support is available..."
+case "$PM" in
+  apt-get) $PM_INSTALL "python${PYTHON_VERSION}-venv" || true ;;
+  dnf|yum) $PM_INSTALL python3-virtualenv || true ;;
+  zypper)  $PM_INSTALL python3-virtualenv || true ;;
+  apk)     $PM_INSTALL python3 || true ;;
+  brew)    $PM_INSTALL python || true ;;
+  *)       echo "⚠️  Skipping venv package install for unknown PM." ;;
+esac
+
+if [[ "$CLEAN_MODE" == "1" ]]; then
+  clean_previous_install
+fi
+
+echo "🛠  Creating virtual environment in '$VENV_DIR'…"
+"$PYTHON_CMD" -m venv "$VENV_DIR"
+
+echo "🚀 Activating '$VENV_DIR'…"
+# shellcheck source=/dev/null
+source "$VENV_DIR/bin/activate"
+
+echo "⬆️  Upgrading pip, setuptools, wheel…"
+pip install --upgrade pip setuptools wheel
+
+if [[ "$PURGE_CACHE" == "1" ]]; then
+  echo "🧽 Purging pip cache..."
+  pip cache purge || true
+fi
+
+echo "📥 Installing PyPNM extras: dev + docs…"
+pip install -e "${PROJECT_ROOT}[dev,docs]"
+
+echo "📦 Installing required tooling: pytest, mkdocs, mkdocs-material, cryptography…"
+pip install "pytest>=7" "mkdocs>=1.6" "mkdocs-material>=9.5" "cryptography>=41"
+
+echo "🔎 Verifying MkDocs install…"
+mkdocs --version
+
+echo "🔧 Configuring PYTHONPATH…"
+"$PROJECT_ROOT/scripts/install_py_path.sh" "$PROJECT_ROOT" || true
+
+echo "🔐 Ensuring PyPNM secret key exists (~/.ssh/pypnm_secrets.key)…"
+if [[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+  echo "ℹ️  Skipping secret key creation (CI environment)."
+  echo "    Create it locally with:"
+  echo "      ./scripts/init_secrets_key.sh"
+else
+  if [[ -x "${PROJECT_ROOT}/scripts/init_secrets_key.sh" ]]; then
+    "${PROJECT_ROOT}/scripts/init_secrets_key.sh" --quiet || true
+  else
+    echo "ℹ️  scripts/init_secrets_key.sh is missing or not executable; skipping."
+  fi
+fi
+
+db_backend="$(choose_db_backend)"
+if [[ "$db_backend" == "sqlite" ]]; then
+  echo "ℹ️  SQLite is recommended for standalone single-writer deployments."
+else
+  echo "ℹ️  Postgres is recommended for PyPNM-CMTS and multi-worker/multi-process deployments."
+fi
+db_postgres_dsn=""
+if [[ "$db_backend" == "postgres" ]]; then
+  db_postgres_dsn="$(prompt_postgres_dsn)"
+  if [[ "$db_postgres_dsn" == "" && -z "${PYPNM_DB_POSTGRES_DSN:-}" ]]; then
+    echo "⚠️  Postgres selected but no DSN provided."
+    echo "    Set ${POSTGRES_DSN_ENV_VAR} to inject the DSN at runtime."
+  fi
+fi
+
+update_database_settings "$db_backend" "$db_postgres_dsn"
+
+echo "🧪 Running unit tests…"
+cd "$PROJECT_ROOT"
+pytest -v
+
+if [[ "$PRODUCTION_MODE" == "1" ]]; then
+  restore_system_settings
+elif [[ "$DEMO_MODE" == "1" ]]; then
+  backup_system_settings
+  enable_demo_mode
+else
+  backup_system_settings
+fi
+
+###############################################################################
+# Optional: PNM File Retrieval Setup (CI-Safe)
+#
+# Behavior:
+#   - If --pnm-file-retrieval-setup was passed:
+#       • Attempt to run tools/pnm/pnm_file_retrieval_setup.py automatically
+#         when in an interactive, non-CI environment.
+#       • If in CI or non-TTY, print a message and skip.
+#
+#   - If the flag was NOT passed:
+#       • Do NOT prompt interactively.
+#       • Just print a short message about the manual helper.
+###############################################################################
+run_pnm_setup_if_possible() {
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "ℹ️  Skipping PNM file retrieval setup (non-interactive or CI environment)."
+    echo "    You can run it later with:"
+    echo "      ./tools/pnm/pnm_file_retrieval_setup.py"
+    return
+  fi
+
+  if [[ -x "./tools/pnm/pnm_file_retrieval_setup.py" ]]; then
+    echo
+    echo "Launching PNM file retrieval setup..."
+    ./tools/pnm/pnm_file_retrieval_setup.py
+  else
+    echo "tools/pnm/pnm_file_retrieval_setup.py is missing or not executable."
+    echo "You can run it manually later once it is available:"
+    echo "  ./tools/pnm/pnm_file_retrieval_setup.py"
+  fi
+}
+
+run_pnm_alias_installer_if_available() {
+  if [[ -x "${PROJECT_ROOT}/scripts/install_aliases.sh" ]]; then
+    echo "🔗 Installing PyPNM shell aliases (e.g., config-menu)…"
+    "${PROJECT_ROOT}/scripts/install_aliases.sh" || true
+  fi
+}
+
+if [[ "$PNM_FILE_RETRIEVAL_SETUP" == "1" ]]; then
+  echo
+  echo "PNM File Retrieval Configuration (requested via --pnm-file-retrieval-setup)"
+  run_pnm_setup_if_possible
+else
+  echo
+  echo "ℹ️  PNM file retrieval setup was not requested."
+  echo "    You can configure it later with:"
+  echo "      ./tools/pnm/pnm_file_retrieval_setup.py"
+fi
+
+run_pnm_alias_installer_if_available
+
+echo "✅ Bootstrap complete."
+if [[ "$DEMO_MODE" == "1" ]]; then
+  echo "👉 Demo mode is enabled: system settings now reference the demo/ directories."
+fi
+if [[ "$PRODUCTION_MODE" == "1" ]]; then
+  echo "👉 Production mode is restored: system settings have been reverted from backup."
+fi
+echo "👉 Next steps:"
+echo "   1) source '$VENV_DIR/bin/activate'"
+echo "   2) (optional) ./tools/pnm/pnm_file_retrieval_setup.py"
+echo "   3) mkdocs serve"
+
+
+# FILE: /home/dev01/Projects/PyPNM/docs/system/system-config.md
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Maurice Garcia -->
+
+# System Configuration Reference
+
+Canonical Structure And Field Semantics For `system.json`.
+
+* **Config file**: [`src/pypnm/settings/system.json`](https://github.com/PyPNMApps/PyPNM/blob/main/src/pypnm/settings/system.json)
+* **ConfigManager class**: [`src/pypnm/config/config_manager.py`](https://github.com/PyPNMApps/PyPNM/blob/main/src/pypnm/config/config_manager.py)
+* **PnmConfigManager class**: [`src/pypnm/config/pnm_config_manager.py`](https://github.com/PyPNMApps/PyPNM/blob/main/src/pypnm/config/pnm_config_manager.py)
+
+## Table Of Contents
+
+* [1. FastApiRequestDefault](#1-fastapirequestdefault)
+* [2. SNMP](#2-snmp)
+* [3. PnmBulkDataTransfer](#3-pnmbulkdatatransfer)
+* [4. PnmFileRetrieval](#4-pnmfileretrieval)
+* [5. Database](#5-database)
+* [6. Logging](#6-logging)
+* [7. TestMode](#7-testmode)
+* [Loading Configuration](#loading-configuration)
+
+## 1. FastApiRequestDefault
+
+Default Parameters For REST Requests To The FastAPI Service.
+
+```json
+"FastApiRequestDefault": {
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "ip_address": "192.168.0.100"
+}
+```
+
+| Field       | Type   | Description                       |
+| ----------- | ------ | --------------------------------- |
+| mac_address | string | Default device MAC address.       |
+| ip_address  | string | Default device IP (IPv4 or IPv6). |
+
+## 2. SNMP
+
+Global SNMP Settings, Including Version-Specific Options.
+
+```json
+"SNMP": {
+  "timeout": 2,
+  "version": {
+    "2c": {
+      "enable": true,
+      "retries": 3,
+      "read_community": "public",
+      "write_community": "private"
+    },
+    "3": {
+      "enable": false,
+      "retries": 3,
+      "username": "user",
+      "securityLevel": "authPriv",
+      "authProtocol": "SHA",
+      "authPassword": "pass",
+      "privProtocol": "AES",
+      "privPassword": "privpass"
+    }
+  }
+}
+```
+
+**Top-Level**
+
+| Field   | Type   | Description                                  |
+| ------- | ------ | -------------------------------------------- |
+| timeout | number | Per-request timeout (seconds).               |
+| version | object | Container for v2c/v3 configuration versions. |
+
+**SNMP v2c**
+
+| Field           | Type    | Description                     |
+| --------------- | ------- | ------------------------------- |
+| enable          | boolean | Enable v2c operations.          |
+| retries         | number  | Retry count on timeout/failure. |
+| read_community  | string  | Community for GET/WALK.         |
+| write_community | string  | Community for SET.              |
+
+**SNMP v3**
+
+| Field         | Type    | Description                                  |
+| ------------- | ------- | -------------------------------------------- |
+| enable        | boolean | Enable v3 operations.                        |
+| retries       | number  | Retry count on timeout/failure.              |
+| username      | string  | Security name.                               |
+| securityLevel | string  | `noAuthNoPriv`, `authNoPriv`, or `authPriv`. |
+| authProtocol  | string  | For example `MD5`, `SHA`.                    |
+| authPassword  | string  | Required when `auth*` is used.               |
+| privProtocol  | string  | For example `DES`, `AES`.                    |
+| privPassword  | string  | Required when `*Priv` is used.               |
+
+## 3. PnmBulkDataTransfer
+
+Transport Parameters For CM-Generated Files (for example, RxMER, FEC Summary) Sent To A Server.
+
+```json
+"PnmBulkDataTransfer": {
+  "method": "tftp",
+  "tftp": {
+    "ip_v4": "192.168.0.10",
+    "ip_v6": "::1",
+    "remote_dir": ""
+  },
+  "http": {
+    "base_url": "http://files.example.com/",
+    "port": 80
+  },
+  "https": {
+    "base_url": "https://files.example.com/",
+    "port": 443
+  }
+}
+```
+
+| Field   | Type   | Description                                                |
+| ------- | ------ | ---------------------------------------------------------- |
+| method  | string | Preferred bulk method: `tftp`, `http`, or `https`.         |
+| tftp.*  | object | TFTP targets for IPv4/IPv6 plus optional remote directory. |
+| http.*  | object | HTTP base URL and port for file delivery.                  |
+| https.* | object | HTTPS base URL and port for file delivery.                 |
+
+## 4. PnmFileRetrieval
+
+Local Storage Layout And Remote Retrieval Methods.
+
+Related Guide: [File Transfer Methods](pnm-file-retrieval/index.md)
+
+Runtime DB location policy: SQLite DB files live under `.data/db/` (demo uses `demo/.data/db/`), while Postgres is external and does not create a local DB file.
+
+```json
+"PnmFileRetrieval": {
+  "pnm_dir": ".data/pnm",
+  "csv_dir": ".data/csv",
+  "json_dir": ".data/json",
+  "xlsx_dir": ".data/xlsx",
+  "png_dir": ".data/png",
+  "archive_dir": ".data/archive",
+  "msg_rsp_dir": ".data/msg_rsp",
+  "transaction_db": ".data/db/transactions.json",
+  "capture_group_db": ".data/db/capture_group.json",
+  "session_group_db": ".data/db/session_group.json",
+  "operation_db": ".data/db/operation_capture.json",
+  "json_transaction_db": ".data/db/json_transactions.json",
+  "retries": 5,
+  "retrieval_method": {
+    "method": "local",
+    "methods": {
+      "local": {
+        "src_dir": "/srv/tftp"
+      },
+      "tftp": {
+        "host": "localhost",
+        "port": 69,
+        "timeout": 5,
+        "remote_dir": ""
+      },
+      "ftp": {
+        "host": "localhost",
+        "port": 21,
+        "tls": false,
+        "timeout": 5,
+        "user": "user",
+        "password_enc": "",
+        "remote_dir": "/srv/tftp"
+      },
+      "sftp": {
+        "host": "localhost",
+        "port": 22,
+        "user": "user",
+        "password_enc": "",
+        "private_key_path": "",
+        "remote_dir": "/srv/tftp"
+      },
+      "http": {
+        "base_url": "http://STUB/",
+        "port": 80
+      },
+      "https": {
+        "base_url": "https://STUB/",
+        "port": 443
+      }
+    }
+  }
+}
+```
+
+`password_enc` is the preferred password field for file retrieval methods. Plaintext `password` is supported only as a legacy fallback and is deprecated.
+
+**Directories And Databases**
+
+| Field               | Type   | Description                                  |
+| ------------------- | ------ | -------------------------------------------- |
+| pnm_dir             | string | Local storage for raw PNM binaries.          |
+| csv_dir             | string | Local storage for derived CSVs.              |
+| json_dir            | string | Local storage for derived JSON.              |
+| xlsx_dir            | string | Local storage for Excel reports.             |
+| png_dir             | string | Local storage for generated PNGs.            |
+| archive_dir         | string | Local storage for analysis ZIP archives.     |
+| msg_rsp_dir         | string | Local storage for message/response metadata. |
+| transaction_db      | string | JSON ledger of file transactions.            |
+| capture_group_db    | string | JSON map of grouped transactions.            |
+| session_group_db    | string | JSON map of session groups.                  |
+| operation_db        | string | JSON map of operation to capture group.      |
+| json_transaction_db | string | JSON map of JSON transaction metadata.       |
+
+**Retrieval Settings**
+
+| Field                                  | Type   | Description                                                           |
+| -------------------------------------- | ------ | --------------------------------------------------------------------- |
+| retrieval_method.method                 | string | Active retrieval method: `local`, `tftp`, `ftp`, `sftp`, `http`, `https`. |
+| retrieval_method.methods.local.src_dir  | string | Source directory to watch/copy from when using `local`.               |
+| retrieval_method.methods.tftp.*         | object | TFTP host/port/timeout and remote directory.                          |
+| retrieval_method.methods.ftp.*          | object | FTP connection, credentials, and remote directory.                    |
+| retrieval_method.methods.sftp.*         | object | SFTP connection and remote directory.                                 |
+| retrieval_method.methods.http.*         | object | HTTP base URL and port.                                               |
+| retrieval_method.methods.https.*        | object | HTTPS base URL and port.                                              |
+| retries                                | number | Max attempts per retrieval operation.                                 |
+
+> The legacy key name `retrival_method` is accepted for backward compatibility.
+
+## 5. Database
+
+Database Backend Selection And Connection Settings.
+
+```json
+"Database": {
+  "backend": "sqlite",
+  "sqlite": {
+    "path": ".data/db/pypnm.sqlite3"
+  },
+  "postgres": {
+    "dsn": ""
+  }
+}
+```
+
+Backend selection is set at install time (SQLite default; Postgres recommended for multi-worker deployments). Set `PYPNM_DB_BACKEND` to override the backend selection (`sqlite` or `postgres`). SQLite stores its DB file under `.data/db/` (demo uses `demo/.data/db/`), while Postgres is external and does not create a local DB file. For Postgres, supply the DSN via `PYPNM_DB_POSTGRES_DSN` to avoid storing plaintext credentials in tracked JSON files. Blank strings for required values are invalid when the backend is active.
+
+DB backend migration is in progress; legacy ledger keys remain until Phase M6.
+
+## 6. Logging
+
+Application Logging Options.
+
+```json
+"logging": {
+  "log_level": "INFO",
+  "log_dir": "logs",
+  "log_filename": "pypnm.log"
+}
+```
+
+| Field        | Type   | Description                                 |
+| ------------ | ------ | ------------------------------------------- |
+| log_level    | string | `DEBUG`, `INFO`, `WARN`, or `ERROR`.        |
+| log_dir      | string | Directory for log files.                    |
+| log_filename | string | Log filename (created under `log_dir`).     |
+
+## 7. TestMode
+
+Global And Class-Specific Test-Mode Controls.
+
+```json
+"TestMode": {
+  "global": {
+    "mode": {
+      "enable": true
+    }
+  },
+  "class_name": {
+    "DsScQamChannelSpectrumAnalyzer": {
+      "mode": {
+        "enable": true
+      }
+    }
+  }
+}
+```
+
+| Field                          | Type    | Description                                            |
+| ------------------------------ | ------- | ------------------------------------------------------ |
+| global.mode.enable             | boolean | Enable or disable global test mode.                    |
+| class_name.<Class>.mode.enable | boolean | Per-class override for test mode, keyed by class name. |
+
+## Loading Configuration
+
+Typical Access Pattern Using The Manager Abstractions.
+
+```python
+from pypnm.config.config_manager import ConfigManager
+from pypnm.config.pnm_config_manager import PnmConfigManager
+
+cfg = ConfigManager()
+
+mac = cfg.get("FastApiRequestDefault", "mac_address")
+ip  = cfg.get("FastApiRequestDefault", "ip_address")
+
+pnm_cfg = PnmConfigManager()
+tftp_v4 = pnm_cfg.get("PnmBulkDataTransfer", "tftp")["ip_v4"]
+```

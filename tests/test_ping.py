@@ -1,23 +1,27 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Callable
+from typing import NoReturn
+
 import pytest
 
 from pypnm.lib.ping import Ping
+
 
 class DummyCompleted:
     def __init__(self, returncode: int) -> None:
         self.returncode = returncode
 
 
-def _mock_run_factory(expected_cmd_out: list[str], rc: int = 0):
+def _mock_run_factory(expected_cmd_out: list[str], rc: int = 0) -> Callable[..., DummyCompleted]:
     captured: dict[str, object] = {}
 
-    def _mock_run(cmd, *args, **kwargs):
+    def _mock_run(cmd: list[str], *args: object, **kwargs: object) -> DummyCompleted:
         captured["cmd"] = cmd
         captured["kwargs"] = kwargs
 
@@ -75,7 +79,7 @@ def test_subprocess_exception_returns_false(
 ) -> None:
     monkeypatch.setattr("platform.system", lambda: "Linux")
 
-    def boom(*args, **kwargs):
+    def boom(*args: object, **kwargs: object) -> NoReturn:
         raise OSError("no ping here")
 
     monkeypatch.setattr("subprocess.run", boom)

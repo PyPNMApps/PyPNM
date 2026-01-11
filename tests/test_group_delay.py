@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import math
-from typing import List, Tuple
 
 import numpy as np
 import pytest
@@ -18,7 +17,7 @@ def _mk_H_from_tau(
     df_hz: float,
     f0_hz: float,
     tau_s: float,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """
     Build H[k] = exp(-j*2π f[k] τ), where f[k] = f0 + k*df.
     Returns list of (real, imag) pairs.
@@ -32,7 +31,7 @@ def _mk_H_from_tau(
 
 def _mk_H_from_tau_with_freqvec(
     f_hz: np.ndarray, tau_s: float
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     phase = -2.0 * math.pi * f_hz * tau_s
     H = np.exp(1j * phase)
     return [(float(z.real), float(z.imag)) for z in H]

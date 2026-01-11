@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Maurice Garcia -->
+
 # System Configuration Reference
 
 Canonical Structure And Field Semantics For `system.json`.
@@ -12,8 +15,9 @@ Canonical Structure And Field Semantics For `system.json`.
 * [2. SNMP](#2-snmp)
 * [3. PnmBulkDataTransfer](#3-pnmbulkdatatransfer)
 * [4. PnmFileRetrieval](#4-pnmfileretrieval)
-* [5. Logging](#5-logging)
-* [6. TestMode](#6-testmode)
+* [5. Database](#5-database)
+* [6. Logging](#6-logging)
+* [7. TestMode](#7-testmode)
 * [Loading Configuration](#loading-configuration)
 
 ## 1. FastApiRequestDefault
@@ -119,11 +123,13 @@ Transport Parameters For CM-Generated Files (for example, RxMER, FEC Summary) Se
 | http.*  | object | HTTP base URL and port for file delivery.                  |
 | https.* | object | HTTPS base URL and port for file delivery.                 |
 
-## 4. PnmFileRetrieval {#pnmfileretrieval}
+## 4. PnmFileRetrieval
 
 Local Storage Layout And Remote Retrieval Methods.
 
 Related Guide: [File Transfer Methods](pnm-file-retrieval/index.md)
+
+Runtime DB location policy: SQLite DB files live under `.data/db/` (demo uses `demo/.data/db/`), while Postgres is external and does not create a local DB file.
 
 ```json
 "PnmFileRetrieval": {
@@ -182,7 +188,7 @@ Related Guide: [File Transfer Methods](pnm-file-retrieval/index.md)
 }
 ```
 
-`password_enc` is the only supported password field for file retrieval methods. Plaintext `password` is not supported.
+`password_enc` is the preferred password field for file retrieval methods. Plaintext `password` is supported only as a legacy fallback and is deprecated.
 
 **Directories And Databases**
 
@@ -216,7 +222,27 @@ Related Guide: [File Transfer Methods](pnm-file-retrieval/index.md)
 
 > The legacy key name `retrival_method` is accepted for backward compatibility.
 
-## 5. Logging
+## 5. Database
+
+Database Backend Selection And Connection Settings.
+
+```json
+"Database": {
+  "backend": "sqlite",
+  "sqlite": {
+    "path": ".data/db/pypnm.sqlite3"
+  },
+  "postgres": {
+    "dsn": ""
+  }
+}
+```
+
+Backend selection is set at install time (SQLite default; Postgres recommended for multi-worker deployments). Set `PYPNM_DB_BACKEND` to override the backend selection (`sqlite` or `postgres`). SQLite stores its DB file under `.data/db/` (demo uses `demo/.data/db/`), while Postgres is external and does not create a local DB file. For Postgres, supply the DSN via `PYPNM_DB_POSTGRES_DSN` to avoid storing plaintext credentials in tracked JSON files. Blank strings for required values are invalid when the backend is active.
+
+DB backend migration is in progress; legacy ledger keys remain until Phase M6.
+
+## 6. Logging
 
 Application Logging Options.
 
@@ -234,7 +260,7 @@ Application Logging Options.
 | log_dir      | string | Directory for log files.                    |
 | log_filename | string | Log filename (created under `log_dir`).     |
 
-## 6. TestMode
+## 7. TestMode
 
 Global And Class-Specific Test-Mode Controls.
 

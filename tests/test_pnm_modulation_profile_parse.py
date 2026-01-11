@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import pytest
 
 from pypnm.pnm.parser.CmDsOfdmModulationProfile import CmDsOfdmModulationProfile
 from pypnm.pnm.parser.model.parser_rtn_models import CmDsOfdmModulationProfileModel
-
 
 DATA_DIR = Path(__file__).parent / "files"
 MODPROF_PATH = DATA_DIR / "modulation_profile.bin"
@@ -23,7 +22,7 @@ def modprof_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_modprof_parses_and_model_shape(modprof_bytes):
+def test_modprof_parses_and_model_shape(modprof_bytes: bytes) -> None:
     mp = CmDsOfdmModulationProfile(modprof_bytes).to_model()
     assert isinstance(mp, CmDsOfdmModulationProfileModel)
 
@@ -40,7 +39,7 @@ def test_modprof_parses_and_model_shape(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_profile_schemes_valid_and_decoded(modprof_bytes):
+def test_profile_schemes_valid_and_decoded(modprof_bytes: bytes) -> None:
     mp = CmDsOfdmModulationProfile(modprof_bytes).to_model()
 
     for profile in mp.profiles:
@@ -51,7 +50,7 @@ def test_profile_schemes_valid_and_decoded(modprof_bytes):
         assert isinstance(profile.schemes, list)
         for sch in profile.schemes:
             # Discriminated union: schema_type is 0 (range) or 1 (skip)
-            assert getattr(sch, "schema_type") in (0, 1)
+            assert sch.schema_type in (0, 1)
             if sch.schema_type == 0:
                 # Range schema
                 assert hasattr(sch, "modulation_order")
@@ -67,7 +66,7 @@ def test_profile_schemes_valid_and_decoded(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_serialization_roundtrip(modprof_bytes):
+def test_serialization_roundtrip(modprof_bytes: bytes) -> None:
     obj = CmDsOfdmModulationProfile(modprof_bytes)
 
     d = obj.to_dict()
@@ -79,7 +78,7 @@ def test_serialization_roundtrip(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_get_frequencies_current_behavior_is_empty(modprof_bytes):
+def test_get_frequencies_current_behavior_is_empty(modprof_bytes: bytes) -> None:
     """
     get_frequencies currently returns [] (TODO noted in implementation).
     Keep this as a behavioral check until the TODO is implemented.
@@ -91,7 +90,7 @@ def test_get_frequencies_current_behavior_is_empty(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_wrong_type_rejected():
+def test_wrong_type_rejected() -> None:
     """Feeding a non-modulation-profile file should raise ValueError."""
     raw = NON_MODPROF_PATH.read_bytes()
     with pytest.raises(ValueError):

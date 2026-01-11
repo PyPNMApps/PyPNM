@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ────────────────────────────────────────────────────────────────────────────────
 # install.sh — Unified OS prerequisite installer and PyPNM bootstrapper
-# Usage: ./install.sh [--demo-mode | --production] [--pnm-file-retrieval-setup] [venv_dir]
+# Usage: ./install.sh [--demo-mode | --production] [--db-install-sqlite | --db-install-postgres] [--pnm-file-retrieval-setup] [venv_dir]
 # ────────────────────────────────────────────────────────────────────────────────
 
 VENV_DIR=".env"
@@ -14,7 +14,10 @@ DEVELOPMENT_MODE="0"
 CLEAN_MODE="0"
 PURGE_CACHE="0"
 UNINSTALL_MODE="0"
+DB_INSTALL_SQLITE="0"
+DB_INSTALL_POSTGRES="0"
 GITLEAKS_VERSION="8.18.1"
+POSTGRES_DSN_ENV_VAR="PYPNM_DB_POSTGRES_DSN"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}"
@@ -30,7 +33,7 @@ usage() {
 PyPNM Installer And Bootstrap Script
 
 Usage:
-  ./install.sh [--demo-mode | --production] [--pnm-file-retrieval-setup] [venv_dir]
+  ./install.sh [--demo-mode | --production] [--db-install-sqlite | --db-install-postgres] [--pnm-file-retrieval-setup] [venv_dir]
   ./install.sh --development
   ./install.sh --clean [--purge-cache]
   ./install.sh --uninstall [venv_dir]
@@ -41,6 +44,12 @@ Options:
   --clean        Remove prior install artifacts (venv/build/dist/cache) before installing.
   --purge-cache  Clear pip cache after activating the venv (use with --clean when needed).
   --uninstall    Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
+  --db-install-sqlite
+                 Select SQLite as the DB backend (default when no DB flag is provided).
+  --db-install-postgres
+                 Select Postgres as the DB backend and prompt for a DSN or connection fields.
+                 If no DB flag is provided, the installer prompts in interactive mode
+                 (defaulting to sqlite) and defaults to sqlite in non-interactive or CI runs.
 
   --demo-mode     Enable demo mode by backing up the default
                   src/pypnm/settings/system.json into backup/src/pypnm/settings/system.json
@@ -136,6 +145,12 @@ for arg in "$@"; do
     --uninstall)
       UNINSTALL_MODE="1"
       ;;
+    --db-install-sqlite)
+      DB_INSTALL_SQLITE="1"
+      ;;
+    --db-install-postgres)
+      DB_INSTALL_POSTGRES="1"
+      ;;
     --help|-h)
       usage
       exit 0
@@ -147,7 +162,7 @@ for arg in "$@"; do
 done
 
 if [[ "$UNINSTALL_MODE" == "1" ]]; then
-  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" ]]; then
+  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" || "$DB_INSTALL_SQLITE" == "1" || "$DB_INSTALL_POSTGRES" == "1" ]]; then
     echo "❌ --uninstall cannot be combined with other flags."
     usage
     exit 1
@@ -156,6 +171,12 @@ fi
 
 if [[ "$DEMO_MODE" == "1" && "$PRODUCTION_MODE" == "1" ]]; then
   echo "❌ Cannot use --demo-mode and --production together."
+  usage
+  exit 1
+fi
+
+if [[ "$DB_INSTALL_SQLITE" == "1" && "$DB_INSTALL_POSTGRES" == "1" ]]; then
+  echo "❌ Cannot use --db-install-sqlite and --db-install-postgres together."
   usage
   exit 1
 fi
@@ -383,6 +404,143 @@ enable_demo_mode() {
   echo "✅ Demo mode system settings applied (directories now point to demo/)."
 }
 
+choose_db_backend() {
+  local selection
+
+  if [[ "$DB_INSTALL_SQLITE" == "1" ]]; then
+    echo "sqlite"
+    return
+  fi
+  if [[ "$DB_INSTALL_POSTGRES" == "1" ]]; then
+    echo "postgres"
+    return
+  fi
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "sqlite"
+    return
+  fi
+
+  echo
+  echo "Database backend selection:"
+  echo "  - SQLite is recommended for standalone/single-writer deployments."
+  echo "  - Postgres is recommended for multi-worker/multi-process deployments."
+  read -r -p "Choose database backend [sqlite]: " selection
+
+  selection="$(echo "$selection" | tr '[:upper:]' '[:lower:]' | xargs)"
+  if [[ "$selection" == "" ]]; then
+    selection="sqlite"
+  fi
+  if [[ "$selection" != "sqlite" && "$selection" != "postgres" ]]; then
+    echo "⚠️  Invalid selection '${selection}'; defaulting to sqlite."
+    selection="sqlite"
+  fi
+
+  echo "$selection"
+}
+
+prompt_postgres_dsn() {
+  local dsn confirm
+  local host port dbname user password sslmode
+
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo ""
+    return
+  fi
+
+  echo
+  echo "Postgres configuration:"
+  echo "  Use ${POSTGRES_DSN_ENV_VAR} to supply secrets at runtime (recommended)."
+  read -r -p "Enter Postgres DSN (leave blank to enter fields or rely on env var): " dsn
+
+  dsn="$(echo "$dsn" | xargs)"
+  if [[ "$dsn" != "" ]]; then
+    local redacted
+    redacted="$(echo "$dsn" | sed -E 's#(postgres(ql)?://[^:/@]+):[^@]*@#\1@#')"
+    if [[ "$redacted" != "$dsn" ]]; then
+      echo "⚠️  Passwords are not persisted to system.json; use ${POSTGRES_DSN_ENV_VAR}."
+      dsn="$redacted"
+    fi
+    echo "$dsn"
+    return
+  fi
+
+  read -r -p "Enter Postgres connection fields now? [y/N]: " confirm
+  confirm="$(echo "$confirm" | tr '[:upper:]' '[:lower:]' | xargs)"
+  if [[ "$confirm" != "y" && "$confirm" != "yes" ]]; then
+    echo ""
+    return
+  fi
+
+  read -r -p "Host [localhost]: " host
+  read -r -p "Port [5432]: " port
+  read -r -p "Database [pypnm]: " dbname
+  read -r -p "User [pypnm]: " user
+  read -r -p "Password (leave blank to avoid storing): " password
+  read -r -p "SSL mode (disable/allow/prefer/require) [disable]: " sslmode
+
+  host="${host:-localhost}"
+  port="${port:-5432}"
+  dbname="${dbname:-pypnm}"
+  user="${user:-pypnm}"
+  sslmode="${sslmode:-disable}"
+
+  if [[ "$password" != "" ]]; then
+    echo "⚠️  Passwords are not persisted to system.json; use ${POSTGRES_DSN_ENV_VAR}."
+  fi
+  dsn="postgresql://${user}@${host}:${port}/${dbname}"
+  if [[ "$sslmode" != "" ]]; then
+    dsn="${dsn}?sslmode=${sslmode}"
+  fi
+
+  echo "$dsn"
+}
+
+update_database_settings() {
+  local backend
+  local dsn
+  local config_path
+
+  backend="$1"
+  dsn="$2"
+  config_path="${PROJECT_ROOT}/src/pypnm/settings/system.json"
+
+  if [[ ! -f "$config_path" ]]; then
+    echo "⚠️  system.json not found at '${config_path}'; skipping DB configuration."
+    return
+  fi
+
+  "$PYTHON_CMD" - <<PY
+import json
+from pathlib import Path
+
+config_path = Path(r"${config_path}")
+data = json.loads(config_path.read_text())
+
+db = data.get("Database")
+if not isinstance(db, dict):
+    db = {}
+    data["Database"] = db
+
+sqlite_cfg = db.get("sqlite")
+if not isinstance(sqlite_cfg, dict):
+    sqlite_cfg = {}
+    db["sqlite"] = sqlite_cfg
+
+if "path" not in sqlite_cfg or sqlite_cfg["path"] is None:
+    sqlite_cfg["path"] = ".data/db/pypnm.sqlite3"
+
+postgres_cfg = db.get("postgres")
+if not isinstance(postgres_cfg, dict):
+    postgres_cfg = {}
+    db["postgres"] = postgres_cfg
+
+postgres_cfg["dsn"] = r"${dsn}"
+db["backend"] = r"${backend}"
+
+config_path.write_text(json.dumps(data, indent=4) + "\\n")
+PY
+}
+
 echo "🔍 Detecting package manager..."
 PM="none"; PM_UPDATE=""; PM_INSTALL=""
 if command -v apt-get >/dev/null 2>&1; then
@@ -569,6 +727,23 @@ else
     echo "ℹ️  scripts/init_secrets_key.sh is missing or not executable; skipping."
   fi
 fi
+
+db_backend="$(choose_db_backend)"
+if [[ "$db_backend" == "sqlite" ]]; then
+  echo "ℹ️  SQLite is recommended for standalone single-writer deployments."
+else
+  echo "ℹ️  Postgres is recommended for PyPNM-CMTS and multi-worker/multi-process deployments."
+fi
+db_postgres_dsn=""
+if [[ "$db_backend" == "postgres" ]]; then
+  db_postgres_dsn="$(prompt_postgres_dsn)"
+  if [[ "$db_postgres_dsn" == "" && -z "${!POSTGRES_DSN_ENV_VAR:-}" ]]; then
+    echo "⚠️  Postgres selected but no DSN provided."
+    echo "    Set ${POSTGRES_DSN_ENV_VAR} to inject the DSN at runtime."
+  fi
+fi
+
+update_database_settings "$db_backend" "$db_postgres_dsn"
 
 echo "🧪 Running unit tests…"
 cd "$PROJECT_ROOT"

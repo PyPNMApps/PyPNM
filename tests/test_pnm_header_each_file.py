@@ -1,16 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
-from pathlib import Path
 import time
+from pathlib import Path
+
 import pytest
 
-from pypnm.lib.types import CaptureTime
-from pypnm.pnm.parser.pnm_header import PnmHeader
-from pypnm.pnm.parser.pnm_file_type import PnmFileType
 from pypnm.lib.constants import DEFAULT_CAPTURE_TIME
+from pypnm.lib.types import CaptureTime
+from pypnm.pnm.parser.pnm_file_type import PnmFileType
+from pypnm.pnm.parser.pnm_header import PnmHeader
 
 DATA_DIR = Path(__file__).parent / "files"
 
@@ -32,7 +33,7 @@ def _p(name: str) -> Path:
 
 
 @pytest.mark.pnm
-def test_data_files_present():
+def test_data_files_present() -> None:
     assert DATA_DIR.is_dir()
     for f in ALL_FILES:
         assert _p(f).is_file(), f"Missing test file: {f}"
@@ -40,7 +41,7 @@ def test_data_files_present():
 
 @pytest.mark.pnm
 @pytest.mark.parametrize("fname", ALL_FILES)
-def test_pnm_header_per_file(fname: str):
+def test_pnm_header_per_file(fname: str) -> None:
     """Exercise PnmHeader parsing for each file and validate invariants."""
     data = _p(fname).read_bytes()
     hdr = PnmHeader.from_bytes(data)

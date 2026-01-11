@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
-from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
-    PnmSingleCaptureRequest,
-)
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
     PnmCaptureConfig,
     TftpConfig,
@@ -19,6 +16,9 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults im
 from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
     SNMPConfig,
     SNMPv2c,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
+    PnmSingleCaptureRequest,
 )
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.inet import Inet

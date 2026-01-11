@@ -6,6 +6,7 @@
 ## Table Of Contents
 
 - [Overview](#overview)
+- [Recent Status Update (2026-01-10)](#recent-status-update-2026-01-10)
 - [Locked Decisions (Selection Summary)](#locked-decisions-selection-summary)
 - [Milestones](#milestones)
 - [Phase 0 · Guardrails And Release Hygiene (M0)](#phase-0--guardrails-and-release-hygiene-m0)
@@ -34,6 +35,21 @@ Concurrency note (design constraint carried into implementation and docs):
 
 - SQLite is supported and recommended for single-process / single-writer deployments (PyPNM standalone, labs, demos).
 - Postgres is recommended when PyPNM is used as a dependency in PyPNM-CMTS, or whenever multiple workers/processes may access the DB concurrently.
+
+## Recent Status Update (2026-01-10)
+
+Work completed since the last burndown sync (per Agent Review Bundles):
+
+- `install.sh`
+  - DB backend selection runs before `pytest` so tests execute against the selected backend contract.
+  - Added `--db-install-sqlite` and `--db-install-postgres`, plus an interactive prompt when no flag is provided (defaults to SQLite in non-interactive/CI).
+  - Added Postgres DSN prompt with password redaction (passwords are not persisted into `system.json`).
+  - Fixed DSN redaction backreference and aligned DSN env-var warning logic to `POSTGRES_DSN_ENV_VAR` via indirect expansion.
+- `docs/system/system-config.md`
+  - Updated `PnmFileRetrieval` heading/anchor for GitHub compatibility.
+  - Documented runtime DB location policy and recommended env var usage for Postgres DSNs.
+
+Out-of-scope but in-flight (separate hygiene workstream): Ruff baseline cleanup (125 remaining issues after `ruff check . --fix`, including `PnmParsers` undefined name).
 
 ## Locked Decisions (Selection Summary)
 
@@ -78,16 +94,16 @@ Prevent DB/data leakage into releases and formalize runtime data placement.
 - [ ] Ensure Docker build excludes runtime data:
   - [ ] `.dockerignore` includes `.data/`, `demo/.data/`, `*.sqlite3`, `*.db`.
   - [ ] Dockerfiles do not `COPY` `.data/` or demo datasets into images.
-- [ ] Document runtime DB location rules:
-  - [ ] SQLite path under `.data/db/`
-  - [ ] Postgres external (no local DB file)
-- [ ] Add doc note: demo uses isolated root (`demo/`) and isolated DB.
+- [x] Document runtime DB location rules:
+  - [x] SQLite path under `.data/db/`
+  - [x] Postgres external (no local DB file)
+- [x] Add doc note: demo uses isolated root (`demo/`) and isolated DB.
 
 ### Acceptance Criteria
 
-- Building sdist/wheel does not contain `.data/` or any DB files.
-- Docker images do not contain `.data/` contents.
-- Docs state the runtime DB location policy clearly.
+- [ ] Building sdist/wheel does not contain `.data/` or any DB files.
+- [ ] Docker images do not contain `.data/` contents.
+- [x] Docs state the runtime DB location policy clearly.
 
 ## Phase 1 · Install-Time Backend Selection And Config Contract (M1)
 
@@ -97,17 +113,18 @@ Make DB backend selection a first-class install-time choice owned by PyPNM and v
 
 ### Tasks
 
-- [ ] Extend `install.sh`:
-  - [ ] Support `--db-install-postgres`
-  - [ ] Support `--db-install-sqlite`
-  - [ ] Add interactive prompt if no flag provided (default: SQLite)
-  - [ ] Add install-time warning text:
-    - [ ] SQLite is recommended for standalone PyPNM / single-writer
-    - [ ] Postgres is recommended for PyPNM-CMTS and/or multi-worker/multi-process
-  - [ ] Add a Postgres config prompt path when Postgres is selected:
-    - [ ] Allow DSN entry OR discrete fields that render into a DSN
-    - [ ] Host / port / database / user / password / ssl mode
-    - [ ] Ensure password can be provided via env var override (no plaintext requirement in JSON)
+- [x] Extend `install.sh`:
+  - [x] Support `--db-install-postgres`
+  - [x] Support `--db-install-sqlite`
+  - [x] Add interactive prompt if no flag provided (default: SQLite)
+  - [x] Add install-time warning text:
+    - [x] SQLite is recommended for standalone PyPNM / single-writer
+    - [x] Postgres is recommended for PyPNM-CMTS and/or multi-worker/multi-process
+  - [x] Add a Postgres config prompt path when Postgres is selected:
+    - [x] Allow DSN entry OR discrete fields that render into a DSN
+    - [x] Host / port / database / user / password / ssl mode
+    - [x] Ensure password can be provided via env var override (no plaintext requirement in JSON)
+    - [x] Ensure passwords are not persisted into `system.json` (DSN redaction + field-based DSN omits password)
 - [ ] Add config keys to `settings/system.json.template` (and demo template if used):
   - [ ] `Database.backend` = `sqlite` | `postgres`
   - [ ] `Database.sqlite.path` default `.data/db/pypnm.sqlite3`
@@ -116,9 +133,9 @@ Make DB backend selection a first-class install-time choice owned by PyPNM and v
     - [ ] Optional discrete settings for UX (installer can populate DSN)
   - [ ] Support environment variable overrides for secrets (do not require plaintext passwords in tracked JSON)
 - [ ] Add `SystemConfigSettings` accessors for DB settings.
-- [ ] Ensure docs explicitly describe:
-  - [ ] Install-time backend selection mechanism
-  - [ ] SQLite vs Postgres recommendation (single-writer vs multi-worker)
+- [x] Ensure docs explicitly describe:
+  - [x] Install-time backend selection mechanism
+  - [x] SQLite vs Postgres recommendation (single-writer vs multi-worker)
   - [ ] PyPNM-CMTS inherits backend (no separate selection)
 - [ ] Add pytest coverage for config defaults and validation (missing/blank handling).
 
@@ -131,9 +148,9 @@ Make DB backend selection a first-class install-time choice owned by PyPNM and v
 
 ### Acceptance Criteria
 
-- Fresh install can select backend via flag or prompt.
-- Config settings are available via `SystemConfigSettings`.
-- Tests cover selection and default behavior.
+- [x] Fresh install can select backend via flag or prompt.
+- [ ] Config settings are available via `SystemConfigSettings`.
+- [ ] Tests cover selection and default behavior.
 
 ## Phase 2 · Schema Introduction And DB Abstraction Layer (M2)
 
@@ -164,9 +181,9 @@ Introduce both schemas and a stable DB API that hides backend differences.
 
 ### Acceptance Criteria
 
-- PyPNM can initialize DB schema for SQLite reliably.
-- Postgres path is implemented and can be exercised with integration tests.
-- `UNKNOWN` sysDescr exists after init.
+- [ ] PyPNM can initialize DB schema for SQLite reliably.
+- [ ] Postgres path is implemented and can be exercised with integration tests.
+- [ ] `UNKNOWN` sysDescr exists after init.
 
 ## Phase 3 · Transactions Migration (Replace `transactions.json`) (M3)
 
@@ -198,8 +215,8 @@ Replace JSON transactions ledger with DB-backed `transaction_records` plus de-du
 
 ### Acceptance Criteria
 
-- Captures produce DB rows instead of writing `transactions.json`.
-- File manager flows can fetch transactions from DB.
+- [ ] Captures produce DB rows instead of writing `transactions.json`.
+- [ ] File manager flows can fetch transactions from DB.
 
 ## Phase 4 · Capture Group And Operation Migration (Replace `capture_group.json`, `operation_capture.json`) (M4)
 
@@ -227,8 +244,8 @@ Move multi-capture and operation tracking to DB, updating operation-based endpoi
 
 ### Acceptance Criteria
 
-- Multi-capture workflows no longer use JSON ledger files.
-- Operation workflows resolve through DB.
+- [ ] Multi-capture workflows no longer use JSON ledger files.
+- [ ] Operation workflows resolve through DB.
 
 ## Phase 5 · Artifact Linkage (Filesystem References) (M5)
 
@@ -265,8 +282,8 @@ Make file linkage explicit via `artifact_stores`, `file_artifacts`, and `transac
 
 ### Acceptance Criteria
 
-- Transactions resolve to binary files without legacy settings JSON linkage.
-- Demo and prod are isolated by data root and DB.
+- [ ] Transactions resolve to binary files without legacy settings JSON linkage.
+- [ ] Demo and prod are isolated by data root and DB.
 
 ## Phase 6 · Remove Ledger JSON Design And Code (M6)
 
@@ -302,9 +319,9 @@ Delete ledger JSON code paths and remove ledger JSON design from documentation, 
 
 ### Acceptance Criteria
 
-- No code path depends on JSON ledgers.
-- Docs and examples reflect DB backend design (no ledger design remains as “current”).
-- Release artifacts contain no DB data.
+- [ ] No code path depends on JSON ledgers.
+- [ ] Docs and examples reflect DB backend design (no ledger design remains as “current”).
+- [ ] Release artifacts contain no DB data.
 
 ## Phase 7 · Pytest And GitHub Actions Migration (M7)
 
@@ -339,9 +356,9 @@ Ensure all tests and GitHub workflows pass with the new DB layer, removing ledge
 
 ### Acceptance Criteria
 
-- `pytest` passes locally for SQLite.
-- GitHub Actions passes with SQLite.
-- Postgres path is validated in CI with a service container.
+- [ ] `pytest` passes locally for SQLite.
+- [ ] GitHub Actions passes with SQLite.
+- [ ] Postgres path is validated in CI with a service container.
 
 ## Cross-Cutting Requirements
 

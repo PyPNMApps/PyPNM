@@ -42,7 +42,6 @@
             "methods": {
                 "ftp": {
                     "host": "localhost",
-                    "password": "",
                     "password_enc": "",
                     "port": 21,
                     "remote_dir": "/srv/tftp",
@@ -52,24 +51,20 @@
                 },
                 "http": {
                     "base_url": "http://STUB/",
-                    "password": "",
                     "password_enc": "",
                     "port": 80
                 },
                 "https": {
                     "base_url": "https://STUB/",
-                    "password": "",
                     "password_enc": "",
                     "port": 443
                 },
                 "local": {
-                    "password": "",
                     "password_enc": "",
                     "src_dir": "/srv/tftp"
                 },
                 "sftp": {
                     "host": "172.19.8.28",
-                    "password": "",
                     "password_enc": "",
                     "port": 22,
                     "private_key_path": "~/.ssh/id_rsa_pypnm",
@@ -78,7 +73,6 @@
                 },
                 "tftp": {
                     "host": "localhost",
-                    "password": "",
                     "password_enc": "",
                     "port": 69,
                     "remote_dir": "",
@@ -89,6 +83,15 @@
         "session_group_db": ".data/db/session_group.json",
         "transaction_db": ".data/db/transactions.json",
         "xlsx_dir": ".data/xlsx"
+    },
+    "Database": {
+        "backend": "sqlite",
+        "sqlite": {
+            "path": ".data/db/pypnm.sqlite3"
+        },
+        "postgres": {
+            "dsn": ""
+        }
     },
     "SNMP": {
         "timeout": 2,

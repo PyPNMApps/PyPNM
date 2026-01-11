@@ -4,7 +4,6 @@
 # tests/test_dictutils_unified.py
 from __future__ import annotations
 
-from typing import Optional
 import pytest
 from pydantic import BaseModel
 
@@ -14,7 +13,7 @@ from pypnm.lib.dict_utils import DictGenerate
 class User(BaseModel):
     id: int
     name: str
-    email: Optional[str] = None
+    email: str | None = None
 
 
 def test_rename_and_pop_key() -> None:

@@ -1,16 +1,28 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import cast
 
+from pydantic import ValidationError
+
 from pypnm.config.config_manager import ConfigManager
+from pypnm.config.database_settings import (
+    DEFAULT_POSTGRES_DSN,
+    DEFAULT_SQLITE_DB_PATH,
+    POSTGRES_DSN_ENV_VAR,
+    DatabaseSettings,
+)
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.secret.crypto_manager import SecretCryptoError, SecretCryptoManager
 from pypnm.lib.types import (
+    DatabaseBackend,
+    DatabaseDsn,
+    DatabasePath,
     FileNameStr,
     InetAddressStr,
     IPv4Str,
@@ -48,6 +60,11 @@ class SystemConfigSettings:
     _DEFAULT_PNG_DIR: str                   = ".data/png"
     _DEFAULT_ARCHIVE_DIR: str               = ".data/archive"
     _DEFAULT_MSG_RSP_DIR: str               = ".data/msg_rsp"
+    _DEFAULT_DB_BACKEND: DatabaseBackend    = DatabaseBackend.SQLITE
+    _DEFAULT_SQLITE_DB_PATH: DatabasePath   = DEFAULT_SQLITE_DB_PATH
+    _DEFAULT_POSTGRES_DSN: DatabaseDsn      = DEFAULT_POSTGRES_DSN
+    _POSTGRES_DSN_ENV_VAR: str              = POSTGRES_DSN_ENV_VAR
+    _DB_BACKEND_ENV_VAR: str               = "PYPNM_DB_BACKEND"
 
     _ENCRYPTED_TOKEN_PREFIX: str            = "ENC["
 
@@ -58,6 +75,26 @@ class SystemConfigSettings:
     def _config_path(cls, *path: str) -> str:
         """Return dotted path for logging."""
         return ".".join(path)
+
+    @classmethod
+    def _postgres_dsn_env_override(cls) -> str:
+        value = os.getenv(cls._POSTGRES_DSN_ENV_VAR, "")
+        return value.strip()
+
+    @classmethod
+    def _db_backend_env_override(cls) -> str:
+        value = os.getenv(cls._DB_BACKEND_ENV_VAR, "")
+        normalized = value.strip().lower()
+        if normalized == "":
+            return ""
+        if normalized in (DatabaseBackend.SQLITE.value, DatabaseBackend.POSTGRES.value):
+            return normalized
+        cls._logger.error(
+            "Invalid %s value '%s'; expected sqlite or postgres",
+            cls._DB_BACKEND_ENV_VAR,
+            value,
+        )
+        return ""
 
     @classmethod
     def _peek_str(cls, *path: str) -> str:
@@ -113,6 +150,10 @@ class SystemConfigSettings:
                 )
             return ""
 
+        cls._logger.warning(
+            "Using legacy plaintext password for '%s'; prefer password_enc",
+            cls._config_path(*method_path, "password"),
+        )
         return cls._maybe_decrypt(password, *method_path, "password")
 
     @classmethod
@@ -134,6 +175,10 @@ class SystemConfigSettings:
                 )
             return ""
 
+        cls._logger.warning(
+            "Using legacy plaintext password for '%s'; prefer password_enc",
+            cls._config_path(*(primary + ("password",))),
+        )
         return cls._maybe_decrypt(password, *(primary + ("password",)))
 
     @classmethod
@@ -395,6 +440,61 @@ class SystemConfigSettings:
             default,
         )
         return default
+
+    @classmethod
+    def database_settings(cls) -> DatabaseSettings:
+        data: dict[str, object] = {}
+
+        backend_value = cls._cfg.get("Database", "backend")
+        if backend_value is not None:
+            data["backend"] = str(backend_value).strip()
+        env_backend = cls._db_backend_env_override()
+        if env_backend != "":
+            data["backend"] = env_backend
+
+        sqlite_value = cls._cfg.get("Database", "sqlite", "path")
+        if sqlite_value is None:
+            sqlite_path = str(cls._DEFAULT_SQLITE_DB_PATH)
+        else:
+            sqlite_path = str(sqlite_value)
+        data["sqlite"] = {"path": sqlite_path}
+
+        postgres_value = cls._cfg.get("Database", "postgres", "dsn")
+        if postgres_value is None:
+            postgres_dsn = str(cls._DEFAULT_POSTGRES_DSN)
+        else:
+            postgres_dsn = str(postgres_value)
+
+        env_override = cls._postgres_dsn_env_override()
+        if env_override != "":
+            postgres_dsn = env_override
+        data["postgres"] = {"dsn": postgres_dsn}
+
+        return DatabaseSettings.model_validate(data)
+
+    @classmethod
+    def database_backend(cls) -> DatabaseBackend:
+        try:
+            return cls.database_settings().backend
+        except ValidationError as exc:
+            cls._logger.error("Invalid Database configuration: %s", exc)
+            return cls._DEFAULT_DB_BACKEND
+
+    @classmethod
+    def database_sqlite_path(cls) -> DatabasePath:
+        try:
+            return cls.database_settings().sqlite.path
+        except ValidationError as exc:
+            cls._logger.error("Invalid Database configuration: %s", exc)
+            return cls._DEFAULT_SQLITE_DB_PATH
+
+    @classmethod
+    def database_postgres_dsn(cls) -> DatabaseDsn:
+        try:
+            return cls.database_settings().postgres.dsn
+        except ValidationError as exc:
+            cls._logger.error("Invalid Database configuration: %s", exc)
+            return cls._DEFAULT_POSTGRES_DSN
 
     @classmethod
     def get_config_path(cls) -> str:

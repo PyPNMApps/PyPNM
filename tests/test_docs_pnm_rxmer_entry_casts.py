@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # tests/test_docs_pnm_rxmer_entry_casts.py
 from __future__ import annotations
+
 import pytest
 
 from pypnm.docsis.data_type.pnm.DocsPnmCmDsOfdmRxMerEntry import (
@@ -14,11 +15,11 @@ from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class _FakeSnmp:
-    def __init__(self, idx: int, table: dict[str, object]):
+    def __init__(self, idx: int, table: dict[str, object]) -> None:
         self._idx = idx
         self._t = table
 
-    async def get(self, oq: str):
+    async def get(self, oq: str) -> object:
         sym, _, sfx = oq.rpartition(".")
         assert int(sfx) == self._idx
         return self._t[sym]

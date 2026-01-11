@@ -10,8 +10,7 @@ import numpy as np
 import pytest
 
 from pypnm.lib.signal_processing.db_linear_converter import DbLinearConverter
-from pypnm.lib.types import FloatSeries, ComplexArray
-
+from pypnm.lib.types import ComplexArray, FloatSeries
 
 # ---------- Absolute linear/dB roundtrips ----------
 

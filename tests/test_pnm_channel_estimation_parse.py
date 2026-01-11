@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -10,9 +10,8 @@ from pathlib import Path
 import pytest
 from typing_extensions import assert_type
 
-
-from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
 from pypnm.lib.types import ComplexArray, ComplexSeries
+from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
 
 DATA_DIR = Path(__file__).parent / "files"
 CE_PATH = DATA_DIR / "channel_estimation.bin"
@@ -21,7 +20,7 @@ NON_CE_PATH = DATA_DIR / "rxmer.bin"  # negative test: valid PNM but wrong type
 MAC_RE = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
 
 
-def _is_pair_seq(x) -> bool:
+def _is_pair_seq(x: object) -> bool:
     """Return True for [re, im] where both are number-like."""
     return (
         isinstance(x, (list, tuple))

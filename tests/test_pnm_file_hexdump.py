@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -43,7 +43,7 @@ def test_hexdump_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
     def fake_get_record(
         self: PnmFileTransaction, txn_id: TransactionId
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         if txn_id == transaction_id:
             return {"filename": filename}
         return None
@@ -92,7 +92,7 @@ def test_hexdump_missing_transaction_raises(tmp_path: Path, monkeypatch: pytest.
 
     def fake_get_record(
         self: PnmFileTransaction, txn_id: TransactionId
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         return None
 
     monkeypatch.setattr(

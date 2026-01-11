@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import logging
 import socket
-from typing import Any
 
 import pytest
 
@@ -15,7 +14,7 @@ from pypnm.lib.types import HostNameStr
 
 
 def test_ping_delegates_to_ping_is_reachable(monkeypatch: pytest.MonkeyPatch) -> None:
-    called: dict[str, Any] = {}
+    called: dict[str, object] = {}
 
     def fake_is_reachable(host: str, timeout: int, count: int) -> bool:
         called["host"] = host
@@ -35,7 +34,7 @@ def test_ping_delegates_to_ping_is_reachable(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_resolve_returns_unique_addresses_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_getaddrinfo(host: str, _service: Any) -> list[tuple[Any, ...]]:
+    def fake_getaddrinfo(host: str, _service: object) -> list[tuple[object, ...]]:
         assert host == "example.com"
         return [
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", 0)),
@@ -57,7 +56,7 @@ def test_resolve_logs_error_and_returns_empty_on_dns_failure(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def fake_getaddrinfo(host: str, _service: int | str | None) -> list[tuple[Any, ...]]:
+    def fake_getaddrinfo(host: str, _service: int | str | None) -> list[tuple[object, ...]]:
         raise OSError("temporary failure in name resolution")
 
     monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)

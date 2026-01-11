@@ -6,11 +6,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
-from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
     SNMPConfig,
     SNMPv2c,
 )
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlStatus
 from pypnm.docsis.data_type.ClabsDocsisVersion import ClabsDocsisVersion

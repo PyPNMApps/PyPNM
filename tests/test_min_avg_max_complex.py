@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-from typing import Dict
 
 import numpy as np
 import pytest
@@ -153,7 +152,7 @@ def test_to_model_and_to_dict_round_trip() -> None:
     assert model.imag.avg == stats.avg_imag
     assert model.imag.max == stats.max_imag
 
-    dumped: Dict[str, object] = stats.to_dict()
+    dumped: dict[str, object] = stats.to_dict()
     assert "real" in dumped
     assert "imag" in dumped
     assert "precision" in dumped

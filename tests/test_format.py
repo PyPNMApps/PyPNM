@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pypnm.lib.format_string import Format
 
+
 class TestJoinParen:
     def test_none_or_empty(self) -> None:
         assert Format.join_paren(None) == "(—)"

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -23,6 +23,11 @@ ExitCode = NewType("ExitCode", int)
 class StringEnum(str, Enum):
     """Py3.10-compatible StrEnum shim."""
     pass
+
+class DatabaseBackend(StringEnum):
+    """Supported Database Backend Identifiers."""
+    SQLITE   = "sqlite"
+    POSTGRES = "postgres"
 
 class FloatEnum(float, Enum):
     """Float-like Enum base: members behave like floats."""
@@ -79,15 +84,10 @@ ProfileId = NewType("ProfileId", int)
 PathLike    = str | Path
 PathArray   = list[PathLike]
 FileNameStr = NewType("FileNameStr", str)
+DatabasePath = NewType("DatabasePath", str)
+DatabaseDsn  = NewType("DatabaseDsn", str)
 
 # ────────────────────────────────────────────────────────────────────────────────
-# JSON-like structures for REST I/O
-# ────────────────────────────────────────────────────────────────────────────────
-JSONScalar = str | int | float | bool | None
-JSONDict   = dict[str, "JSONValue"]
-JSONList   = list["JSONValue"]
-JSONValue  = JSONScalar | JSONDict | JSONList
-
 # ────────────────────────────────────────────────────────────────────────────────
 # Unit-tagged NewTypes (scalars only; runtime = underlying type)
 # ────────────────────────────────────────────────────────────────────────────────
@@ -188,9 +188,9 @@ __all__ = [
     "HashStr",
     "TransactionId", "GroupId", "OperationId",
     # enums
-    "StringEnum", "FloatEnum",
+    "StringEnum", "FloatEnum", "DatabaseBackend",
     # strings
-    "String", "StringArray",
+    "String", "StringArray", "JsonScalar", "JsonValue", "JsonObject",
     "ByteArray",
     # numerics
     "Number", "Float64", "ArrayLike", "ArrayLikeF64", "NDArrayF64", "NDArrayI64",
@@ -198,9 +198,7 @@ __all__ = [
     # complex
     "Complex", "ComplexArray", "ComplexSeries",
     # paths
-    "PathLike", "PathArray", "FileNameStr",
-    # JSON
-    "JSONScalar", "JSONDict", "JSONList", "JSONValue",
+    "PathLike", "PathArray", "FileNameStr", "DatabasePath", "DatabaseDsn",
     # unit-tagged scalars
     "CaptureTime", "TimeStamp", "TimestampSec", "TimestampMs", "TimeStampUs", "TimeStampNs",
     "SampleIndex",

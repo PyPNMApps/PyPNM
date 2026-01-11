@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -33,7 +33,11 @@ CASES = [
 
 @pytest.mark.pnm
 @pytest.mark.parametrize("fname,supported,parser_cls", CASES)
-def test_get_pnm_parser_and_parameters_and_models(fname: str, supported: bool, parser_cls) -> None:
+def test_get_pnm_parser_and_parameters_and_models(
+    fname: str,
+    supported: bool,
+    parser_cls: type[object] | None,
+) -> None:
     blob = (DATA_DIR / fname).read_bytes()
     wrapper = GetPnmParserAndParameters(blob)
 

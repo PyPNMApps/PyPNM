@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
-
-from typing import Any
 
 import pytest
 
@@ -40,7 +38,7 @@ def test_measurement_status_valid_enum_values(value: ScalarValue) -> None:
 
 
 @pytest.mark.parametrize("value", ["not-an-int", "abc", "", object()])
-def test_measurement_status_invalid_returns_other(value: Any) -> None:
+def test_measurement_status_invalid_returns_other(value: object) -> None:
     assert measurement_status(value) == "other"
 
 

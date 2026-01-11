@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -397,10 +397,7 @@ class SecretCryptoManager:
         retrieval = pnm.get("retrieval_method")
         if not isinstance(retrieval, dict):
             legacy = pnm.get("retrival_method")
-            if isinstance(legacy, dict):
-                retrieval = legacy
-            else:
-                retrieval = {}
+            retrieval = legacy if isinstance(legacy, dict) else {}
         methods = retrieval.get("methods", {})
 
         if not isinstance(methods, dict):

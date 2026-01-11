@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from pypnm.api.routes.advance.analysis.signal_analysis.detection.anolamaly.heatmap_anomaly_detection import HeatmapAnomalyDetector
+from pypnm.api.routes.advance.analysis.signal_analysis.detection.anolamaly.heatmap_anomaly_detection import (
+    HeatmapAnomalyDetector,
+)
+
 
 @pytest.mark.pnm
-def test_compute_zmap_basic_stats():
+def test_compute_zmap_basic_stats() -> None:
     # simple 2D ramp
     a = np.arange(20, dtype=float).reshape(4, 5)
     det = HeatmapAnomalyDetector(a, threshold=2.0)
@@ -22,7 +25,7 @@ def test_compute_zmap_basic_stats():
 
 
 @pytest.mark.pnm
-def test_compute_zmap_zero_sigma():
+def test_compute_zmap_zero_sigma() -> None:
     # constant matrix -> std == 0 -> zmap should be all zeros
     a = np.full((3, 4), 7.0)
     det = HeatmapAnomalyDetector(a, threshold=3.0)
@@ -36,7 +39,7 @@ def test_compute_zmap_zero_sigma():
 
 
 @pytest.mark.pnm
-def test_detect_thresholding_and_boxes_single_blob():
+def test_detect_thresholding_and_boxes_single_blob() -> None:
     # Create a small grid with one obvious high anomaly block
     a = np.zeros((6, 6), dtype=float)
     a[2:4, 3:5] = 100.0  # 2x2 bright blob
@@ -57,7 +60,7 @@ def test_detect_thresholding_and_boxes_single_blob():
 
 
 @pytest.mark.pnm
-def test_find_boxes_multiple_disjoint_blobs():
+def test_find_boxes_multiple_disjoint_blobs() -> None:
     a = np.zeros((8, 8), dtype=float)
     a[1:3, 1:3] = 10.0     # blob A
     a[5:7, 5:7] = -10.0    # blob B (negative should also be flagged via |z|)
@@ -73,7 +76,7 @@ def test_find_boxes_multiple_disjoint_blobs():
 
 
 @pytest.mark.pnm
-def test_four_connectivity_not_diagonal_connected():
+def test_four_connectivity_not_diagonal_connected() -> None:
     # Two pixels touching diagonally should be separate components.
     a = np.zeros((3, 3), dtype=float)
     a[0, 0] = 100.0
@@ -89,7 +92,7 @@ def test_four_connectivity_not_diagonal_connected():
 
 
 @pytest.mark.pnm
-def test_to_json_structure_after_detection():
+def test_to_json_structure_after_detection() -> None:
     a = np.zeros((5, 5), dtype=float)
     a[2, 2] = 50.0
 

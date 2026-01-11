@@ -22,11 +22,11 @@ from pypnm.api.routes.common.classes.analysis.multi_analysis import MultiAnalysi
 from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import (
     OutputType,
 )
-from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
-    PnmAnalysisResponse,
-)
 from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults import (
     RequestDefaultsResolver,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
+    PnmAnalysisResponse,
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import (
     SnmpResponse,

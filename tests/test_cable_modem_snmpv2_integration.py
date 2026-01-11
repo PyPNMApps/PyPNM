@@ -2,14 +2,14 @@ from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025
-
 import os
+
 import pytest
 
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.inet import Inet
 from pypnm.docsis.cable_modem import CableModem
+from pypnm.lib.inet import Inet
+from pypnm.lib.mac_address import MacAddress
 
 # ---- Skip all tests unless explicitly enabled (prevents CI/network flakiness) ----
 IT_ENABLED = os.getenv("PNM_CM_IT") == "1"

@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
 
 import pytest
 
-from pypnm.lib.file_processor import FileProcessor, DEFAULT_HEXDUMP_BYTES_PER_LINE
+from pypnm.lib.file_processor import DEFAULT_HEXDUMP_BYTES_PER_LINE, FileProcessor
 
 
 @pytest.mark.pnm
@@ -53,7 +52,7 @@ def test_hexdump_basic_16_bytes_per_line(tmp_path: Path) -> None:
     file_path.write_bytes(payload)
 
     fp: FileProcessor = FileProcessor(file_path)
-    lines: List[str]  = fp.hexdump(bytes_per_line=bytes_per_line)
+    lines: list[str]  = fp.hexdump(bytes_per_line=bytes_per_line)
 
     assert isinstance(lines, list)
     assert len(lines) == 2

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -18,13 +18,21 @@ from pypnm.api.routes.basic.constellation_display_analysis_rpt import (
     ConstellationDisplayReport,
 )
 from pypnm.api.routes.basic.fec_summary_analysis_rpt import FecSummaryAnalysisReport
-from pypnm.api.routes.basic.modulation_profile_analysis_rpt import ModulationProfileReport
+from pypnm.api.routes.basic.modulation_profile_analysis_rpt import (
+    ModulationProfileReport,
+)
 from pypnm.api.routes.basic.rxmer_analysis_rpt import RxMerAnalysisReport
 from pypnm.api.routes.basic.us_ofdma_pre_eq_analysis_rpt import CmUsOfdmaPreEqReport
-from pypnm.api.routes.common.classes.analysis.model.schema import ParserAnalysisModelReturn
+from pypnm.api.routes.common.classes.analysis.model.schema import (
+    ParserAnalysisModelReturn,
+)
 from pypnm.api.routes.common.classes.file_capture.file_type import FileType
-from pypnm.api.routes.common.classes.file_capture.pnm_file_opearation import OperationCaptureGroupResolver
-from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import PnmFileTransaction
+from pypnm.api.routes.common.classes.file_capture.pnm_file_opearation import (
+    OperationCaptureGroupResolver,
+)
+from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
+    PnmFileTransaction,
+)
 from pypnm.api.routes.docs.pnm.files.schemas import (
     FileAnalysisRequest,
     FileEntry,
@@ -40,7 +48,13 @@ from pypnm.lib.archive.manager import ArchiveManager
 from pypnm.lib.constants import MediaType
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import FileName, MacAddressStr, OperationId, PathLike, TransactionId
+from pypnm.lib.types import (
+    FileName,
+    MacAddressStr,
+    OperationId,
+    PathLike,
+    TransactionId,
+)
 from pypnm.lib.utils import Generate
 from pypnm.pnm.parser.model.parser_rtn_models import (
     CmDsConstDispMeasModel,
@@ -52,7 +66,11 @@ from pypnm.pnm.parser.model.parser_rtn_models import (
     CmUsOfdmaPreEqModel,
 )
 from pypnm.pnm.parser.pnm_file_type import PnmFileType
-from pypnm.pnm.parser.pnm_parameter import GetPnmParserAndParameters, PnmParserParametersModel
+from pypnm.pnm.parser.pnm_parameter import (
+    GetPnmParserAndParameters,
+    PnmParserParametersModel,
+    PnmParsers,
+)
 from pypnm.pnm.parser.pnm_type_header_mapper import PnmFileTypeMapper
 
 

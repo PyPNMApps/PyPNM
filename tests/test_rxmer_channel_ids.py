@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import pytest
 
-from pypnm.api.routes.common.extended.common_measure_schema import DownstreamOfdmParameters
+from pypnm.api.routes.common.extended.common_measure_schema import (
+    DownstreamOfdmParameters,
+)
 from pypnm.api.routes.common.extended.common_measure_service import CommonMeasureService
-from pypnm.api.routes.docs.pnm.ds.ofdm.rxmer.router import RxMerRouter
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
-from pypnm.lib.types import ChannelId, InterfaceIndex
+from pypnm.api.routes.docs.pnm.ds.ofdm.rxmer.router import RxMerRouter
 from pypnm.lib.inet import Inet
+from pypnm.lib.types import ChannelId, InterfaceIndex
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 
 

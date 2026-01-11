@@ -10,7 +10,11 @@ import pytest
 from pydantic import ValidationError
 
 from pypnm.lib.signal_processing.butterworth import (
-    PreEqButterworthConfig, PreEqButterworthFilter, PreEqButterworthResult, MagnitudeButterworthFilter,)
+    MagnitudeButterworthFilter,
+    PreEqButterworthConfig,
+    PreEqButterworthFilter,
+    PreEqButterworthResult,
+)
 from pypnm.lib.types import FrequencyHz, NDArrayC128, NDArrayF64
 
 

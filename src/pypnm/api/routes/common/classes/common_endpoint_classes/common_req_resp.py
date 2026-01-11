@@ -10,11 +10,11 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import 
     AnalysisType,
     OutputType,
 )
-from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
-    SNMPConfig,
-)
 from pypnm.api.routes.common.classes.common_endpoint_classes.request_validation import (
     RequestListNormalizer,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
+    SNMPConfig,
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
