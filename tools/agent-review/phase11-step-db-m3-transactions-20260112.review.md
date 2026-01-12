@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Migrated transaction persistence to the DB by introducing repository helpers and wiring PnmFileTransaction/file manager reads to DB-backed queries while keeping payload shapes stable. Updated multi-capture operation result tests to seed DB transactions and added repository unit coverage for deduplication and listing order.
 

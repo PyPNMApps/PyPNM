@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a generic operation workflow router with start/status/result/cancel endpoints, an in-memory operation registry for cancellation hooks, and updated capture-service registration/unregistration. Extended workflow service start/result logic, added router tests, and documented the new POST endpoints.
 

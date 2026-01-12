@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from typing import cast
 
 from pypnm.api.routes.common.classes.file_capture.types import (
     DeviceDetailsModel,
@@ -100,8 +101,11 @@ class PnmFileTransaction:
             digest prefix) suitable for later lookup (download and analysis).
         """
         sd: SystemDescriptor = await cable_modem.getSysDescr()
+        mac_address_value = cable_modem.get_mac_address
+        if callable(mac_address_value):
+            mac_address_value = mac_address_value()
         return self._insert_generic(
-            mac_address=cable_modem.get_mac_address,
+            mac_address=cast(MacAddress, mac_address_value),
             pnm_test_type=pnm_test_type,
             filename=filename,
             system_description=sd.to_dict(),
@@ -304,7 +308,9 @@ class PnmFileTransaction:
             Newly created transaction identifier associated with the record.
         """
         timestamp = int(time.time())
-        hash_input = f"{filename}{timestamp}".encode()
+        hash_input = (
+            f"{filename}{mac_address}{pnm_test_type.name}{time.time_ns()}"
+        ).encode()
         transaction_id = TransactionId(hashlib.sha256(hash_input).hexdigest()[:16])
         tx_id = str(transaction_id)
         if not tx_id.strip():

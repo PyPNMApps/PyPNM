@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Hardened CI parity by aligning daily-test checks with Postgres CI, added a PR trigger, and documented local Postgres validation needs while clarifying burndown update policy.
 

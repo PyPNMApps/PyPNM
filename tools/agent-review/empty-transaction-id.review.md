@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Prevented empty or whitespace transaction IDs from being persisted to capture_group.json while preserving in-memory error samples, and added a focused test for the skip behavior.
 

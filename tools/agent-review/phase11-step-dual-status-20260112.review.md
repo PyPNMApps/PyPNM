@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added dual-status support for operation start responses, centralized workflow schemas via re-exports, and aligned registry status responses with the shared time_remaining contract; updated docs and tests to reflect the unified payload shape.
 

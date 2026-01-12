@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Updated AGENTS.md to require the standard review-bundle summary template, added a TODO entry documenting the preference, and inserted the template into the existing M0 review bundle.
 

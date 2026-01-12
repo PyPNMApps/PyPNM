@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a required Postgres CI job with service container and env wiring, documented local Postgres validation steps, and updated AGENTS with the nested-loop rule while marking M7 CI items complete in the burndown.
 

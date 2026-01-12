@@ -91,6 +91,8 @@ class PnmFileService:
         - get_file: Serve generated CSV/JSON/ARCHIVE files.
     """
 
+    DEFAULT_HEXDUMP_BYTES_PER_LINE: int = 16
+
     def __init__(self) -> None:
         self.pnm_dir: PathLike = SystemConfigSettings.pnm_dir()
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -494,10 +496,8 @@ class PnmFileService:
             effective bytes-per-line setting, and formatted hexdump lines
             containing offset, hex bytes, and ASCII representation.
         """
-        DEFAULT_HEXDUMP_BYTES_PER_LINE = 16
-
         if bytes_per_line <= 0:
-            bytes_per_line = DEFAULT_HEXDUMP_BYTES_PER_LINE
+            bytes_per_line = self.DEFAULT_HEXDUMP_BYTES_PER_LINE
 
         file_path = self.get_pnm_path_for_transaction(transaction_id)
         processor = FileProcessor(file_path)
@@ -527,44 +527,44 @@ class PnmFileService:
         """
         from pypnm.api.routes.common.classes.analysis.analysis import Analysis
 
-        if model.file_type == PnmFileType.RECEIVE_MODULATION_ERROR_RATIO:
-            return Analysis.basic_analysis_rxmer_from_model(
-                cast(CmDsOfdmRxMerModel, parser.to_model())
-            ), model.file_type
+        match model.file_type:
+            case PnmFileType.RECEIVE_MODULATION_ERROR_RATIO:
+                return Analysis.basic_analysis_rxmer_from_model(
+                    cast(CmDsOfdmRxMerModel, parser.to_model())
+                ), model.file_type
 
-        elif model.file_type == PnmFileType.OFDM_CHANNEL_ESTIMATE_COEFFICIENT:
-            return Analysis.basic_analysis_ds_chan_est_from_model(
-                cast(CmDsOfdmChanEstimateCoefModel, parser.to_model())
-            ), model.file_type
+            case PnmFileType.OFDM_CHANNEL_ESTIMATE_COEFFICIENT:
+                return Analysis.basic_analysis_ds_chan_est_from_model(
+                    cast(CmDsOfdmChanEstimateCoefModel, parser.to_model())
+                ), model.file_type
 
-        elif model.file_type == PnmFileType.OFDM_MODULATION_PROFILE:
-            return Analysis.basic_analysis_ds_modulation_profile_from_model(
-                cast(CmDsOfdmModulationProfileModel, parser.to_model())
-            ), model.file_type
+            case PnmFileType.OFDM_MODULATION_PROFILE:
+                return Analysis.basic_analysis_ds_modulation_profile_from_model(
+                    cast(CmDsOfdmModulationProfileModel, parser.to_model())
+                ), model.file_type
 
-        elif model.file_type == PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:
-            return Analysis.basic_analysis_ds_constellation_display_from_model(
-                cast(CmDsConstDispMeasModel, parser.to_model())
-            ), model.file_type
+            case PnmFileType.DOWNSTREAM_CONSTELLATION_DISPLAY:
+                return Analysis.basic_analysis_ds_constellation_display_from_model(
+                    cast(CmDsConstDispMeasModel, parser.to_model())
+                ), model.file_type
 
-        elif model.file_type == PnmFileType.DOWNSTREAM_HISTOGRAM:
-            return Analysis.basic_analysis_ds_histogram_from_model(
-                cast(CmDsHistModel, parser.to_model())
-            ), model.file_type
+            case PnmFileType.DOWNSTREAM_HISTOGRAM:
+                return Analysis.basic_analysis_ds_histogram_from_model(
+                    cast(CmDsHistModel, parser.to_model())
+                ), model.file_type
 
-        elif model.file_type == PnmFileType.OFDM_FEC_SUMMARY:
-            return Analysis.basic_analysis_ds_ofdm_fec_summary_from_model(
-                cast(CmDsOfdmFecSummaryModel, parser.to_model())
-            ), model.file_type
+            case PnmFileType.OFDM_FEC_SUMMARY:
+                return Analysis.basic_analysis_ds_ofdm_fec_summary_from_model(
+                    cast(CmDsOfdmFecSummaryModel, parser.to_model())
+                ), model.file_type
 
-        elif (
-            model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
-            or model.file_type
-            == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
-        ):
-            return Analysis.basic_analysis_us_ofdma_pre_equalization_from_model(
-                cast(CmUsOfdmaPreEqModel, parser.to_model())
-            ), model.file_type
+            case (
+                PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
+                | PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE
+            ):
+                return Analysis.basic_analysis_us_ofdma_pre_equalization_from_model(
+                    cast(CmUsOfdmaPreEqModel, parser.to_model())
+                ), model.file_type
 
         raise HTTPException(
             status_code=400,

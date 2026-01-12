@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Normalized multi-ChannelEstimation status/stop responses to use ServiceStatusCode at the top level and removed exception-based capture-group resolution in /analysis, then added tests to lock the status semantics and stop state behavior. Updated docs to clarify top-level status vs operation.state.
 

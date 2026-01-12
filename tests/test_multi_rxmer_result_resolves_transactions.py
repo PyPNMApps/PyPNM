@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +13,10 @@ from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.ds.ofdm.rxmer.multi.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
+)
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
@@ -40,6 +43,7 @@ def _build_app() -> FastAPI:
 
 
 PNM_TEST_TYPE: str = "DS_OFDM_RXMER_PER_SUBCAR"
+DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
@@ -89,6 +93,36 @@ class _DbFixture:
             device_detail_id=device_detail_id,
         )
 
+    @staticmethod
+    def bind_operation(
+        db_path: Path,
+        operation_id: OperationId,
+        capture_group_id: str,
+        transaction_ids: list[str],
+    ) -> None:
+        sqlite_path = DatabasePath(str(db_path))
+        postgres_dsn = DatabaseDsn("")
+        capture_repo = CaptureGroupRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        operation_repo = OperationCaptureRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        capture_repo.get_or_create_capture_group(
+            capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
+        )
+        for transaction_id in transaction_ids:
+            capture_repo.add_transaction(
+                capture_group_id,
+                TransactionId(transaction_id),
+                TimestampSec(DEFAULT_CREATED_EPOCH),
+            )
+        operation_repo.upsert_operation_capture(
+            operation_id,
+            capture_group_id,
+            TimestampSec(DEFAULT_CREATED_EPOCH),
+        )
+
 
 def _configure_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -99,24 +133,12 @@ def _configure_paths(
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -136,47 +158,28 @@ def _configure_paths(
     _DbFixture.initialize(sqlite_db)
 
     return {
-        "capture_group_db": capture_group_db,
-        "operation_db": operation_db,
         "database_sqlite_path": sqlite_db,
     }
 
 
 def test_result_resolves_transactions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
     client = TestClient(_build_app())
-    caplog.set_level("WARNING")
-
     operation_id = OperationId("op-123")
     capture_group_id = "group-123"
-    transaction_id = "txn123"
-    missing_transaction_id = "txn-missing"
+    transaction_id_one = "txn-123-a"
+    transaction_id_two = "txn-123-b"
 
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id_one)
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id_two)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [transaction_id_two, transaction_id_one],
     )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id, missing_transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -199,8 +202,8 @@ def test_result_resolves_transactions(
     payload = response.json()
     assert payload["capture_group_id"] == capture_group_id
     assert payload["transactions"]
-    assert payload["transactions"][0]["transaction_id"] == transaction_id
-    assert "Missing transaction record for transaction_id" in caplog.text
+    assert payload["transactions"][0]["transaction_id"] == transaction_id_two
+    assert payload["transactions"][1]["transaction_id"] == transaction_id_one
     OperationRegistry.unregister(operation_id)
 
 
@@ -212,31 +215,12 @@ def test_result_rejects_when_no_transactions_resolve(
 
     operation_id = OperationId("op-124")
     capture_group_id = "group-124"
-    transaction_id = "txn-missing"
-
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [],
     )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    # No transaction records seeded.
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -259,7 +243,7 @@ def test_result_rejects_when_no_transactions_resolve(
     assert "No transaction records found" in response.json()["detail"]
 
 
-def test_result_resolves_transactions_with_legacy_key(
+def test_result_resolves_transactions_without_json_ledgers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
@@ -269,29 +253,13 @@ def test_result_resolves_transactions_with_legacy_key(
     capture_group_id = "group-125"
     transaction_id = "txn125"
 
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
     _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [transaction_id],
+    )
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")

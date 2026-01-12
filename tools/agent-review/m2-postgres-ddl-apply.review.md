@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Updated Postgres schema apply to execute the DDL asset statement-by-statement under a Python-managed transaction, added a SQL splitter to respect quotes/comments/dollar blocks, and expanded tests to cover splitting behavior with an optional Postgres init check.
 

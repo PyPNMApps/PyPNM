@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Normalized transaction_id linking through a capture-service helper, ensured capture-group persistence strips whitespace, corrected final-invocation timestamps to use Generate.time_stamp(), and added direct tests for whitespace persistence and resolver filtering.
 

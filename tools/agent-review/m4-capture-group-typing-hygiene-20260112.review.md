@@ -1,3 +1,34 @@
+## Agent Review Bundle Summary
+- Goal: Restore strict typing and TimestampSec consistency in CaptureGroup without altering runtime behavior.
+- Changes: Typed _grp_id as GroupId | None, returned GroupId from _create_group_id, cast UUIDs, and wrapped repo timestamps with TimestampSec.
+- Files: src/pypnm/api/routes/common/classes/file_capture/capture_group.py
+- Tests: python3 -m compileall src; ruff check .; ruff format --check .; pytest -q.
+- Notes: pytest skips due to optional integration/DSN settings.
+
+### Summary
+Aligned CaptureGroup typing and timestamp usage with strict conventions by using GroupId/None for internal state, returning GroupId from _create_group_id, and passing TimestampSec to repository calls. Behavior and API shapes remain unchanged.
+
+### Modified Files
+- src/pypnm/api/routes/common/classes/file_capture/capture_group.py
+
+### Commands Executed And Results
+- `python3 -m compileall src` → pass
+- `ruff check .` → pass
+- `ruff format --check .` → pass (375 files already formatted)
+- `pytest -q` → pass (585 passed, 4 skipped)
+
+### Tests
+- `pytest -q` → pass (585 passed, 4 skipped)
+- `ruff check .` → pass
+- `ruff format --check .` → pass
+
+### Notes / Warnings
+- pytest skips: `PNM_CM_IT` not set (3 tests), `PYPNM_DB_POSTGRES_DSN` not set (1 test)
+
+### Remaining TODOs / Follow-Ups
+- None
+
+# FILE: src/pypnm/api/routes/common/classes/file_capture/capture_group.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 

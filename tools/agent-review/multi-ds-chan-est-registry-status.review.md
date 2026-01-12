@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added canonical service_status fields to operation registry responses while preserving legacy status strings, updated multi-ChannelEstimation registry endpoints to populate both fields, and documented dual-status semantics. Added tests to assert registry status/cancel responses include service_status alongside legacy status.
 

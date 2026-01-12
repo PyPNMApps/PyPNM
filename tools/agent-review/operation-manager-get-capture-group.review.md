@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Aligned OperationManager.get_capture_group to return GroupId | None with canonical/legacy key support, removed empty-string sentinels, and added tests for canonical, legacy, and missing record behavior.
 

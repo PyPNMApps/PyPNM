@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Updated the FAQ note to explicitly call out `capture_group_id` as canonical and `capture_group` as a transitional fallback, and removed the completed TODO.
 

@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Aligned multi-RxMER and multi-ChannelEstimation registry status endpoints with the shared time_remaining contract, including safe coercion to the default when missing. Added unit tests for both endpoints to validate service-provided and default time_remaining behavior.
 

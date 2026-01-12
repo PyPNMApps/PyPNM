@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -32,13 +31,7 @@ def _configure_operation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     db_dir = base_dir / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
-    )
     monkeypatch.setattr(
         SystemConfigSettings,
         "database_backend",
@@ -55,7 +48,20 @@ def _configure_operation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         classmethod(lambda cls: DatabaseDsn("")),
     )
     DatabaseSchemaManager.from_system_config().initialize_schema()
-    return operation_db
+    return sqlite_db
+
+
+def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_open = Path.open
+
+    def _guarded_open(
+        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
+    ) -> object:
+        if self.name in ("capture_group.json", "operation_capture.json"):
+            raise AssertionError(f"Unexpected JSON ledger access: {self}")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _guarded_open)
 
 
 def test_get_capture_group_prefers_db(
@@ -80,59 +86,22 @@ def test_get_capture_group_prefers_db(
     assert operation_repo.get_capture_group_id(operation_id) == capture_group_id
 
 
-def test_get_capture_group_returns_group_id_for_canonical_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    operation_db = _configure_operation_db(tmp_path, monkeypatch)
-    operation_id = OperationId("op-200")
-    capture_group_id = GroupId("group-200")
-
-    operation_db.write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": str(capture_group_id),
-                    "created": DEFAULT_CREATED_EPOCH,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    resolved = OperationManager.get_capture_group(operation_id)
-    assert resolved == capture_group_id
-    operation_repo = OperationCaptureRepository.from_system_config()
-    assert operation_repo.get_capture_group_id(operation_id) == capture_group_id
-
-
-def test_get_capture_group_returns_group_id_for_legacy_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    operation_db = _configure_operation_db(tmp_path, monkeypatch)
-    operation_id = OperationId("op-201")
-    capture_group_id = GroupId("group-201")
-
-    operation_db.write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group": str(capture_group_id),
-                    "created": DEFAULT_CREATED_EPOCH,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    resolved = OperationManager.get_capture_group(operation_id)
-    assert resolved == capture_group_id
-
-
 def test_get_capture_group_returns_none_when_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _configure_operation_db(tmp_path, monkeypatch)
     operation_id = OperationId("op-202")
+
+    resolved = OperationManager.get_capture_group(operation_id)
+    assert resolved is None
+
+
+def test_get_capture_group_does_not_touch_json_ledgers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_operation_db(tmp_path, monkeypatch)
+    _guard_json_ledgers(monkeypatch)
+    operation_id = OperationId("op-203")
 
     resolved = OperationManager.get_capture_group(operation_id)
     assert resolved is None

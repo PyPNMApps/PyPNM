@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a filesystem-backed operation registry with status/cancel/result endpoints for multi-RxMER and multi-ChannelEstimation, plus operation workflow tests and documentation updates for the new async flow.
 

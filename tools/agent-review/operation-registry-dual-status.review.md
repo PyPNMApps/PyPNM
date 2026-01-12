@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added service_status to generic operation registry responses (status/cancel/result) while preserving legacy status strings, updated the generic operation workflow router to emit both fields, and documented the dual-status behavior. Added tests covering the three generic operation registry endpoints.
 

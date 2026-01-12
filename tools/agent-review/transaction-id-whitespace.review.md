@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Normalized whitespace-only transaction_id and filename handling in capture parsing, tightened resolver filtering for empty IDs, and added tests to cover whitespace variants in capture linking, collection adds, and file-generator mapping.
 

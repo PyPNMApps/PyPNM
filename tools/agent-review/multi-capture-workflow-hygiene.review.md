@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Normalized operation capture records to use capture_group_id with legacy read support, and hardened multi-RxMER result resolution to skip missing transaction records while returning a clear 404 when none resolve. Updated multi-capture docs to match canonical field names and added tests covering legacy keys, missing records, and operation manager writes.
 

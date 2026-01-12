@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added upstream guards to skip empty/whitespace transaction_id linking in capture workflows and in-memory collections, plus safe filtering when reading capture-group transactions. Added focused tests for empty-transaction handling at capture service, collection, and filename mapping layers.
 

@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a runtime-data cleanup line in the Dockerfile to keep `.data/` out of container layers for M0 release hygiene. This bundle includes the Dockerfile content only.
 

@@ -67,24 +67,12 @@ def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,

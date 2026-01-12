@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Aligned CI checks to use the QA checker command in daily-test and postgres-test, and tightened the Postgres validation sentence in the QA guide.
 

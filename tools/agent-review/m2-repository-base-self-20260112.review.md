@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+# FILE: src/pypnm/lib/db/transaction_repository.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Maurice Garcia
 
@@ -35,8 +42,6 @@ from pypnm.lib.types import (
 
 _UNKNOWN_FIELD_VALUE: str = "UNKNOWN"
 _EMPTY_JSON_OBJECT: str = "{}"
-_IS_UNKNOWN_TRUE: int = 1
-_IS_UNKNOWN_FALSE: int = 0
 
 
 @dataclass(frozen=True)
@@ -237,7 +242,7 @@ class SystemDescriptionRepository(_RepositoryBase):
                         model,
                         sysdescr_json,
                         sysdescr_hash,
-                        _IS_UNKNOWN_TRUE if is_unknown else _IS_UNKNOWN_FALSE,
+                        1 if is_unknown else 0,
                     ),
                 )
                 connection.commit()

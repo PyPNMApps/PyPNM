@@ -5,6 +5,7 @@
 - [Overview](#overview)
 - [Recent Status Update (2026-01-11)](#recent-status-update-2026-01-11)
 - [Phase 7.7 Burndown Tracker (Updated 2026-01-11)](#phase-77-burndown-tracker-updated-2026-01-11)
+- [Open Issues From Review Bundles (Updated 2026-01-11)](#open-issues-from-review-bundles-updated-2026-01-11)
 - [Locked Decisions (Selection Summary)](#locked-decisions-selection-summary)
 - [Milestones](#milestones)
 - [Phase 0 · Guardrails And Release Hygiene (M0)](#phase-0--guardrails-and-release-hygiene-m0)
@@ -44,16 +45,29 @@ DB-only cutover policy (current intent):
 
 ## Recent Status Update (2026-01-11)
 
-Work completed since the last burndown sync (per Agent Review Bundles):
+Work completed since the last burndown sync (per Agent Review Bundles and the current codebase snapshot):
 
-- **Transactions are now DB-backed (M3 complete):**
-  - Introduced repository helpers for sysDescr/device_details dims and transaction_records.
+- **M2 complete (schema init + DB abstraction layer):**
+  - Schema assets maintained as authoritative:
+    - `docs/design/db/schema_sqlite.sql`
+    - `docs/design/db/schema_postgres.sql`
+  - Schema apply/init is idempotent and invoked from startup.
+  - Seeds `UNKNOWN` sysDescr row idempotently.
+  - Seeds default `artifact_stores` rows idempotently (at least the primary/prod default).
+
+- **M3 complete (transactions are DB-backed; `transactions.json` no longer required at runtime):**
+  - Introduced repository helpers for sysDescr/device_details dimensions and transaction_records.
   - Wired `PnmFileTransaction` reads/writes to DB while preserving legacy payload shapes.
   - Updated file manager reads (`search_files`, `get_mac_addresses`) to query DB-backed repositories.
-  - Updated multi-capture result tests to seed DB transactions and added repository unit coverage for:
+  - Updated tests to seed DB transactions and added repository unit coverage for:
     - sysDescr de-duplication
     - device_details de-duplication
     - deterministic listing and ordering (timestamp + transaction_id tie-break)
+
+- **M4 is now in progress (repositories exist; cutover tasks remain):**
+  - DB repositories for capture groups and operation→capture group linkage exist.
+  - A compatibility layer exists for legacy column naming differences (operation_id vs operation_capture_id).
+  - Remaining work is primarily cutover enforcement: stop runtime reads/writes of the capture/operation JSON ledgers and shift remaining endpoints/services fully to DB.
 
 - `install.sh`
   - DB backend selection runs before `pytest` so tests execute against the selected backend contract.
@@ -111,6 +125,28 @@ This tracker is a near-term hygiene lane that should remain compatible with the 
 - Optional (when enabled): SNMP integration tests via `PNM_CM_IT`
 - Optional (when enabled): Postgres schema init via `PYPNM_DB_POSTGRES_DSN`
 
+## Open Issues From Review Bundles (Updated 2026-01-11)
+
+These are implementation follow-ups that are not blocked by the milestone plan but should be addressed during M4/M5 hardening.
+
+1) Potential bug in `PnmFileTransaction.insert()`
+   - Risk: passing `cable_modem.get_mac_address` (callable) instead of invoking it.
+   - Requirement: ensure an actual MAC value is used consistently (normalized to lowercase).
+
+2) Transaction ID generation hardening (keep the 16-char prefix contract)
+   - Current: sha256(filename + timestamp) with truncation.
+   - Improve: add higher-resolution time (e.g., `time.time_ns()`), plus MAC and/or test type.
+
+3) Magic-number cleanup
+   - Example: DEFAULT_HEXDUMP_BYTES_PER_LINE = 16 defined inside a function.
+   - Requirement: promote to a named constant.
+
+4) Refactor long if/elif chains to `match/case`
+   - Target: `PnmFileService.__get_analysis()` (behavior unchanged).
+
+5) Strict typing improvement
+   - Target: `_RepositoryBase._from_system_config` should return `Self` (or an equivalent strict typing approach).
+
 ## Locked Decisions (Selection Summary)
 
 This burndown must implement (and keep consistent with the design doc) the locked decision set:
@@ -140,12 +176,12 @@ Milestone status (as of 2026-01-11):
 
 - M0: In progress (docs updated; packaging/docker hygiene still open)
 - M1: In progress (installer selection landed; config template + settings accessors still open)
-- M2: **Complete** (DB schema init + backend-aware connection path landed; schema manager in use)
-- M3: **Complete** (transactions are DB-backed; `transactions.json` is no longer a runtime write/read dependency)
-- M4: Not started (capture groups + operations migration; stops `capture_group.json` / `operation_capture.json` writes)
+- M2: Complete (DB schema init + backend-aware connection path landed; schema manager in use)
+- M3: Complete (transactions are DB-backed; `transactions.json` is no longer a runtime write/read dependency)
+- M4: In progress (capture groups + operation linkage repositories exist; JSON ledger cutover and endpoint wiring still open)
 - M5: Not started (artifact linkage; DB becomes authoritative for path resolution)
 - M6: Not started (delete ledger code paths and ledger docs)
-- M7: Partially done (Postgres CI job plumbing landed; full DB-backed test suite pending)
+- M7: Partially done (Postgres CI job plumbing landed; full DB-backed test suite + ledger removal assertions pending)
 
 ## Phase 0 · Guardrails And Release Hygiene (M0)
 
@@ -232,11 +268,9 @@ Introduce both schemas and a stable DB API that hides backend differences.
 
 ### Tasks
 
-- [ ] Ensure schema assets exist and are treated as authoritative:
-  - [ ] `docs/design/db/schema_postgres.sql`
-  - [ ] `docs/design/db/schema_sqlite.sql`
-  - Notes:
-    - If DDL currently exists only in design doc appendices, extract it into these authoritative assets.
+- [x] Ensure schema assets exist and are treated as authoritative:
+  - [x] `docs/design/db/schema_postgres.sql`
+  - [x] `docs/design/db/schema_sqlite.sql`
 
 - [x] Implement DB connection layer in PyPNM:
   - [x] SQLite connection opens with `PRAGMA foreign_keys = ON`
@@ -247,8 +281,8 @@ Introduce both schemas and a stable DB API that hides backend differences.
 - [x] Implement schema apply/init (idempotent, using shipped DDL assets):
   - [x] Apply DDL idempotently on startup/install
   - [x] Seed canonical `UNKNOWN` sysDescr row idempotently
-  - [ ] Seed default `artifact_stores` row idempotently:
-    - [ ] prod store: `.data/pnm`
+  - [x] Seed default `artifact_stores` row idempotently:
+    - [x] prod store: `.data/pnm`
     - [ ] demo store: `demo/.data/pnm` (only if demo enabled/used)
 
 - [x] Add “DB health” check function for diagnostics:
@@ -322,27 +356,30 @@ Cutover note:
 
 ### Tasks
 
-- [ ] Implement `CaptureGroupRepository`:
-  - [ ] Create capture group
-  - [ ] Add ordered transaction membership (`position`)
-  - [ ] Load capture group with ordered transactions
+- [x] Implement `CaptureGroupRepository`:
+  - [x] Create capture group
+  - [x] Add ordered transaction membership (`position`)
+  - [x] Load capture group with ordered transactions
 
-- [ ] Implement `OperationCaptureRepository`:
-  - [ ] Create operation capture linking to capture group
-  - [ ] Resolve operation capture -> capture group -> ordered transaction list
+- [x] Implement `OperationCaptureRepository`:
+  - [x] Create operation capture linking to capture group
+  - [x] Resolve operation capture -> capture group -> ordered transaction list
+  - [x] Support legacy schema compatibility (`operation_id` vs `operation_capture_id`) without branching call sites
 
-- [ ] Update existing grouping/operation services to use DB:
+- [ ] Update existing grouping/operation services to use DB end-to-end:
   - [ ] Stop writing `.data/db/capture_group.json`
   - [ ] Stop writing `.data/db/operation_capture.json`
   - [ ] Stop reading capture/operation ledgers from runtime paths
+  - [ ] Ensure multi-capture start/status/result endpoints resolve operation/group via DB only
 
 - [ ] Update file-manager endpoint behavior:
-  - [ ] `download/operationID/{operation_id}` resolves op -> group -> ordered tx list
+  - [ ] `download/operationID/{operation_id}` resolves op -> group -> ordered tx list via DB
 
 - [ ] Add pytest coverage:
   - [ ] Position uniqueness within group
   - [ ] Operation capture references group correctly
   - [ ] Endpoint path resolution uses DB (service-level tests)
+  - [ ] Explicit assertion: no runtime read/write of capture/operation JSON ledgers
 
 ### Acceptance Criteria
 
@@ -506,3 +543,10 @@ Codex should maintain a running checklist aligned to these phases:
 - Tests added and executed
 - CI workflow impacts validated
 - Deferred items (with rationale)
+
+## Phase 2 · Schema Introduction And DB Abstraction Layer (M2) Status Block
+
+- Status: Complete (schema assets authoritative, startup idempotent schema init, connection factory, health check, seeds for UNKNOWN sysDescr and default artifact store)
+- Verified gates: compileall, ruff check, ruff format --check, pytest all green in the latest bundle
+- Known deltas: demo artifact store seeding only required if demo mode is actively supported; otherwise defer to M5/demo hardening
+- Next dependencies: M4 cutover enforcement (eliminate capture/operation JSON ledger runtime usage), then M5 artifact linkage as the authoritative file resolver

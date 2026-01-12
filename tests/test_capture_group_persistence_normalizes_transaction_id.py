@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -44,6 +43,19 @@ SYS_DESCR: dict[str, str] = {
 DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
 DEFAULT_FILENAME = FileName("rxmer.bin")
 DEFAULT_MAC = MacAddress("aa:bb:cc:dd:ee:ff")
+
+
+def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_open = Path.open
+
+    def _guarded_open(
+        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
+    ) -> object:
+        if self.name in ("capture_group.json", "operation_capture.json"):
+            raise AssertionError(f"Unexpected JSON ledger access: {self}")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _guarded_open)
 
 
 def _configure_capture_group_db(
@@ -116,26 +128,14 @@ def test_resolver_filters_whitespace_transaction_ids(
     db_path = _configure_capture_group_db(tmp_path, monkeypatch)
     _insert_transaction(db_path, "txn123")
     group_id = GroupId("group-1")
-    json_path = tmp_path / "capture_group.json"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(json_path)),
-    )
-    payload = {
-        str(group_id): {
-            "created": DEFAULT_CREATED_EPOCH,
-            "transactions": ["", "   ", "txn123"],
-        }
-    }
-    json_path.write_text(json.dumps(payload), encoding="utf-8")
+    repo = CaptureGroupRepository.from_system_config()
+    repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
+    repo.add_transaction(group_id, TransactionId("txn123"), TimestampSec(2))
 
     resolver = OperationCaptureGroupResolver()
     txns = resolver.get_transaction_ids_for_capture_group(group_id)
 
     assert txns == [TransactionId("txn123")]
-    repo = CaptureGroupRepository.from_system_config()
-    assert repo.list_transactions(group_id) == [TransactionId("txn123")]
 
 
 def test_resolver_prefers_db_transaction_order(
@@ -154,3 +154,20 @@ def test_resolver_prefers_db_transaction_order(
     txns = resolver.get_transaction_ids_for_capture_group(group_id)
 
     assert txns == [TransactionId("txn-b"), TransactionId("txn-a")]
+
+
+def test_resolver_does_not_touch_json_ledgers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = _configure_capture_group_db(tmp_path, monkeypatch)
+    _guard_json_ledgers(monkeypatch)
+    group_id = GroupId("group-no-json")
+    _insert_transaction(db_path, "txn-json-guard")
+    repo = CaptureGroupRepository.from_system_config()
+    repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
+    repo.add_transaction(group_id, TransactionId("txn-json-guard"), TimestampSec(1))
+
+    resolver = OperationCaptureGroupResolver()
+    txns = resolver.get_transaction_ids_for_capture_group(group_id)
+
+    assert txns == [TransactionId("txn-json-guard")]

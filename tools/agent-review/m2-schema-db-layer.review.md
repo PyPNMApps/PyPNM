@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Implemented the M2 DB schema manager with connection handling, idempotent schema apply, seed rows, and a health check, added SQLite coverage for schema init, and updated docs plus dependency wiring to reflect the DB bootstrap behavior. Adjusted FastAPI parameter defaults to satisfy lint and kept schema assets as the authoritative DDL source.
 

@@ -1,33 +1,20 @@
 ## Agent Review Bundle Summary
-- Goal:
-- Changes:
-- Files:
-- Tests:
-- Notes:
+- Goal: Enforce DB-only capture group and operation linkage resolution across runtime flows and tests.
+- Changes: Removed JSON ledger fallback logic, wired DB-only resolution paths, and updated tests to use DB repositories with JSON-guard checks.
+- Files: src/pypnm/api/routes/advance/common/operation_manager.py, src/pypnm/api/routes/common/classes/file_capture/capture_group.py, src/pypnm/api/routes/common/classes/file_capture/pnm_file_opearation.py, tests/test_capture_group_persistence_normalizes_transaction_id.py, tests/test_multi_channel_estimation_result.py, tests/test_multi_channel_estimation_start_and_analysis.py, tests/test_multi_rxmer_result_resolves_transactions.py, tests/test_multi_rxmer_start_returns_operation_and_group.py, tests/test_operation_manager_capture_group_id.py, tests/test_operation_manager_get_capture_group.py, tests/test_operation_workflow.py.
+- Tests: python3 -m compileall src; ruff check .; ruff format --check .; pytest -q.
+- Notes: pytest skips due to optional integration/DSN settings.
 
-### Summary
-Shifted capture-group and operation linkage persistence to DB-backed repositories with JSON fallback/backfill, aligned schema assets, and updated tests to seed DB transactions for capture group linking while keeping existing API shapes stable. Added a brief FAQ entry for the legacy operation_capture key handling, recorded a TODO to confirm the FAQ update, and documented the multi-part bundle line cap.
+### What Changed And Why
+- Removed JSON ledger read/write fallbacks in operation/capture group resolution so DB is the sole source of truth.
+- Updated multi-capture and operation-manager tests to use DB repositories and enforce deterministic ordering.
+- Added JSON-ledger access guards in tests to fail on accidental file access.
 
-### Modified Files
-- AGENTS.md
-- docs/design/db/database-backend-burndown.md
-- docs/design/db/database-backend.md
-- docs/design/db/schema_postgres.sql
-- docs/design/db/schema_sqlite.sql
-- docs/issues/index.md
-- docs/todo/todo.md
+### Files Changed
 - src/pypnm/api/routes/advance/common/operation_manager.py
 - src/pypnm/api/routes/common/classes/file_capture/capture_group.py
 - src/pypnm/api/routes/common/classes/file_capture/pnm_file_opearation.py
-- src/pypnm/api/routes/common/classes/file_capture/pnm_file_transaction.py
-- src/pypnm/api/routes/docs/pnm/files/service.py
-- src/pypnm/lib/db/capture_group_repository.py
-- src/pypnm/lib/db/db_schema_manager.py
-- src/pypnm/lib/db/transaction_repository.py
-- src/pypnm/startup/startup.py
-- tests/test_capture_group_empty_transaction.py
 - tests/test_capture_group_persistence_normalizes_transaction_id.py
-- tests/test_db_schema_manager.py
 - tests/test_multi_channel_estimation_result.py
 - tests/test_multi_channel_estimation_start_and_analysis.py
 - tests/test_multi_rxmer_result_resolves_transactions.py
@@ -35,134 +22,390 @@ Shifted capture-group and operation linkage persistence to DB-backed repositorie
 - tests/test_operation_manager_capture_group_id.py
 - tests/test_operation_manager_get_capture_group.py
 - tests/test_operation_workflow.py
-- tests/test_transaction_id_persistence_guards.py
-- tests/test_transaction_repository.py
 
-### Commands Executed And Results
-- `python3 -m compileall src` → pass
-- `ruff check .` → pass
-- `ruff format --check .` → pass (375 files already formatted)
-- `pytest -q` → pass (585 passed, 4 skipped)
+### New Or Updated Tests
+- tests/test_capture_group_persistence_normalizes_transaction_id.py::test_resolver_does_not_touch_json_ledgers
+- tests/test_operation_manager_get_capture_group.py::test_get_capture_group_does_not_touch_json_ledgers
+- tests/test_multi_rxmer_result_resolves_transactions.py::test_result_resolves_transactions
 
-### Tests
-- `pytest -q` → pass (585 passed, 4 skipped)
-- `ruff check .` → pass
-- `ruff format --check .` → pass
+### Commands Executed And Outcomes
+- python3 -m compileall src → pass
+- ruff check . → pass
+- ruff format --check . → pass (375 files already formatted)
+- pytest -q → pass (585 passed, 4 skipped)
 
 ### Notes / Warnings
-- pytest skips: `PNM_CM_IT` not set (3 tests), `PYPNM_DB_POSTGRES_DSN` not set (1 test)
+- pytest skips: PNM_CM_IT not set (3 tests), PYPNM_DB_POSTGRES_DSN not set (1 test)
 
 ### Remaining TODOs / Follow-Ups
-- Confirm the FAQ entry for legacy operation_capture capture_group fallback is published.
+- None
 
-# FILE: tests/test_capture_group_empty_transaction.py
+# FILE: src/pypnm/api/routes/advance/common/operation_manager.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+from __future__ import annotations
+
+import logging
+import time
+import uuid
+from pathlib import Path
+
+from pypnm.lib.constants import cast
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
+)
+from pypnm.lib.types import GroupId, OperationId, TimestampSec
+
+
+class OperationManager:
+    """
+    Manager for mapping background capture operations to their capture group IDs.
+
+    Each operation is assigned a unique operation_id and linked to a
+    capture_group_id. Mappings are persisted in the DB backend so that
+    captures can be looked up later by operation ID.
+    """
+
+    def __init__(self, capture_group_id: GroupId, db_path: Path | None = None) -> None:
+        """
+        Initialize a new operation manager for a given capture group.
+
+        Args:
+            capture_group_id: The ID of the capture group to associate.
+            db_path: Deprecated legacy JSON path override. Ignored; DB is authoritative.
+        """
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.capture_group_id: GroupId = capture_group_id
+        self.operation_id: OperationId = cast(OperationId, uuid.uuid4().hex[:16])
+
+        self._capture_repo = CaptureGroupRepository.from_system_config()
+        self._operation_repo = OperationCaptureRepository.from_system_config()
+
+    def register(self) -> OperationId:
+        """
+        Register this operation with its capture group ID in the DB.
+
+        Verifies that the associated capture group exists before registration.
+
+        Returns:
+            The operation_id assigned.
+
+        Raises:
+            ValueError: If the capture_group_id is not present in the CaptureGroup database.
+        """
+        if not self._capture_repo.capture_group_exists(self.capture_group_id):
+            raise ValueError(f"CaptureGroup '{self.capture_group_id}' does not exist")
+
+        created_epoch = TimestampSec(int(time.time()))
+        self._operation_repo.upsert_operation_capture(
+            self.operation_id, self.capture_group_id, created_epoch
+        )
+        self.logger.info(
+            f"Registered operation {self.operation_id} for group {self.capture_group_id}"
+        )
+        return self.operation_id
+
+    @classmethod
+    def get_capture_group(
+        cls, operation_id: OperationId, db_path: Path | None = None
+    ) -> GroupId | None:
+        """
+        Retrieve the capture_group_id for a given operation_id.
+
+        Args:
+            operation_id: The operation ID to look up.
+            db_path: Deprecated legacy JSON path override. Ignored; DB is authoritative.
+
+        Returns:
+            capture_group_id if found, otherwise None.
+        """
+        operation_repo = OperationCaptureRepository.from_system_config()
+        capture_group_id = operation_repo.get_capture_group_id(operation_id)
+        if capture_group_id is not None:
+            return capture_group_id
+        return None
+
+    @classmethod
+    def list_operations(cls, db_path: Path | None = None) -> list[str]:
+        """
+        List all registered operation IDs.
+
+        Args:
+            db_path: Deprecated legacy JSON path override. Ignored; DB is authoritative.
+
+        Returns:
+            List of operation_id strings.
+        """
+        operation_repo = OperationCaptureRepository.from_system_config()
+        operation_ids = operation_repo.list_operation_ids()
+        return [str(op_id) for op_id in operation_ids]
+
+# FILE: src/pypnm/api/routes/common/classes/file_capture/capture_group.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
+import logging
+import time
+import uuid
 from pathlib import Path
 
-import pytest
-
-from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
-from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
-from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
-from pypnm.lib.db.transaction_repository import (
-    DeviceDetailsRepository,
-    SystemDescriptionRepository,
-    TransactionRepository,
+from pypnm.lib.db.transaction_repository import TransactionRepository
+from pypnm.lib.types import GroupId, TransactionId
+
+
+class CaptureGroup:
+    """
+    Manage sessions of capture operations (e.g., multi-RxMER runs) by grouping
+    multiple file-transfer transactions under a single UUID-based group ID.
+
+    Features:
+      - Persist groups and their transaction lists in the DB backend.
+      - Generate or load a 16-character hexadecimal group ID per session.
+      - Add, list, delete transactions; prune stale groups.
+
+    Example:
+        # New session
+        cg = CaptureGroup()
+        group_id = cg.create_group()
+
+        # Existing session
+        cg2 = CaptureGroup(group_id=group_id)
+        txns = cg2.get_transactions()
+    """
+
+    def __init__(
+        self, group_id: GroupId | None = None, db_path: Path | None = None
+    ) -> None:
+        """
+        Initialize the CaptureGroup manager.
+
+        Args:
+            group_id: Optional existing group ID to load; generates a new one if None.
+            db_path: Deprecated legacy JSON path override. Ignored; DB is authoritative.
+
+        Raises:
+            OSError: If the parent directory cannot be created.
+        """
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+        self._repo = CaptureGroupRepository.from_system_config()
+        self._transaction_repo = TransactionRepository.from_system_config()
+
+        self._grp_id: GroupId = group_id
+        self._create_group_id()
+
+    def _create_group_id(self) -> str:
+        """
+        Ensure a group ID is set (use existing or generate new).
+        Returns the active group ID.
+        """
+        if not self._grp_id:
+            self._grp_id = uuid.uuid4().hex[:16]
+        return self._grp_id
+
+    def get_group_id(self) -> GroupId:
+        """
+        Get the current active group ID.
+        Raises AssertionError if uninitialized.
+        """
+        assert self._grp_id, "Group ID not initialized"
+        return self._grp_id
+
+    def create_group(self) -> GroupId:
+        """
+        Add the current group to the DB (no-op if exists).
+        Returns the group ID.
+        """
+        gid = self.get_group_id()
+        created_epoch = int(time.time())
+        self._repo.get_or_create_capture_group(gid, created_epoch)
+        self.logger.info(f"Created new group: {gid}")
+        return gid
+
+    def add_transaction(self, txn_id: str) -> None:
+        """
+        Append a transaction ID to this group, saving the DB.
+        Raises ValueError if group missing.
+        """
+        tx_id = str(txn_id).strip()
+        if not tx_id:
+            self.logger.warning("Skipping empty transaction_id persistence")
+            return
+        gid = self.get_group_id()
+        if not self._repo.capture_group_exists(gid):
+            raise ValueError("Group not found; create_group() first")
+        if self._transaction_repo.get_transaction_record(TransactionId(tx_id)) is None:
+            self.logger.warning(
+                "Skipping capture_group link for missing transaction_id=%s",
+                tx_id,
+            )
+            return
+        created_epoch = int(time.time())
+        self._repo.add_transaction(gid, TransactionId(tx_id), created_epoch)
+        self.logger.debug(f"Added txn {tx_id} to group {gid}")
+
+    def getTransactionIds(self) -> list[TransactionId]:
+        """
+        Return all transaction IDs for this group (empty list if none).
+        """
+        return self._repo.list_transactions(self.get_group_id())
+
+    def delete_group(self) -> None:
+        """
+        Remove this group and its transactions from the DB; resets group ID.
+        """
+        gid = self.get_group_id()
+        self._repo.delete_capture_group(gid)
+        self.logger.info(f"Deleted group: {gid}")
+        self._grp_id = None
+
+    def list_groups(self) -> list[str]:
+        """
+        List all group IDs currently in the DB.
+        """
+        return [str(group_id) for group_id in self._repo.list_capture_groups()]
+
+    def prune_older_than(self, seconds: int) -> None:
+        """
+        Remove groups older than the given age (seconds).
+        """
+        cutoff = int(time.time()) - seconds
+        deleted_count = self._repo.prune_older_than(cutoff)
+        if deleted_count:
+            self.logger.info(f"Pruned groups: {deleted_count}")
+
+# FILE: src/pypnm/api/routes/common/classes/file_capture/pnm_file_opearation.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+from __future__ import annotations
+
+import logging
+
+from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
+    PnmFileTransaction,
 )
-from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import (
-    DatabaseBackend,
-    DatabaseDsn,
-    DatabasePath,
-    FileName,
-    TimestampSec,
-    TransactionId,
+from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
 )
-
-PNM_TEST_TYPE: str = "DS_RXMER"
-DEFAULT_TIMESTAMP: int = 1
-SYS_DESCR: dict[str, str] = {
-    "HW_REV": "1.0",
-    "VENDOR": "LANCity",
-    "BOOTR": "NONE",
-    "SW_REV": "1.0.0",
-    "MODEL": "LCPET-3",
-}
-DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
-DEFAULT_FILENAME = FileName("rxmer.bin")
-DEFAULT_MAC = MacAddress("aa:bb:cc:dd:ee:ff")
-TRANSACTION_ID: str = "txn-1"
+from pypnm.lib.types import GroupId, OperationId, TransactionId
 
 
-def _configure_capture_group_db(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Path:
-    db_path = tmp_path / "pypnm.sqlite3"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_backend",
-        classmethod(lambda cls: DatabaseBackend.SQLITE),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_sqlite_path",
-        classmethod(lambda cls: DatabasePath(str(db_path))),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_postgres_dsn",
-        classmethod(lambda cls: DatabaseDsn("")),
-    )
-    DatabaseSchemaManager.from_system_config().initialize_schema()
-    return db_path
+class OperationCaptureGroupResolver:
+    """
+    Resolve Operation IDs Into Capture Groups And Transaction Records.
 
+    This helper class ties together DB-backed datasets for operation resolution:
 
-def _insert_transaction(db_path: Path, transaction_id: str) -> None:
-    sqlite_path = DatabasePath(str(db_path))
-    postgres_dsn = DatabaseDsn("")
-    sys_repo = SystemDescriptionRepository.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-    device_repo = DeviceDetailsRepository.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-    txn_repo = TransactionRepository.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-    sysdescr_id = sys_repo.get_or_create_sysdescr_id(SYS_DESCR)
-    device_detail_id = device_repo.get_or_create_device_detail_id(
-        DEVICE_DETAILS, sysdescr_id
-    )
-    txn_repo.insert_transaction(
-        transaction_id=TransactionId(transaction_id),
-        timestamp_epoch=TimestampSec(DEFAULT_TIMESTAMP),
-        mac_address=DEFAULT_MAC,
-        pnm_test_type=PNM_TEST_TYPE,
-        filename=DEFAULT_FILENAME,
-        device_detail_id=device_detail_id,
-    )
+    1) Operation Database
+       - DB: operation_captures table (operation_id -> capture_group_id)
 
+    2) Capture Group Database
+       - DB: capture_groups/capture_group_transactions tables
 
-def test_add_transaction_skips_empty_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    db_path = _configure_capture_group_db(tmp_path, monkeypatch)
-    _insert_transaction(db_path, TRANSACTION_ID)
-    capture_group = CaptureGroup()
-    group_id = capture_group.create_group()
+    3) Transaction Database (transaction_records)
+       - Already managed by PnmFileTransaction.
 
-    capture_group.add_transaction("")
-    capture_group.add_transaction("   ")
-    capture_group.add_transaction(TRANSACTION_ID)
+    Public APIs:
+      - get_capture_group_id(operation_id)
+      - get_transaction_ids_for_operation(operation_id)
+      - get_transaction_models_for_operation(operation_id)
+    """
 
-    repo = CaptureGroupRepository.from_system_config()
-    transactions = repo.list_transactions(group_id)
-    assert transactions == [TransactionId(TRANSACTION_ID)]
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._capture_repo = CaptureGroupRepository.from_system_config()
+        self._operation_repo = OperationCaptureRepository.from_system_config()
+
+    # ------------------------------------------------------------------ #
+    # Resolution helpers
+    # ------------------------------------------------------------------ #
+    def get_capture_group_id(self, operation_id: OperationId) -> GroupId | None:
+        """
+        Resolve A Capture Group Identifier From An Operation ID.
+
+        Returns the associated capture_group_id string when present in the
+        operation database; otherwise returns None.
+        """
+        capture_group_id = self._operation_repo.get_capture_group_id(operation_id)
+        if capture_group_id is not None:
+            return capture_group_id
+        self.logger.info("No operation record found for operation_id=%s", operation_id)
+        return None
+
+    def get_transaction_ids_for_capture_group(
+        self, capture_group_id: GroupId
+    ) -> list[TransactionId]:
+        """
+        Resolve All Transaction IDs Belonging To A Capture Group.
+
+        Returns an ordered list of TransactionId values, or an empty list if
+        the capture group is unknown or has no associated transactions.
+        """
+        db_transactions = self._capture_repo.list_transactions(capture_group_id)
+        if db_transactions:
+            return db_transactions
+        self.logger.info(
+            "No capture group record found for capture_group_id=%s",
+            capture_group_id,
+        )
+        return []
+
+    def get_transaction_ids_for_operation(
+        self, operation_id: OperationId
+    ) -> list[TransactionId]:
+        """
+        Resolve All Transaction IDs Associated With An Operation ID.
+
+        This is a convenience wrapper that:
+          1) Finds the capture_group_id for the supplied operation_id.
+          2) Returns the list of TransactionId values for that capture group.
+        """
+        capture_group_id = self.get_capture_group_id(operation_id)
+        if not capture_group_id:
+            return []
+        return self.get_transaction_ids_for_capture_group(capture_group_id)
+
+    def get_transaction_models_for_operation(
+        self, operation_id: OperationId
+    ) -> list[TransactionRecordModel]:
+        """
+        Resolve TransactionRecordModel Instances For An Operation ID.
+
+        For each transaction id mapped to the given operation, this method
+        constructs a canonical TransactionRecordModel via PnmFileTransaction.
+
+        Missing records are skipped; only models with a non-empty transaction_id
+        field are returned.
+        """
+        txn_ids = self.get_transaction_ids_for_operation(operation_id)
+        if not txn_ids:
+            self.logger.info(
+                "No transaction IDs found for operation_id=%s", operation_id
+            )
+            return []
+
+        txn_store = PnmFileTransaction()
+        models: list[TransactionRecordModel] = []
+
+        for tid in txn_ids:
+            model = txn_store.getRecordModel(tid)
+            # Assuming TransactionRecordModel.null() sets transaction_id to an empty string.
+            tx_id = str(getattr(model, "transaction_id", "")).strip()
+            if tx_id:
+                models.append(model)
+            else:
+                self.logger.warning(
+                    "TransactionRecordModel for tid=%s is null/empty and will be skipped",
+                    tid,
+                )
+
+        return models
 
 # FILE: tests/test_capture_group_persistence_normalizes_transaction_id.py
 # SPDX-License-Identifier: Apache-2.0
@@ -170,7 +413,6 @@ def test_add_transaction_skips_empty_id(
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -211,6 +453,19 @@ SYS_DESCR: dict[str, str] = {
 DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
 DEFAULT_FILENAME = FileName("rxmer.bin")
 DEFAULT_MAC = MacAddress("aa:bb:cc:dd:ee:ff")
+
+
+def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_open = Path.open
+
+    def _guarded_open(
+        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
+    ) -> object:
+        if self.name in ("capture_group.json", "operation_capture.json"):
+            raise AssertionError(f"Unexpected JSON ledger access: {self}")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _guarded_open)
 
 
 def _configure_capture_group_db(
@@ -283,26 +538,14 @@ def test_resolver_filters_whitespace_transaction_ids(
     db_path = _configure_capture_group_db(tmp_path, monkeypatch)
     _insert_transaction(db_path, "txn123")
     group_id = GroupId("group-1")
-    json_path = tmp_path / "capture_group.json"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(json_path)),
-    )
-    payload = {
-        str(group_id): {
-            "created": DEFAULT_CREATED_EPOCH,
-            "transactions": ["", "   ", "txn123"],
-        }
-    }
-    json_path.write_text(json.dumps(payload), encoding="utf-8")
+    repo = CaptureGroupRepository.from_system_config()
+    repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
+    repo.add_transaction(group_id, TransactionId("txn123"), TimestampSec(2))
 
     resolver = OperationCaptureGroupResolver()
     txns = resolver.get_transaction_ids_for_capture_group(group_id)
 
     assert txns == [TransactionId("txn123")]
-    repo = CaptureGroupRepository.from_system_config()
-    assert repo.list_transactions(group_id) == [TransactionId("txn123")]
 
 
 def test_resolver_prefers_db_transaction_order(
@@ -322,198 +565,22 @@ def test_resolver_prefers_db_transaction_order(
 
     assert txns == [TransactionId("txn-b"), TransactionId("txn-a")]
 
-# FILE: tests/test_db_schema_manager.py
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
 
-from __future__ import annotations
+def test_resolver_does_not_touch_json_ledgers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = _configure_capture_group_db(tmp_path, monkeypatch)
+    _guard_json_ledgers(monkeypatch)
+    group_id = GroupId("group-no-json")
+    _insert_transaction(db_path, "txn-json-guard")
+    repo = CaptureGroupRepository.from_system_config()
+    repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
+    repo.add_transaction(group_id, TransactionId("txn-json-guard"), TimestampSec(1))
 
-import os
-import sqlite3
-from pathlib import Path
-from typing import cast
+    resolver = OperationCaptureGroupResolver()
+    txns = resolver.get_transaction_ids_for_capture_group(group_id)
 
-import pytest
-
-from pypnm.lib.db.db_schema_manager import (
-    BEGIN_STATEMENT,
-    COMMIT_STATEMENT,
-    DEFAULT_ARTIFACT_STORE_NAME,
-    SCHEMA_VERSION,
-    SQLITE_BUSY_TIMEOUT_MS,
-    SQLITE_JOURNAL_MODE,
-    UNKNOWN_SYSDESCR_HASH,
-    DatabaseSchemaManager,
-)
-from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
-
-SCHEMA_META_ID: int = 1
-EXPECTED_UNKNOWN_COUNT: int = 1
-EXPECTED_SCHEMA_STATEMENTS_MIN: int = 1
-EXPECTED_SQLITE_JOURNAL_MODE: str = SQLITE_JOURNAL_MODE.lower()
-UNSUPPORTED_SCHEMA_VERSION: int = SCHEMA_VERSION + 1
-
-
-def test_sqlite_schema_init_and_health(tmp_path: Path) -> None:
-    db_path = tmp_path / "pypnm_schema.sqlite3"
-    sqlite_path = cast(DatabasePath, str(db_path))
-    postgres_dsn = cast(DatabaseDsn, "")
-    manager = DatabaseSchemaManager.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-
-    manager.initialize_schema()
-    manager.initialize_schema()
-
-    health = manager.health_check()
-    assert health.ok is True
-    assert health.schema_version == SCHEMA_VERSION
-    assert health.missing_tables == []
-    assert health.unknown_sysdescr_present is True
-    assert health.default_artifact_store_present is True
-
-    connection = sqlite3.connect(db_path)
-    try:
-        cursor = connection.execute(
-            "SELECT schema_version FROM schema_meta WHERE schema_meta_id = ?;",
-            (SCHEMA_META_ID,),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == SCHEMA_VERSION
-
-        cursor = connection.execute(
-            "SELECT COUNT(1) FROM system_description_dim WHERE sysdescr_hash = ?;",
-            (UNKNOWN_SYSDESCR_HASH,),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == EXPECTED_UNKNOWN_COUNT
-
-        cursor = connection.execute(
-            "SELECT root_path FROM artifact_stores WHERE store_name = ?;",
-            (DEFAULT_ARTIFACT_STORE_NAME,),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert str(row[0]).strip() != ""
-    finally:
-        connection.close()
-
-
-def test_sqlite_pragmas_applied(tmp_path: Path) -> None:
-    db_path = tmp_path / "pypnm_schema.sqlite3"
-    sqlite_path = cast(DatabasePath, str(db_path))
-    postgres_dsn = cast(DatabaseDsn, "")
-    manager = DatabaseSchemaManager.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-
-    connection = manager.connect()
-    try:
-        cursor = connection.execute("PRAGMA journal_mode;")
-        row = cursor.fetchone()
-        assert row is not None
-        assert str(row[0]).lower() == EXPECTED_SQLITE_JOURNAL_MODE
-
-        cursor = connection.execute("PRAGMA busy_timeout;")
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == SQLITE_BUSY_TIMEOUT_MS
-    finally:
-        connection.close()
-
-
-def test_schema_version_mismatch_raises(tmp_path: Path) -> None:
-    db_path = tmp_path / "pypnm_schema.sqlite3"
-    sqlite_path = cast(DatabasePath, str(db_path))
-    postgres_dsn = cast(DatabaseDsn, "")
-    manager = DatabaseSchemaManager.from_overrides(
-        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-    )
-
-    manager.initialize_schema()
-
-    connection = sqlite3.connect(db_path)
-    try:
-        connection.execute(
-            "UPDATE schema_meta SET schema_version = ? WHERE schema_meta_id = ?;",
-            (UNSUPPORTED_SCHEMA_VERSION, SCHEMA_META_ID),
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-    with pytest.raises(RuntimeError, match="Unsupported schema_version"):
-        manager.initialize_schema()
-
-
-def test_split_sql_statements_handles_quotes_and_comments() -> None:
-    sql = (
-        "CREATE TABLE t (v text CHECK (v ~* '^([0-9a-f]{2}:){5}[0-9a-f]{2}$'));\n"
-        "-- Comment with ; should not split\n"
-        "INSERT INTO t (v) VALUES ('{}'::jsonb);\n"
-        "/* Block comment ; still in comment */\n"
-        "SELECT $$a; b$$;\n"
-    )
-    statements = DatabaseSchemaManager._split_sql_statements(sql)
-    assert len(statements) == 3
-
-
-def test_split_sql_statements_filters_begin_commit() -> None:
-    sql = "BEGIN; CREATE TABLE demo (id int); COMMIT;"
-    statements = DatabaseSchemaManager._split_sql_statements(sql)
-    normalized = {stmt.strip().strip(";").upper() for stmt in statements}
-    assert BEGIN_STATEMENT in normalized
-    assert COMMIT_STATEMENT in normalized
-    assert "CREATE TABLE DEMO (ID INT)" in normalized
-    assert DatabaseSchemaManager._should_skip_statement("BEGIN") is True
-    assert DatabaseSchemaManager._should_skip_statement("BEGIN TRANSACTION") is True
-    assert DatabaseSchemaManager._should_skip_statement("COMMIT") is True
-    assert DatabaseSchemaManager._should_skip_statement("COMMIT WORK") is True
-    assert DatabaseSchemaManager._should_skip_statement("ROLLBACK") is True
-    assert DatabaseSchemaManager._should_skip_statement("ROLLBACK WORK") is True
-
-
-def test_split_sql_statements_handles_escaped_single_quotes() -> None:
-    sql = "INSERT INTO t (v) VALUES ('a''b; still string'); SELECT 1;"
-    statements = DatabaseSchemaManager._split_sql_statements(sql)
-    assert len(statements) == 2
-
-
-def test_split_sql_statements_handles_valid_dollar_tag() -> None:
-    sql = "SELECT $tag$a; b$tag$; SELECT 2;"
-    statements = DatabaseSchemaManager._split_sql_statements(sql)
-    assert len(statements) == 2
-
-
-def test_split_sql_statements_rejects_invalid_dollar_tag() -> None:
-    sql = "SELECT $a$b$; SELECT 2;"
-    statements = DatabaseSchemaManager._split_sql_statements(sql)
-    assert len(statements) == 2
-
-
-def test_split_schema_postgres_contains_schema_meta() -> None:
-    ddl_path = Path("docs/design/db/schema_postgres.sql")
-    ddl_sql = ddl_path.read_text(encoding="utf-8")
-    statements = DatabaseSchemaManager._split_sql_statements(ddl_sql)
-    assert len(statements) >= EXPECTED_SCHEMA_STATEMENTS_MIN
-    joined = "\n".join(statements)
-    assert "CREATE TABLE IF NOT EXISTS schema_meta" in joined
-
-
-def test_postgres_schema_init_optional() -> None:
-    dsn = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    postgres_dsn = cast(DatabaseDsn, dsn)
-    sqlite_path = cast(DatabasePath, ".data/db/pypnm.sqlite3")
-    manager = DatabaseSchemaManager.from_overrides(
-        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
-    )
-    manager.initialize_schema()
-    health = manager.health_check()
-    assert health.ok is True
+    assert txns == [TransactionId("txn-json-guard")]
 
 # FILE: tests/test_multi_channel_estimation_result.py
 # SPDX-License-Identifier: Apache-2.0
@@ -521,7 +588,6 @@ def test_postgres_schema_init_optional() -> None:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -531,6 +597,10 @@ from fastapi.testclient import TestClient
 from pypnm.api.routes.advance.multi_ds_chan_est.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
+)
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
@@ -557,6 +627,7 @@ def _build_app() -> FastAPI:
 
 
 PNM_TEST_TYPE: str = "DS_OFDM_CHAN_EST_COEF"
+DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
@@ -606,6 +677,36 @@ class _DbFixture:
             device_detail_id=device_detail_id,
         )
 
+    @staticmethod
+    def bind_operation(
+        db_path: Path,
+        operation_id: OperationId,
+        capture_group_id: str,
+        transaction_ids: list[str],
+    ) -> None:
+        sqlite_path = DatabasePath(str(db_path))
+        postgres_dsn = DatabaseDsn("")
+        capture_repo = CaptureGroupRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        operation_repo = OperationCaptureRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        capture_repo.get_or_create_capture_group(
+            capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
+        )
+        for transaction_id in transaction_ids:
+            capture_repo.add_transaction(
+                capture_group_id,
+                TransactionId(transaction_id),
+                TimestampSec(DEFAULT_CREATED_EPOCH),
+            )
+        operation_repo.upsert_operation_capture(
+            operation_id,
+            capture_group_id,
+            TimestampSec(DEFAULT_CREATED_EPOCH),
+        )
+
 
 def _configure_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -616,24 +717,12 @@ def _configure_paths(
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -653,46 +742,12 @@ def _configure_paths(
     _DbFixture.initialize(sqlite_db)
 
     return {
-        "capture_group_db": capture_group_db,
-        "operation_db": operation_db,
         "database_sqlite_path": sqlite_db,
     }
 
 
-def _seed_operation(
-    operation_id: OperationId, capture_group_id: str, paths: dict[str, Path]
-) -> None:
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
 def _seed_transaction_db(transaction_id: str, paths: dict[str, Path]) -> None:
     _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
-
-
-def _seed_capture_group(
-    capture_group_id: str, transaction_ids: list[str], paths: dict[str, Path]
-) -> None:
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": transaction_ids,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
 
 
 def _complete_operation(operation_id: OperationId) -> None:
@@ -709,21 +764,23 @@ def _complete_operation(operation_id: OperationId) -> None:
     )
 
 
-def test_multi_channel_estimation_result_skips_missing_records_and_returns_200(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_multi_channel_estimation_result_returns_transactions_from_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
     client = TestClient(_build_app())
-    caplog.set_level("WARNING")
 
     operation_id = OperationId("op-300")
     capture_group_id = "group-300"
     txn_ok = "txn-ok"
-    txn_missing = "txn-missing"
 
-    _seed_operation(operation_id, capture_group_id, paths)
-    _seed_capture_group(capture_group_id, [txn_ok, txn_missing], paths)
     _seed_transaction_db(txn_ok, paths)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [txn_ok],
+    )
     _complete_operation(operation_id)
 
     response = client.post(
@@ -736,7 +793,6 @@ def test_multi_channel_estimation_result_skips_missing_records_and_returns_200(
     assert payload["capture_group_id"] == capture_group_id
     assert len(payload["transactions"]) == 1
     assert payload["transactions"][0]["transaction_id"] == txn_ok
-    assert "Missing transaction record for transaction_id" in caplog.text
 
 
 def test_multi_channel_estimation_result_returns_404_when_none_resolve(
@@ -747,11 +803,13 @@ def test_multi_channel_estimation_result_returns_404_when_none_resolve(
 
     operation_id = OperationId("op-301")
     capture_group_id = "group-301"
-    txn_missing = "txn-missing"
 
-    _seed_operation(operation_id, capture_group_id, paths)
-    _seed_capture_group(capture_group_id, [txn_missing], paths)
-    # No transaction records seeded.
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [],
+    )
     _complete_operation(operation_id)
 
     response = client.post(
@@ -763,7 +821,7 @@ def test_multi_channel_estimation_result_returns_404_when_none_resolve(
     assert "No transaction records found" in response.json()["detail"]
 
 
-def test_multi_channel_estimation_result_accepts_legacy_capture_group_key(
+def test_multi_channel_estimation_result_uses_db_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
@@ -773,19 +831,13 @@ def test_multi_channel_estimation_result_accepts_legacy_capture_group_key(
     capture_group_id = "group-302"
     txn_ok = "txn-ok-302"
 
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    _seed_capture_group(capture_group_id, [txn_ok], paths)
     _seed_transaction_db(txn_ok, paths)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [txn_ok],
+    )
     _complete_operation(operation_id)
 
     response = client.post(
@@ -804,7 +856,6 @@ def test_multi_channel_estimation_result_accepts_legacy_capture_group_key(
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -842,24 +893,12 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -947,8 +986,6 @@ def test_analysis_returns_capture_group_not_found_when_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _configure_paths(tmp_path, monkeypatch)
-    db_path = Path(SystemConfigSettings.operation_db())
-    db_path.write_text(json.dumps({}), encoding="utf-8")
 
     client = TestClient(_build_app())
     response = client.post(
@@ -1192,7 +1229,6 @@ def test_registry_cancel_endpoint_returns_dual_status_fields(
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -1203,6 +1239,10 @@ from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.ds.ofdm.rxmer.multi.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
+from pypnm.lib.db.capture_group_repository import (
+    CaptureGroupRepository,
+    OperationCaptureRepository,
+)
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
@@ -1229,6 +1269,7 @@ def _build_app() -> FastAPI:
 
 
 PNM_TEST_TYPE: str = "DS_OFDM_RXMER_PER_SUBCAR"
+DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
@@ -1278,6 +1319,36 @@ class _DbFixture:
             device_detail_id=device_detail_id,
         )
 
+    @staticmethod
+    def bind_operation(
+        db_path: Path,
+        operation_id: OperationId,
+        capture_group_id: str,
+        transaction_ids: list[str],
+    ) -> None:
+        sqlite_path = DatabasePath(str(db_path))
+        postgres_dsn = DatabaseDsn("")
+        capture_repo = CaptureGroupRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        operation_repo = OperationCaptureRepository.from_overrides(
+            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+        )
+        capture_repo.get_or_create_capture_group(
+            capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
+        )
+        for transaction_id in transaction_ids:
+            capture_repo.add_transaction(
+                capture_group_id,
+                TransactionId(transaction_id),
+                TimestampSec(DEFAULT_CREATED_EPOCH),
+            )
+        operation_repo.upsert_operation_capture(
+            operation_id,
+            capture_group_id,
+            TimestampSec(DEFAULT_CREATED_EPOCH),
+        )
+
 
 def _configure_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1288,24 +1359,12 @@ def _configure_paths(
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -1325,47 +1384,28 @@ def _configure_paths(
     _DbFixture.initialize(sqlite_db)
 
     return {
-        "capture_group_db": capture_group_db,
-        "operation_db": operation_db,
         "database_sqlite_path": sqlite_db,
     }
 
 
 def test_result_resolves_transactions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
     client = TestClient(_build_app())
-    caplog.set_level("WARNING")
-
     operation_id = OperationId("op-123")
     capture_group_id = "group-123"
-    transaction_id = "txn123"
-    missing_transaction_id = "txn-missing"
+    transaction_id_one = "txn-123-a"
+    transaction_id_two = "txn-123-b"
 
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id_one)
+    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id_two)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [transaction_id_two, transaction_id_one],
     )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id, missing_transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -1388,8 +1428,8 @@ def test_result_resolves_transactions(
     payload = response.json()
     assert payload["capture_group_id"] == capture_group_id
     assert payload["transactions"]
-    assert payload["transactions"][0]["transaction_id"] == transaction_id
-    assert "Missing transaction record for transaction_id" in caplog.text
+    assert payload["transactions"][0]["transaction_id"] == transaction_id_two
+    assert payload["transactions"][1]["transaction_id"] == transaction_id_one
     OperationRegistry.unregister(operation_id)
 
 
@@ -1401,31 +1441,12 @@ def test_result_rejects_when_no_transactions_resolve(
 
     operation_id = OperationId("op-124")
     capture_group_id = "group-124"
-    transaction_id = "txn-missing"
-
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [],
     )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    # No transaction records seeded.
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -1448,7 +1469,7 @@ def test_result_rejects_when_no_transactions_resolve(
     assert "No transaction records found" in response.json()["detail"]
 
 
-def test_result_resolves_transactions_with_legacy_key(
+def test_result_resolves_transactions_without_json_ledgers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     paths = _configure_paths(tmp_path, monkeypatch)
@@ -1458,29 +1479,13 @@ def test_result_resolves_transactions_with_legacy_key(
     capture_group_id = "group-125"
     transaction_id = "txn125"
 
-    paths["operation_db"].write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group": capture_group_id,
-                    "created": 1,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    paths["capture_group_db"].write_text(
-        json.dumps(
-            {
-                capture_group_id: {
-                    "created": 1,
-                    "transactions": [transaction_id],
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
     _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)
+    _DbFixture.bind_operation(
+        paths["database_sqlite_path"],
+        operation_id,
+        capture_group_id,
+        [transaction_id],
+    )
 
     store = OperationStore()
     store.create_operation(operation_id, progress_total=1, message="Operation created")
@@ -1539,24 +1544,12 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -1627,20 +1620,8 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db_dir = base_dir / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
-    )
     monkeypatch.setattr(
         SystemConfigSettings,
         "database_backend",
@@ -1658,7 +1639,7 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     DatabaseSchemaManager.from_system_config().initialize_schema()
 
-    return operation_db
+    return sqlite_db
 
 
 def test_operation_manager_writes_capture_group_id(
@@ -1681,7 +1662,6 @@ def test_operation_manager_writes_capture_group_id(
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -1710,13 +1690,7 @@ def _configure_operation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     db_dir = base_dir / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
-    )
     monkeypatch.setattr(
         SystemConfigSettings,
         "database_backend",
@@ -1733,7 +1707,20 @@ def _configure_operation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         classmethod(lambda cls: DatabaseDsn("")),
     )
     DatabaseSchemaManager.from_system_config().initialize_schema()
-    return operation_db
+    return sqlite_db
+
+
+def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_open = Path.open
+
+    def _guarded_open(
+        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
+    ) -> object:
+        if self.name in ("capture_group.json", "operation_capture.json"):
+            raise AssertionError(f"Unexpected JSON ledger access: {self}")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _guarded_open)
 
 
 def test_get_capture_group_prefers_db(
@@ -1758,59 +1745,22 @@ def test_get_capture_group_prefers_db(
     assert operation_repo.get_capture_group_id(operation_id) == capture_group_id
 
 
-def test_get_capture_group_returns_group_id_for_canonical_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    operation_db = _configure_operation_db(tmp_path, monkeypatch)
-    operation_id = OperationId("op-200")
-    capture_group_id = GroupId("group-200")
-
-    operation_db.write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group_id": str(capture_group_id),
-                    "created": DEFAULT_CREATED_EPOCH,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    resolved = OperationManager.get_capture_group(operation_id)
-    assert resolved == capture_group_id
-    operation_repo = OperationCaptureRepository.from_system_config()
-    assert operation_repo.get_capture_group_id(operation_id) == capture_group_id
-
-
-def test_get_capture_group_returns_group_id_for_legacy_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    operation_db = _configure_operation_db(tmp_path, monkeypatch)
-    operation_id = OperationId("op-201")
-    capture_group_id = GroupId("group-201")
-
-    operation_db.write_text(
-        json.dumps(
-            {
-                str(operation_id): {
-                    "capture_group": str(capture_group_id),
-                    "created": DEFAULT_CREATED_EPOCH,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    resolved = OperationManager.get_capture_group(operation_id)
-    assert resolved == capture_group_id
-
-
 def test_get_capture_group_returns_none_when_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _configure_operation_db(tmp_path, monkeypatch)
     operation_id = OperationId("op-202")
+
+    resolved = OperationManager.get_capture_group(operation_id)
+    assert resolved is None
+
+
+def test_get_capture_group_does_not_touch_json_ledgers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _configure_operation_db(tmp_path, monkeypatch)
+    _guard_json_ledgers(monkeypatch)
+    operation_id = OperationId("op-203")
 
     resolved = OperationManager.get_capture_group(operation_id)
     assert resolved is None
@@ -1885,24 +1835,12 @@ def _configure_operation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -2023,404 +1961,3 @@ async def test_capture_service_skips_whitespace_transaction_id_linking(
     repo = CaptureGroupRepository.from_system_config()
     assert repo.list_transactions(group_id) == []
     assert "Skipping capture_group link for empty transaction_id" in caplog.text
-
-# FILE: tests/test_transaction_id_persistence_guards.py
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
-
-from __future__ import annotations
-
-import json
-import sqlite3
-from pathlib import Path
-
-import pytest
-
-from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
-    PnmFileTransaction,
-)
-from pypnm.api.routes.common.classes.file_capture.session_group import SessionGroup
-from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.docsis.cable_modem import CableModem
-from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
-from pypnm.lib.inet import Inet
-from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
-from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
-
-
-def _configure_transaction_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    db_path = tmp_path / "pypnm.sqlite3"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_backend",
-        classmethod(lambda cls: DatabaseBackend.SQLITE),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_sqlite_path",
-        classmethod(lambda cls: DatabasePath(str(db_path))),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "database_postgres_dsn",
-        classmethod(lambda cls: DatabaseDsn("")),
-    )
-    DatabaseSchemaManager.from_system_config().initialize_schema()
-    return db_path
-
-
-def _configure_session_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    db_path = tmp_path / "session_group.json"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "session_group_db",
-        classmethod(lambda cls: str(db_path)),
-    )
-    return db_path
-
-
-def _empty_sha256() -> object:
-    class _Hasher:
-        def update(self, _data: bytes) -> None:
-            return None
-
-        def hexdigest(self) -> str:
-            return ""
-
-    return _Hasher()
-
-
-def test_session_group_skips_empty_transaction_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    db_path = _configure_session_db(tmp_path, monkeypatch)
-    caplog.set_level("WARNING")
-    group = SessionGroup()
-    session_id = group.create_session()
-
-    group.add_transaction("")
-    group.add_transaction("   ")
-    group.add_transaction("txn-1")
-
-    with db_path.open("r", encoding="utf-8") as handle:
-        db = json.load(handle)
-    assert db[session_id]["transactions"] == ["txn-1"]
-    assert (
-        "Skipping empty transaction_id persistence in session_group_db" in caplog.text
-    )
-
-
-def test_pnm_file_transaction_skips_empty_transaction_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    db_path = _configure_transaction_db(tmp_path, monkeypatch)
-    caplog.set_level("WARNING")
-    monkeypatch.setattr(
-        "pypnm.api.routes.common.classes.file_capture.pnm_file_transaction.hashlib.sha256",
-        lambda _data=None: _empty_sha256(),
-    )
-
-    txn_store = PnmFileTransaction()
-    cm = CableModem(
-        mac_address=MacAddress("aa:bb:cc:dd:ee:ff"),
-        inet=Inet("192.168.0.100"),
-        write_community="public",
-    )
-    txn_id = txn_store._insert_generic(
-        mac_address=cm.get_mac_address,
-        pnm_test_type=DocsPnmCmCtlTest.DS_OFDM_RXMER_PER_SUBCAR,
-        filename="rxmer.bin",
-    )
-
-    assert str(txn_id) == ""
-    assert "Skipping transaction insert for empty transaction_id" in caplog.text
-
-    connection = sqlite3.connect(db_path)
-    try:
-        cursor = connection.execute("SELECT COUNT(1) FROM transaction_records;")
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == 0
-    finally:
-        connection.close()
-
-
-def test_pnm_file_transaction_persists_valid_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    db_path = _configure_transaction_db(tmp_path, monkeypatch)
-    txn_store = PnmFileTransaction()
-    cm = CableModem(
-        mac_address=MacAddress("aa:bb:cc:dd:ee:ff"),
-        inet=Inet("192.168.0.100"),
-        write_community="public",
-    )
-    txn_id = txn_store._insert_generic(
-        mac_address=cm.get_mac_address,
-        pnm_test_type=DocsPnmCmCtlTest.DS_OFDM_RXMER_PER_SUBCAR,
-        filename="rxmer.bin",
-    )
-
-    connection = sqlite3.connect(db_path)
-    try:
-        cursor = connection.execute(
-            "SELECT COUNT(1) FROM transaction_records WHERE transaction_id = ?;",
-            (str(txn_id),),
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == 1
-    finally:
-        connection.close()
-
-# FILE: tests/test_transaction_repository.py
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2026 Maurice Garcia
-
-from __future__ import annotations
-
-import sqlite3
-from pathlib import Path
-from typing import cast
-
-from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
-from pypnm.lib.db.transaction_repository import (
-    DeviceDetailsRepository,
-    SystemDescriptionRepository,
-    TransactionRepository,
-)
-from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import (
-    DatabaseBackend,
-    DatabaseDsn,
-    DatabasePath,
-    FileName,
-    TimestampSec,
-    TransactionId,
-)
-
-PNM_TEST_TYPE: str = "DS_RXMER"
-
-SYS_DESCR: dict[str, str] = {
-    "HW_REV": "1.0",
-    "VENDOR": "ACME",
-    "BOOTR": "1.1",
-    "SW_REV": "2.0.1",
-    "MODEL": "ACME-123",
-}
-
-MAC_ONE = MacAddress("aa:bb:cc:dd:ee:ff")
-MAC_TWO = MacAddress("11:22:33:44:55:66")
-
-TRANSACTION_ONE = TransactionId("aaaaaaaaaaaaaaaa")
-TRANSACTION_TWO = TransactionId("bbbbbbbbbbbbbbbb")
-TRANSACTION_THREE = TransactionId("cccccccccccccccc")
-
-FILENAME_ONE = FileName("rxmer_one.bin")
-FILENAME_TWO = FileName("rxmer_two.bin")
-FILENAME_THREE = FileName("rxmer_three.bin")
-
-TIMESTAMP_ONE: int = 1700000000
-TIMESTAMP_TWO: int = 1700000100
-
-EXPECTED_SYS_DESCR_COUNT: int = 1
-EXPECTED_DEVICE_DETAILS_COUNT: int = 1
-EXPECTED_DISTINCT_MACS: int = 2
-
-
-class _RepoFixture:
-    @staticmethod
-    def build(
-        tmp_path: Path,
-    ) -> tuple[
-        SystemDescriptionRepository,
-        DeviceDetailsRepository,
-        TransactionRepository,
-        Path,
-    ]:
-        db_path = tmp_path / "pypnm.sqlite3"
-        sqlite_path = cast(DatabasePath, str(db_path))
-        postgres_dsn = cast(DatabaseDsn, "")
-
-        manager = DatabaseSchemaManager.from_overrides(
-            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-        )
-        manager.initialize_schema()
-
-        sys_repo = SystemDescriptionRepository.from_overrides(
-            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-        )
-        device_repo = DeviceDetailsRepository.from_overrides(
-            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-        )
-        txn_repo = TransactionRepository.from_overrides(
-            DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
-        )
-
-        return sys_repo, device_repo, txn_repo, db_path
-
-    @staticmethod
-    def insert_transaction(
-        sys_repo: SystemDescriptionRepository,
-        device_repo: DeviceDetailsRepository,
-        txn_repo: TransactionRepository,
-        transaction_id: TransactionId,
-        timestamp_epoch: int,
-        mac_address: MacAddress,
-        filename: FileName,
-        sysdescr: dict[str, str],
-    ) -> None:
-        sysdescr_id = sys_repo.get_or_create_sysdescr_id(sysdescr)
-        device_details: dict[str, object] = {"system_description": sysdescr}
-        device_detail_id = device_repo.get_or_create_device_detail_id(
-            device_details, sysdescr_id
-        )
-        txn_repo.insert_transaction(
-            transaction_id=transaction_id,
-            timestamp_epoch=TimestampSec(timestamp_epoch),
-            mac_address=mac_address,
-            pnm_test_type=PNM_TEST_TYPE,
-            filename=filename,
-            device_detail_id=device_detail_id,
-        )
-
-
-def test_sysdescr_dedup(tmp_path: Path) -> None:
-    sys_repo, device_repo, txn_repo, db_path = _RepoFixture.build(tmp_path)
-
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_ONE,
-        TIMESTAMP_ONE,
-        MAC_ONE,
-        FILENAME_ONE,
-        SYS_DESCR,
-    )
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_TWO,
-        TIMESTAMP_TWO,
-        MAC_ONE,
-        FILENAME_TWO,
-        SYS_DESCR,
-    )
-
-    connection = sqlite3.connect(db_path)
-    try:
-        cursor = connection.execute(
-            "SELECT COUNT(1) FROM system_description_dim WHERE is_unknown = 0;"
-        )
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == EXPECTED_SYS_DESCR_COUNT
-    finally:
-        connection.close()
-
-
-def test_device_details_dedup(tmp_path: Path) -> None:
-    sys_repo, device_repo, txn_repo, db_path = _RepoFixture.build(tmp_path)
-
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_ONE,
-        TIMESTAMP_ONE,
-        MAC_ONE,
-        FILENAME_ONE,
-        SYS_DESCR,
-    )
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_TWO,
-        TIMESTAMP_TWO,
-        MAC_TWO,
-        FILENAME_TWO,
-        SYS_DESCR,
-    )
-
-    connection = sqlite3.connect(db_path)
-    try:
-        cursor = connection.execute("SELECT COUNT(1) FROM device_details;")
-        row = cursor.fetchone()
-        assert row is not None
-        assert int(row[0]) == EXPECTED_DEVICE_DETAILS_COUNT
-    finally:
-        connection.close()
-
-
-def test_list_macs_returns_distinct(tmp_path: Path) -> None:
-    sys_repo, device_repo, txn_repo, _db_path = _RepoFixture.build(tmp_path)
-
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_ONE,
-        TIMESTAMP_ONE,
-        MAC_ONE,
-        FILENAME_ONE,
-        SYS_DESCR,
-    )
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_TWO,
-        TIMESTAMP_TWO,
-        MAC_ONE,
-        FILENAME_TWO,
-        SYS_DESCR,
-    )
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_THREE,
-        TIMESTAMP_TWO,
-        MAC_TWO,
-        FILENAME_THREE,
-        SYS_DESCR,
-    )
-
-    mac_entries = txn_repo.list_macs()
-    assert len(mac_entries) == EXPECTED_DISTINCT_MACS
-    macs = {entry.mac_address for entry in mac_entries}
-    assert str(MAC_ONE) in macs
-    assert str(MAC_TWO) in macs
-
-
-def test_list_transactions_for_mac_orders_by_timestamp(tmp_path: Path) -> None:
-    sys_repo, device_repo, txn_repo, _db_path = _RepoFixture.build(tmp_path)
-
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_ONE,
-        TIMESTAMP_TWO,
-        MAC_ONE,
-        FILENAME_ONE,
-        SYS_DESCR,
-    )
-    _RepoFixture.insert_transaction(
-        sys_repo,
-        device_repo,
-        txn_repo,
-        TRANSACTION_TWO,
-        TIMESTAMP_ONE,
-        MAC_ONE,
-        FILENAME_TWO,
-        SYS_DESCR,
-    )
-
-    records = txn_repo.list_transactions_for_mac(MAC_ONE)
-    timestamps = [int(record.timestamp_epoch) for record in records]
-    assert timestamps == [TIMESTAMP_ONE, TIMESTAMP_TWO]

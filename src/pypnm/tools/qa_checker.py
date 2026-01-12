@@ -40,7 +40,9 @@ def _run_command(label: str, cmd: list[str]) -> int:
         return 127
 
 
-def _build_commands(include_pyright: bool, pytest_args: list[str]) -> list[Command]:
+def _build_commands(
+    include_pyright: bool, include_pylint: bool, pytest_args: list[str]
+) -> list[Command]:
     """
     Build The Ordered List Of QA Commands To Run.
 
@@ -69,6 +71,14 @@ def _build_commands(include_pyright: bool, pytest_args: list[str]) -> list[Comma
     if include_pyright:
         # Insert Pyright after Ruff but before loop nesting and pytest for faster feedback.
         commands.append(("pyright", ["pyright"]))
+
+    if include_pylint:
+        commands.append(
+            (
+                "pylint",
+                ["pylint", "--rcfile=.pylintrc", "src/pypnm/lib/db/transaction_repository.py"],
+            )
+        )
 
     commands.append(("loop-nesting", [python_cmd, "-m", "pypnm.tools.loop_nesting_checker", "src"]))
     commands.append(("pytest", ["pytest", *pytest_args]))
@@ -105,6 +115,15 @@ def main() -> None:
     - pyright              - static type analysis using [tool.pyright] settings,
                              executed after Ruff but before loop nesting and pytest.
 
+    Optional Pylint (Magic Values)
+    ------------------------------
+    To enable magic-value checks with Pylint, pass the flag:
+
+        pypnm-software-qa-checker --with-pylint
+
+    This runs the Pylint magic-value extension (R2004) using the
+    .pylintrc configuration, after Ruff but before loop nesting.
+
     Passing Extra Pytest Arguments
     ------------------------------
     To pass additional arguments directly to pytest, use ``--`` as a separator.
@@ -129,12 +148,17 @@ def main() -> None:
         pytest_args = raw_args[sep_index + 1 :]
 
     include_pyright = "--with-pyright" in qa_args
-    filtered_qa_args = [a for a in qa_args if a != "--with-pyright"]
+    include_pylint = "--with-pylint" in qa_args
+    filtered_qa_args = [a for a in qa_args if a not in {"--with-pyright", "--with-pylint"}]
 
     # Preserve a minimal sys.argv for any downstream libraries that inspect it.
     sys.argv = [sys.argv[0], *filtered_qa_args]
 
-    commands = _build_commands(include_pyright=include_pyright, pytest_args=pytest_args)
+    commands = _build_commands(
+        include_pyright=include_pyright,
+        include_pylint=include_pylint,
+        pytest_args=pytest_args,
+    )
 
     overall_rc = 0
     for label, cmd in commands:

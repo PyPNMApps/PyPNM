@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Hardened the Postgres SQL splitter to handle escaped single quotes, stricter dollar-quote tags, and transaction-control variants, and expanded tests to validate the new parsing behaviors.
 

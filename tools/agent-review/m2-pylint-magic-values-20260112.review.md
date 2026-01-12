@@ -1,3 +1,243 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+# FILE: .pylintrc
+[MASTER]
+load-plugins=pylint.extensions.magic_value
+
+[MESSAGES CONTROL]
+disable=all
+enable=magic-value-comparison
+
+[MAGIC_VALUE]
+valid-magic-values="-1,0,1,__main__"
+
+# FILE: pyproject.toml
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "pypnm-docsis"
+version         = "1.0.20.0"
+description     = "DOCSIS 3.x/4.0 Proactive Network Maintenance Toolkit"
+readme          = "README.md"
+requires-python = ">=3.10"
+license         = "Apache-2.0"
+
+authors = [
+  { name = "Maurice Garcia", email = "mgarcia01752@outlook.com" }
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+  "Framework :: FastAPI",
+  "Topic :: System :: Networking",
+  "Typing :: Typed",
+]
+
+license-files = ["LICENSE", "NOTICE"]
+
+dependencies = [
+  "fastapi==0.115.12",
+  "uvicorn[standard]==0.34.2",
+  "python-multipart>=0.0.20",
+  "numpy==2.2.6",
+  "scipy==1.15.1",
+  "pydantic>=2.12.4,<2.13",
+  "pysmi==1.6.1",
+  "pysnmp==7.1.17",
+  "python-dotenv>=1.0.0",
+  "psycopg[binary]==3.2.3",
+  "requests==2.32.3",
+  "pandas==2.2.3",
+  "paramiko==3.5.1",
+  "tftpy==0.8.5",
+  "matplotlib==3.10.8",
+  "typing-extensions>=4.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "pytest-asyncio>=0.23.5",
+  "black>=24.0.0",
+  "pydantic-settings>=2.6.0",
+  "pylint>=4.0.4",
+  "ruff>=0.14.7",
+  "pycycle>=0.0.8",
+  "pyright>=1.1.407",
+  "pyyaml>=6.0.2",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "pymdown-extensions>=10.8",
+]
+reports = []
+
+[project.urls]
+Homepage    = "https://www.pypnm.io"
+Repository  = "https://github.com/PyPNMApps/PyPNM"
+Bug-Tracker = "https://github.com/PyPNMApps/PyPNM/issues"
+Documentation = "https://www.pypnm.io"
+
+[project.scripts]
+pypnm      = "pypnm.cli:main"
+docs-serve = "mkdocs.__main__:serve"
+docs-build = "mkdocs.__main__:build"
+pypnm-software-qa-checker  = "pypnm.tools.qa_checker:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where   = ["src"]
+include = ["pypnm*"]
+
+[tool.setuptools.package-data]
+"pypnm" = [
+  "settings/*.json",
+  "py.typed",
+]
+
+[tool.pytest.ini_options]
+minversion   = "8.0"
+pythonpath   = ["src"]
+testpaths    = ["tests"]
+addopts      = "-ra -q --strict-markers --tb=short -m 'not cm_it'"
+asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s:%(lineno)d | %(message)s"
+log_cli_date_format = "%H:%M:%S"
+markers = [
+  "asyncio: mark test as asyncio-based (requires pytest-asyncio)",
+  "cm_it: cable modem integration tests (enable with -m cm_it)",
+  "slow: slow tests",
+  "net: network-required tests",
+  "pnm: PNM file parsing tests",
+]
+filterwarnings = [
+  "ignore:getReadersFromUrls is deprecated:DeprecationWarning:pysnmp",
+  "ignore:smiV1Relaxed is deprecated:DeprecationWarning:pysnmp",
+  "ignore:.*getReadersFromUrls.*:DeprecationWarning:pysmi.reader.url",
+  "ignore:.*addSources.*:DeprecationWarning:pysnmp.smi.compiler",
+  "ignore:.*addSearchers.*:DeprecationWarning:pysnmp.smi.compiler",
+  "ignore:.*addBorrowers.*:DeprecationWarning:pysnmp.smi.compiler",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["pypnm"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+src            = ["src"]
+target-version = "py310"
+exclude        = [
+  "tools",
+  "src/pypnm/lib/matplot/manager.py",
+  "src/pypnm/lib/csv/manager.py",
+  "src/pypnm/api/routes/common/extended/common_messaging_service.py",
+  "src/pypnm/api/routes/common/extended/common_measure_service.py",
+  "src/pypnm/examples/",
+]
+
+[tool.ruff.lint]
+# Common, high-signal rulesets:
+# F   = Pyflakes (real errors)
+# E,W = pycodestyle
+# I   = import sorting
+# B   = flake8-bugbear
+# UP  = pyupgrade
+#
+# Ignore:
+# E501 - https://docs.astral.sh/ruff/rules/line-too-long/
+# B006 - https://docs.astral.sh/ruff/rules/mutable-argument-default/
+#
+# ---------------------------------------------------------------------------
+# Ruff Roadmap (do NOT enable by default; turn on gradually when ready)
+# ---------------------------------------------------------------------------
+# Phase 1 (current):
+#   - Focus on correctness + core style only.
+#   - Enabled rule families:
+#       F, E, W, I, B, UP
+#
+# Phase 2 (optional): Naming rules
+#   - Add N (pep8-naming) when public API naming is stable.
+#   - This enforces conventional names for functions, classes, etc.
+#   - Example change (for later, DO NOT UNCOMMENT YET):
+#       select = ["F", "E", "W", "I", "B", "UP", "N"]
+#
+# Phase 3 (optional): Type-annotation rules
+#   - Add ANN to enforce more consistent type hints once F/E/W noise is low.
+#   - You can selectively ignore strict ANN codes if needed (e.g., ANN101/ANN102).
+#   - Example (for later):
+#       select = ["F", "E", "W", "I", "B", "UP", "ANN"]
+#       ignore = ["E501", "B006", "ANN101", "ANN102"]
+#
+# Phase 4 (optional): Simplification & performance hints
+#   - Enable SIM (flake8-simplify) to flag redundant or over-complicated logic.
+#   - Enable PERF to catch obvious performance footguns in hot paths.
+#   - Recommended approach:
+#       - First, run ad-hoc from CLI without adding to select:
+#           ruff check src --select SIM,PERF
+#       - Fix only the diagnostics you agree with.
+#   - If you like the results, you can later extend select:
+#       select = ["F", "E", "W", "I", "B", "UP", "N", "ANN", "SIM", "PERF"]
+#
+# Packs to generally avoid for PyPNM (unless explicitly desired later):
+#   - D (pydocstyle): conflicts with custom docstring rules.
+#   - C90 / PL (mccabe / pylint families): very noisy, low signal for this project.
+
+select = ["F", "E", "W", "I", "B", "UP", "ANN", "SIM", "PERF"]
+ignore = [
+  "E501",
+  "B006"
+]
+
+[tool.pyright]
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+
+include = ["src"]
+exclude = [
+  "tools",
+  "src/pypnm/examples/",
+  "**/__pycache__",
+]
+
+# VSCode + .env venv
+venvPath = "."
+venv = ".env"
+
+reportMissingImports = "warning"
+reportMissingTypeStubs = "warning"
+typeCheckingMode = "basic"
+
+# FILE: src/pypnm/lib/db/transaction_repository.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Maurice Garcia
 
@@ -742,3 +982,184 @@ class TransactionRepository(_RepositoryBase):
         for key, value in sysdesc.items():
             cleaned[str(key)] = str(value)
         return cleaned or None
+
+# FILE: src/pypnm/tools/qa_checker.py
+# SPDX-License-Identifier: Apache-2.0
+
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+
+Command = tuple[str, list[str]]
+
+
+def _run_command(label: str, cmd: list[str]) -> int:
+    """
+    Run A Single QA Tool Command And Stream Its Output.
+
+    Parameters
+    ----------
+    label : str
+        Human-readable label for the tool (e.g., "ruff", "pyright").
+    cmd : Sequence[str]
+        The command and arguments to execute.
+
+    Returns
+    -------
+    int
+        The process return code (0 on success, non-zero on failure).
+    """
+    print(f"\n=== [{label}] running: {' '.join(cmd)} ===", flush=True)
+    try:
+        proc = subprocess.run(cmd, check=False)
+        if proc.returncode == 0:
+            print(f"=== [{label}] OK ===", flush=True)
+        else:
+            print(f"=== [{label}] FAILED (exit code {proc.returncode}) ===", flush=True)
+        return proc.returncode
+    except FileNotFoundError:
+        print(f"=== [{label}] NOT FOUND on PATH ===", flush=True)
+        return 127
+
+
+def _build_commands(
+    include_pyright: bool, include_pylint: bool, pytest_args: list[str]
+) -> list[Command]:
+    """
+    Build The Ordered List Of QA Commands To Run.
+
+    Parameters
+    ----------
+    include_pyright : bool
+        If True, include a `pyright` static type-check step after Ruff.
+    pytest_args : Sequence[str]
+        Additional arguments to pass through to pytest (for example, via
+        the CLI separator ``--``).
+
+    Returns
+    -------
+    list[Command]
+        Ordered list of (label, cmd) tuples to execute.
+    """
+    python_cmd = sys.executable or "python"
+    commands: list[Command] = [
+        ("secrets", ["./tools/security/scan-secrets.sh"]),
+        ("enc-secrets", [python_cmd, "./tools/security/scan-enc-secrets.py"]),
+        ("macs", ["./tools/security/scan-mac-addresses.py", "--fail-on-found"]),
+        ("headers", [python_cmd, "./tools/maintenance/add-required-python-headers.py"]),
+        ("ruff", ["ruff", "check", "src"]),
+    ]
+
+    if include_pyright:
+        # Insert Pyright after Ruff but before loop nesting and pytest for faster feedback.
+        commands.append(("pyright", ["pyright"]))
+
+    if include_pylint:
+        commands.append(
+            (
+                "pylint",
+                ["pylint", "--rcfile=.pylintrc", "src/pypnm/lib/db/transaction_repository.py"],
+            )
+        )
+
+    commands.append(("loop-nesting", [python_cmd, "-m", "pypnm.tools.loop_nesting_checker", "src"]))
+    commands.append(("pytest", ["pytest", *pytest_args]))
+
+    return commands
+
+
+def main() -> None:
+    """
+    Run The Standard PyPNM Software QA Suite.
+
+    Default Behavior
+    ----------------
+    By default, this helper aggregates the core quality checks configured for
+    the project:
+
+    1) secrets             - secret scanning via ./tools/security/scan-secrets.sh
+                             (gitleaks + .gitleaks.toml if available).
+    2) enc-secrets         - encrypted password pattern scan (ENC[v1] + password_enc).
+    3) macs                - repository scan for non-approved MAC addresses.
+    4) headers             - ensure SPDX/license headers (./tools/maintenance/add-required-python-headers.py).
+    5) ruff check src      - syntax, style, and common bug patterns.
+    6) loop nesting        - ensure no function exceeds 3+ nested loops.
+    7) pytest              - unit tests (pytest options from pyproject.toml).
+
+    Optional Pyright
+    ----------------
+    To enable static type checking with Pyright, pass the flag:
+
+        pypnm-software-qa-checker --with-pyright
+
+    This will run an additional step:
+
+    - pyright              - static type analysis using [tool.pyright] settings,
+                             executed after Ruff but before loop nesting and pytest.
+
+    Optional Pylint (Magic Values)
+    ------------------------------
+    To enable magic-value checks with Pylint, pass the flag:
+
+        pypnm-software-qa-checker --with-pylint
+
+    This runs the Pylint magic-value extension (R2004) using the
+    .pylintrc configuration, after Ruff but before loop nesting.
+
+    Passing Extra Pytest Arguments
+    ------------------------------
+    To pass additional arguments directly to pytest, use ``--`` as a separator.
+    Any arguments after ``--`` are forwarded only to pytest. For example:
+
+        pypnm-software-qa-checker --with-pyright -- -k \"fast\" --maxfail=1
+
+    In this example, pytest will be invoked as:
+
+        pytest -k \"fast\" --maxfail=1
+
+    The process exit code is non-zero if any check fails.
+    """
+    raw_args = sys.argv[1:]
+
+    pytest_args: list[str] = []
+    qa_args: list[str] = raw_args
+
+    if "--" in raw_args:
+        sep_index = raw_args.index("--")
+        qa_args = raw_args[:sep_index]
+        pytest_args = raw_args[sep_index + 1 :]
+
+    include_pyright = "--with-pyright" in qa_args
+    include_pylint = "--with-pylint" in qa_args
+    filtered_qa_args = [a for a in qa_args if a not in {"--with-pyright", "--with-pylint"}]
+
+    # Preserve a minimal sys.argv for any downstream libraries that inspect it.
+    sys.argv = [sys.argv[0], *filtered_qa_args]
+
+    commands = _build_commands(
+        include_pyright=include_pyright,
+        include_pylint=include_pylint,
+        pytest_args=pytest_args,
+    )
+
+    overall_rc = 0
+    for label, cmd in commands:
+        rc = _run_command(label, cmd)
+        if rc != 0 and overall_rc == 0:
+            overall_rc = rc
+
+    print("\n=== PyPNM Software QA Suite Finished ===", flush=True)
+    if overall_rc == 0:
+        print("All checks passed.", flush=True)
+    else:
+        print(f"One or more checks failed (exit code {overall_rc}).", flush=True)
+
+    sys.exit(overall_rc)
+
+
+if __name__ == "__main__":
+    main()

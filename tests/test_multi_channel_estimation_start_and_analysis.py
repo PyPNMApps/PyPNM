@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -41,24 +40,12 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pnm_dir.mkdir(parents=True, exist_ok=True)
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
     monkeypatch.setattr(
         SystemConfigSettings,
         "pnm_dir",
         classmethod(lambda cls: str(pnm_dir)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
@@ -146,8 +133,6 @@ def test_analysis_returns_capture_group_not_found_when_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _configure_paths(tmp_path, monkeypatch)
-    db_path = Path(SystemConfigSettings.operation_db())
-    db_path.write_text(json.dumps({}), encoding="utf-8")
 
     client = TestClient(_build_app())
     response = client.post(

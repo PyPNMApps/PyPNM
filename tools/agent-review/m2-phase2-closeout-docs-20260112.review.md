@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+# FILE: docs/issues/index.md
 # Reporting Issues
 
 If you encounter a bug or unexpected behavior while using PyPNM, please report it
@@ -29,3 +36,8 @@ The canonical MAC address stored in `transaction_records` is a lowercase string.
 Earlier builds could persist a non-string value when `PnmFileTransaction.insert`
 was passed a callable. Upgrade to a build with the fix and re-run captures to
 refresh affected entries.
+
+# FILE: docs/todo/todo.md
+# TODO
+
+- None.

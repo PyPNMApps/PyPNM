@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Wired multi-ChannelEstimation result resolution to the hardened workflow path with capture-group mapping, missing-record filtering, and 404 when no transactions resolve, while keeping existing capture service usage intact. Updated start responses to include capture_group_id and documented the result behavior with new regression tests.
 

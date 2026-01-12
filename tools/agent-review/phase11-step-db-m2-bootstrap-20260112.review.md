@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a runtime DB schema bootstrap hook with health validation, applied SQLite WAL and busy_timeout pragmas on connect, and extended schema manager tests to cover pragmas plus schema version mismatch errors.
 

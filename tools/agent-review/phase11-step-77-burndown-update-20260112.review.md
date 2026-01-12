@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Updated the Phase 7.7 burndown tracker section with recent completions, remaining TODOs, and validation gate details.
 

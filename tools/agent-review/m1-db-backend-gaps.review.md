@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Aligned DB backend change set with policy and config hygiene: demo paths now use a single demo root, legacy plaintext passwords are logged as deprecated, JSON type aliases were consolidated, and documentation/install help were updated for consistency.
 

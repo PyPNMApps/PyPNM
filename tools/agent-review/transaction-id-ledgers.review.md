@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added empty/whitespace transaction_id guards to session_group and transaction_db persistence, plus tests and doc note to standardize the contract across JSON ledgers.
 

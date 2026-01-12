@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Removed the duplicated Workflow Summary block in the multi-capture operation doc to keep a single source of truth.
 

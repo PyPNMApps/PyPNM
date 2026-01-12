@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Adjusted Multi-DS-Channel-Estimation workflow semantics to use ServiceStatusCode for start responses, handle missing capture groups via None checks, and de-scope the legacy measure payload while documenting canonical capture_group_id usage. Added start/analysis tests and updated docs for legacy fields and result behavior.
 

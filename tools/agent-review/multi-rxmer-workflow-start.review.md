@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal:
+- Changes:
+- Files:
+- Tests:
+- Notes:
+
 ### Summary
 Added a multi-RxMER workflow start/result API under the DS/OFDM path, introduced protocol-typed operation registry entries, and wired result resolution through capture-group records. Added tests for start and result endpoints and documented the new routes and registry behavior.
 

@@ -20,20 +20,8 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db_dir = base_dir / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
 
-    capture_group_db = db_dir / "capture_group.json"
-    operation_db = db_dir / "operation_capture.json"
     sqlite_db = db_dir / "pypnm.sqlite3"
 
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "capture_group_db",
-        classmethod(lambda cls: str(capture_group_db)),
-    )
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "operation_db",
-        classmethod(lambda cls: str(operation_db)),
-    )
     monkeypatch.setattr(
         SystemConfigSettings,
         "database_backend",
@@ -51,7 +39,7 @@ def _configure_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     DatabaseSchemaManager.from_system_config().initialize_schema()
 
-    return operation_db
+    return sqlite_db
 
 
 def test_operation_manager_writes_capture_group_id(
