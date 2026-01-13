@@ -8,10 +8,8 @@ from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
     PnmFileTransaction,
 )
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
-from pypnm.lib.db.capture_group_repository import (
-    CaptureGroupRepository,
-    OperationCaptureRepository,
-)
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.types import GroupId, OperationId, TransactionId
 
 

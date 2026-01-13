@@ -41,6 +41,8 @@ _REQUIRED_TABLES: tuple[str, ...] = (
     "capture_groups",
     "capture_group_transactions",
     "operation_captures",
+    "session_groups",
+    "session_group_transactions",
     "artifact_stores",
     "file_artifacts",
     "transaction_artifacts",

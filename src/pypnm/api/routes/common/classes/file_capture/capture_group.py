@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class CaptureGroup:
 
         # Existing session
         cg2 = CaptureGroup(group_id=group_id)
-        txns = cg2.get_transactions()
+        txns = cg2.getTransactionIds()
     """
 
     def __init__(
@@ -47,6 +47,10 @@ class CaptureGroup:
             OSError: If the parent directory cannot be created.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
+        if db_path is not None:
+            self.logger.warning(
+                "Deprecated db_path override ignored; DB is authoritative"
+            )
 
         self._repo = CaptureGroupRepository.from_system_config()
         self._transaction_repo = TransactionRepository.from_system_config()
@@ -78,7 +82,7 @@ class CaptureGroup:
         """
         gid = self.get_group_id()
         created_epoch = TimestampSec(int(time.time()))
-        self._repo.get_or_create_capture_group(gid, created_epoch)
+        self._repo.create_capture_group(gid, created_epoch)
         self.logger.info(f"Created new group: {gid}")
         return gid
 
@@ -101,7 +105,9 @@ class CaptureGroup:
             )
             return
         created_epoch = TimestampSec(int(time.time()))
-        self._repo.add_transaction(gid, TransactionId(tx_id), created_epoch)
+        self._repo.add_transaction_next_position(
+            gid, TransactionId(tx_id), created_epoch
+        )
         self.logger.debug(f"Added txn {tx_id} to group {gid}")
 
     def getTransactionIds(self) -> list[TransactionId]:
@@ -130,6 +136,6 @@ class CaptureGroup:
         Remove groups older than the given age (seconds).
         """
         cutoff = TimestampSec(int(time.time()) - seconds)
-        deleted_count = self._repo.prune_older_than(cutoff)
-        if deleted_count:
-            self.logger.info(f"Pruned groups: {deleted_count}")
+        deleted = self._repo.delete_older_than(cutoff)
+        if deleted:
+            self.logger.info(f"Pruned groups: {len(deleted)}")

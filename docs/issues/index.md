@@ -23,6 +23,12 @@ keys are not accepted by live endpoints. Use the offline migrator or re-run the
 capture workflow on a DB-backed build to populate the operation-to-group
 mapping in the database.
 
+### Session group mappings missing after upgrade
+
+Runtime no longer reads `session_group.json`; session groups are DB-backed. Use
+the offline migrator (`python -m pypnm.tools.migrate_session_groups --input
+PATH`) or re-run the session workflow to repopulate the DB.
+
 ### Transaction records store an unexpected MAC address value
 
 The canonical MAC address stored in `transaction_records` is a lowercase string.

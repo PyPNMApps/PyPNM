@@ -12,11 +12,9 @@ from fastapi.testclient import TestClient
 from pypnm.api.routes.advance.multi_ds_chan_est.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
-from pypnm.lib.db.capture_group_repository import (
-    CaptureGroupRepository,
-    OperationCaptureRepository,
-)
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
     SystemDescriptionRepository,
@@ -29,6 +27,7 @@ from pypnm.lib.types import (
     DatabaseDsn,
     DatabasePath,
     FileName,
+    GroupId,
     OperationId,
     TimestampSec,
     TransactionId,
@@ -44,6 +43,7 @@ def _build_app() -> FastAPI:
 PNM_TEST_TYPE: str = "DS_OFDM_CHAN_EST_COEF"
 DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
+POSITION_START: int = 0
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
     "VENDOR": "LANCity",
@@ -96,7 +96,7 @@ class _DbFixture:
     def bind_operation(
         db_path: Path,
         operation_id: OperationId,
-        capture_group_id: str,
+        capture_group_id: GroupId,
         transaction_ids: list[str],
     ) -> None:
         sqlite_path = DatabasePath(str(db_path))
@@ -110,13 +110,16 @@ class _DbFixture:
         capture_repo.get_or_create_capture_group(
             capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
         )
-        for transaction_id in transaction_ids:
+        for position, transaction_id in enumerate(
+            transaction_ids, start=POSITION_START
+        ):
             capture_repo.add_transaction(
                 capture_group_id,
                 TransactionId(transaction_id),
+                position,
                 TimestampSec(DEFAULT_CREATED_EPOCH),
             )
-        operation_repo.upsert_operation_capture(
+        operation_repo.create_operation_capture(
             operation_id,
             capture_group_id,
             TimestampSec(DEFAULT_CREATED_EPOCH),
@@ -186,7 +189,7 @@ def test_multi_channel_estimation_result_returns_transactions_from_db(
     client = TestClient(_build_app())
 
     operation_id = OperationId("op-300")
-    capture_group_id = "group-300"
+    capture_group_id = GroupId("group-300")
     txn_ok = "txn-ok"
 
     _seed_transaction_db(txn_ok, paths)
@@ -217,7 +220,7 @@ def test_multi_channel_estimation_result_returns_404_when_none_resolve(
     client = TestClient(_build_app())
 
     operation_id = OperationId("op-301")
-    capture_group_id = "group-301"
+    capture_group_id = GroupId("group-301")
 
     _DbFixture.bind_operation(
         paths["database_sqlite_path"],
@@ -243,7 +246,7 @@ def test_multi_channel_estimation_result_uses_db_only(
     client = TestClient(_build_app())
 
     operation_id = OperationId("op-302")
-    capture_group_id = "group-302"
+    capture_group_id = GroupId("group-302")
     txn_ok = "txn-ok-302"
 
     _seed_transaction_db(txn_ok, paths)

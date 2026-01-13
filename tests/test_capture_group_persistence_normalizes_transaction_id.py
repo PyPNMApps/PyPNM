@@ -32,6 +32,12 @@ from pypnm.lib.types import (
 
 DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
+POSITION_FIRST: int = 0
+POSITION_SECOND: int = 1
+POSITION_THIRD: int = 2
+ADDED_EPOCH_FIRST: int = 1
+ADDED_EPOCH_SECOND: int = 2
+ADDED_EPOCH_THIRD: int = 3
 PNM_TEST_TYPE: str = "DS_RXMER"
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
@@ -130,7 +136,12 @@ def test_resolver_filters_whitespace_transaction_ids(
     group_id = GroupId("group-1")
     repo = CaptureGroupRepository.from_system_config()
     repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
-    repo.add_transaction(group_id, TransactionId("txn123"), TimestampSec(2))
+    repo.add_transaction(
+        group_id,
+        TransactionId("txn123"),
+        POSITION_FIRST,
+        TimestampSec(ADDED_EPOCH_SECOND),
+    )
 
     resolver = OperationCaptureGroupResolver()
     txns = resolver.get_transaction_ids_for_capture_group(group_id)
@@ -147,8 +158,18 @@ def test_resolver_prefers_db_transaction_order(
     repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
     _insert_transaction(db_path, "txn-b")
     _insert_transaction(db_path, "txn-a")
-    repo.add_transaction(group_id, TransactionId("txn-b"), TimestampSec(2))
-    repo.add_transaction(group_id, TransactionId("txn-a"), TimestampSec(3))
+    repo.add_transaction(
+        group_id,
+        TransactionId("txn-b"),
+        POSITION_FIRST,
+        TimestampSec(ADDED_EPOCH_SECOND),
+    )
+    repo.add_transaction(
+        group_id,
+        TransactionId("txn-a"),
+        POSITION_SECOND,
+        TimestampSec(ADDED_EPOCH_THIRD),
+    )
 
     resolver = OperationCaptureGroupResolver()
     txns = resolver.get_transaction_ids_for_capture_group(group_id)
@@ -165,7 +186,12 @@ def test_resolver_does_not_touch_json_ledgers(
     _insert_transaction(db_path, "txn-json-guard")
     repo = CaptureGroupRepository.from_system_config()
     repo.get_or_create_capture_group(group_id, TimestampSec(DEFAULT_CREATED_EPOCH))
-    repo.add_transaction(group_id, TransactionId("txn-json-guard"), TimestampSec(1))
+    repo.add_transaction(
+        group_id,
+        TransactionId("txn-json-guard"),
+        POSITION_FIRST,
+        TimestampSec(ADDED_EPOCH_FIRST),
+    )
 
     resolver = OperationCaptureGroupResolver()
     txns = resolver.get_transaction_ids_for_capture_group(group_id)

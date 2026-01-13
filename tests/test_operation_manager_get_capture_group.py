@@ -9,11 +9,9 @@ import pytest
 
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.db.capture_group_repository import (
-    CaptureGroupRepository,
-    OperationCaptureRepository,
-)
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.types import (
     DatabaseBackend,
     DatabaseDsn,
@@ -76,7 +74,7 @@ def test_get_capture_group_prefers_db(
         capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
     )
     operation_repo = OperationCaptureRepository.from_system_config()
-    operation_repo.upsert_operation_capture(
+    operation_repo.create_operation_capture(
         operation_id, capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
     )
 

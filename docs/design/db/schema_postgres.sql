@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS capture_group_transactions (
 CREATE INDEX IF NOT EXISTS idx_cg_tx_capture_group_id
 ON capture_group_transactions (capture_group_id);
 
+CREATE INDEX IF NOT EXISTS idx_cg_tx_capture_group_position
+ON capture_group_transactions (capture_group_id, position);
+
 CREATE INDEX IF NOT EXISTS idx_cg_tx_transaction_id
 ON capture_group_transactions (transaction_id);
 
@@ -114,6 +117,32 @@ CREATE TABLE IF NOT EXISTS operation_captures (
 
 CREATE INDEX IF NOT EXISTS idx_operation_captures_capture_group_id
 ON operation_captures (capture_group_id);
+
+CREATE INDEX IF NOT EXISTS idx_operation_captures_operation_id
+ON operation_captures (operation_id);
+
+CREATE TABLE IF NOT EXISTS session_groups (
+    session_id     TEXT   PRIMARY KEY,
+    created_epoch  BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_groups_created_epoch
+ON session_groups (created_epoch);
+
+CREATE TABLE IF NOT EXISTS session_group_transactions (
+    session_group_transaction_id  BIGSERIAL PRIMARY KEY,
+    session_id                    TEXT     NOT NULL REFERENCES session_groups(session_id) ON DELETE CASCADE,
+    transaction_id                TEXT     NOT NULL REFERENCES transaction_records(transaction_id) ON DELETE CASCADE,
+    added_epoch                   BIGINT   NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT),
+
+    CONSTRAINT uq_session_group_transaction UNIQUE (session_id, transaction_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sg_tx_session_order
+ON session_group_transactions (session_id, added_epoch, transaction_id);
+
+CREATE INDEX IF NOT EXISTS idx_sg_tx_transaction_id
+ON session_group_transactions (transaction_id);
 
 -- ---------------------------------------------------------------------------
 -- Artifact linkage (file system integration)

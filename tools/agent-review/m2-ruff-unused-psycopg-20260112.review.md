@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Resolve ruff unused import in Postgres-gated schema test.
+- Changes: Swapped psycopg import check to importlib.util.find_spec to avoid unused import.
+- Files: tests/test_db_schema_manager.py
+- Tests: Not run (user ran ruff check --fix and reported error).
+- Notes: None.
+
+# FILE: tests/test_db_schema_manager.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from pathlib import Path
 
@@ -17,14 +16,38 @@ from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.session_group_repository import SessionGroupRepository
+from pypnm.lib.db.transaction_repository import (
+    DeviceDetailsRepository,
+    SystemDescriptionRepository,
+    TransactionRepository,
+)
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
+from pypnm.lib.types import (
+    DatabaseBackend,
+    DatabaseDsn,
+    DatabasePath,
+    FileName,
+    TimestampSec,
+    TransactionId,
+)
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 
 _TRANSACTION_ID_LENGTH: int = 16
 _TIME_NS_FIRST: int = 100
 _TIME_NS_SECOND: int = 101
+DEFAULT_TIMESTAMP: int = 12
+PNM_TEST_TYPE: str = "DS_RXMER"
+SYS_DESCR: dict[str, str] = {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+}
+DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
+DEFAULT_FILENAME = FileName("rxmer.bin")
 
 
 def _configure_transaction_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -48,14 +71,43 @@ def _configure_transaction_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     return db_path
 
 
-def _configure_session_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    db_path = tmp_path / "session_group.json"
-    monkeypatch.setattr(
-        SystemConfigSettings,
-        "session_group_db",
-        classmethod(lambda cls: str(db_path)),
+def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_open = Path.open
+
+    def _guarded_open(
+        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
+    ) -> object:
+        if self.name == "session_group.json":
+            raise AssertionError(f"Unexpected JSON ledger access: {self}")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _guarded_open)
+
+
+def _insert_transaction(db_path: Path, transaction_id: str) -> None:
+    sqlite_path = DatabasePath(str(db_path))
+    postgres_dsn = DatabaseDsn("")
+    sys_repo = SystemDescriptionRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
     )
-    return db_path
+    device_repo = DeviceDetailsRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+    txn_repo = TransactionRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+    sysdescr_id = sys_repo.get_or_create_sysdescr_id(SYS_DESCR)
+    device_detail_id = device_repo.get_or_create_device_detail_id(
+        DEVICE_DETAILS, sysdescr_id
+    )
+    txn_repo.insert_transaction(
+        transaction_id=TransactionId(transaction_id),
+        timestamp_epoch=TimestampSec(DEFAULT_TIMESTAMP),
+        mac_address=MacAddress("aa:bb:cc:dd:ee:ff"),
+        pnm_test_type=PNM_TEST_TYPE,
+        filename=DEFAULT_FILENAME,
+        device_detail_id=device_detail_id,
+    )
 
 
 def _empty_sha256() -> object:
@@ -72,7 +124,9 @@ def _empty_sha256() -> object:
 def test_session_group_skips_empty_transaction_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    db_path = _configure_session_db(tmp_path, monkeypatch)
+    db_path = _configure_transaction_db(tmp_path, monkeypatch)
+    _guard_json_ledgers(monkeypatch)
+    _insert_transaction(db_path, "txn-1")
     caplog.set_level("WARNING")
     group = SessionGroup()
     session_id = group.create_session()
@@ -81,12 +135,9 @@ def test_session_group_skips_empty_transaction_id(
     group.add_transaction("   ")
     group.add_transaction("txn-1")
 
-    with db_path.open("r", encoding="utf-8") as handle:
-        db = json.load(handle)
-    assert db[session_id]["transactions"] == ["txn-1"]
-    assert (
-        "Skipping empty transaction_id persistence in session_group_db" in caplog.text
-    )
+    repo = SessionGroupRepository.from_system_config()
+    assert repo.list_transactions(session_id) == [TransactionId("txn-1")]
+    assert "Skipping empty transaction_id persistence in session_group" in caplog.text
 
 
 def test_pnm_file_transaction_skips_empty_transaction_id(

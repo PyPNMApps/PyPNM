@@ -13,11 +13,9 @@ from pypnm.api.routes.advance.common.operation_registry import OperationRegistry
 from pypnm.api.routes.advance.ds.ofdm.rxmer.multi.router import router
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import OperationExecutionState
-from pypnm.lib.db.capture_group_repository import (
-    CaptureGroupRepository,
-    OperationCaptureRepository,
-)
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
     SystemDescriptionRepository,
@@ -30,6 +28,7 @@ from pypnm.lib.types import (
     DatabaseDsn,
     DatabasePath,
     FileName,
+    GroupId,
     OperationId,
     TimestampSec,
     TransactionId,
@@ -45,6 +44,7 @@ def _build_app() -> FastAPI:
 PNM_TEST_TYPE: str = "DS_OFDM_RXMER_PER_SUBCAR"
 DEFAULT_CREATED_EPOCH: int = 1
 DEFAULT_TIMESTAMP: int = 1
+POSITION_START: int = 0
 SYS_DESCR: dict[str, str] = {
     "HW_REV": "1.0",
     "VENDOR": "LANCity",
@@ -97,7 +97,7 @@ class _DbFixture:
     def bind_operation(
         db_path: Path,
         operation_id: OperationId,
-        capture_group_id: str,
+        capture_group_id: GroupId,
         transaction_ids: list[str],
     ) -> None:
         sqlite_path = DatabasePath(str(db_path))
@@ -111,13 +111,16 @@ class _DbFixture:
         capture_repo.get_or_create_capture_group(
             capture_group_id, TimestampSec(DEFAULT_CREATED_EPOCH)
         )
-        for transaction_id in transaction_ids:
+        for position, transaction_id in enumerate(
+            transaction_ids, start=POSITION_START
+        ):
             capture_repo.add_transaction(
                 capture_group_id,
                 TransactionId(transaction_id),
+                position,
                 TimestampSec(DEFAULT_CREATED_EPOCH),
             )
-        operation_repo.upsert_operation_capture(
+        operation_repo.create_operation_capture(
             operation_id,
             capture_group_id,
             TimestampSec(DEFAULT_CREATED_EPOCH),
@@ -168,7 +171,7 @@ def test_result_resolves_transactions(
     paths = _configure_paths(tmp_path, monkeypatch)
     client = TestClient(_build_app())
     operation_id = OperationId("op-123")
-    capture_group_id = "group-123"
+    capture_group_id = GroupId("group-123")
     transaction_id_one = "txn-123-a"
     transaction_id_two = "txn-123-b"
 
@@ -214,7 +217,7 @@ def test_result_rejects_when_no_transactions_resolve(
     client = TestClient(_build_app())
 
     operation_id = OperationId("op-124")
-    capture_group_id = "group-124"
+    capture_group_id = GroupId("group-124")
     _DbFixture.bind_operation(
         paths["database_sqlite_path"],
         operation_id,
@@ -250,7 +253,7 @@ def test_result_resolves_transactions_without_json_ledgers(
     client = TestClient(_build_app())
 
     operation_id = OperationId("op-125")
-    capture_group_id = "group-125"
+    capture_group_id = GroupId("group-125")
     transaction_id = "txn125"
 
     _DbFixture.insert_transaction(paths["database_sqlite_path"], transaction_id)

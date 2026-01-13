@@ -8,10 +8,8 @@ import uuid
 from pathlib import Path
 
 from pypnm.lib.constants import cast
-from pypnm.lib.db.capture_group_repository import (
-    CaptureGroupRepository,
-    OperationCaptureRepository,
-)
+from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.types import GroupId, OperationId, TimestampSec
 
 
@@ -55,7 +53,7 @@ class OperationManager:
             raise ValueError(f"CaptureGroup '{self.capture_group_id}' does not exist")
 
         created_epoch = TimestampSec(int(time.time()))
-        self._operation_repo.upsert_operation_capture(
+        self._operation_repo.create_operation_capture(
             self.operation_id, self.capture_group_id, created_epoch
         )
         self.logger.info(

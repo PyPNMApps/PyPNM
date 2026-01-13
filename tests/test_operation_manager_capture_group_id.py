@@ -10,8 +10,8 @@ import pytest
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.db.capture_group_repository import OperationCaptureRepository
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.operation_capture_repository import OperationCaptureRepository
 from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
 
 
