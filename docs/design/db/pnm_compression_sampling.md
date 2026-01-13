@@ -1,6 +1,3 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- Copyright (c) 2026 Maurice Garcia -->
-
 # PNM Compression Sampling
 
 This note captures a 10-file random sample from `tests/files` and records size savings plus single-run compress/decompress time per algorithm.

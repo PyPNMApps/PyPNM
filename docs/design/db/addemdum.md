@@ -1,6 +1,3 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- Copyright (c) 2026 Maurice Garcia -->
-
 # PyPNM DB Backend · Locked Decisions (Selection Summary)
 
 This file captures the decision set you selected:

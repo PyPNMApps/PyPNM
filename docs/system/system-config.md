@@ -1,6 +1,3 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- Copyright (c) 2025-2026 Maurice Garcia -->
-
 # System Configuration Reference
 
 Canonical Structure And Field Semantics For `system.json`.
