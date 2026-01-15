@@ -47,11 +47,8 @@ support ticket or email when requesting help.
 Given a set of input selectors (Transaction ID, Operation ID, or MAC address),
 the tool:
 
-1. Uses the configured JSON databases to discover the relevant transactions:
-
-   - `PnmFileRetrieval.transaction_db`
-   - `PnmFileRetrieval.capture_group_db`
-   - `PnmFileRetrieval.operation_db`
+1. Uses the configured DB backend (SQLite or Postgres) to discover the relevant transactions
+   via `transaction_records`, `capture_groups`, and `operation_captures`.
 
 2. Resolves each transaction into:
 
@@ -66,9 +63,7 @@ the tool:
   pnm/
     <capture files>
   db/
-    json_transactions.json
-    capture_group_db.json
-    operation_db.json
+    pypnm.sqlite3
 ```
 
 4. Sanitizes the dataset (MAC address, filename MAC fragments, and
@@ -254,9 +249,7 @@ reproduce the issue:
     ds_ofdm_constellation_aa_bb_cc_dd_ee_ff_194_1764820678.bin
     ...
   db/
-    json_transactions.json
-    capture_group_db.json
-    operation_db.json
+    pypnm.sqlite3
 ```
 
 Key points:

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -47,6 +47,11 @@ from pypnm.api.routes.docs.pnm.files.schemas import (
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.archive.manager import ArchiveManager
 from pypnm.lib.constants import MediaType
+from pypnm.lib.db.artifact_repository import (
+    ROLE_PNM_RAW,
+    ROLE_PNM_UPLOADED_RAW,
+    ArtifactRepository,
+)
 from pypnm.lib.db.transaction_repository import TransactionRepository
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.mac_address import MacAddress
@@ -96,6 +101,7 @@ class PnmFileService:
     def __init__(self) -> None:
         self.pnm_dir: PathLike = SystemConfigSettings.pnm_dir()
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._artifact_repo = ArtifactRepository.from_system_config()
 
     def search_files(self, req: FileQueryRequest) -> FileQueryResponse:
         """
@@ -142,24 +148,17 @@ class PnmFileService:
         """
         Retrieves and serves the binary file associated with the given transaction ID.
         """
-        txn_data = PnmFileTransaction().get_record(transaction_id)
-
-        if not txn_data:
-            raise HTTPException(status_code=404, detail="Transaction ID not found.")
-
-        filename = txn_data.get("filename")
-        full_path = Path(self.pnm_dir) / str(filename)
+        full_path = self._resolve_pnm_artifact_path(transaction_id)
 
         self.logger.info(
-            f"Retrieving file for transaction {transaction_id}: {full_path}"
+            "Retrieving file for transaction %s: %s",
+            transaction_id,
+            full_path,
         )
-
-        if not full_path.exists():
-            raise HTTPException(status_code=404, detail="File not found on disk.")
 
         return FileResponse(
             path=full_path,
-            filename=filename,
+            filename=full_path.name,
             media_type=MediaType.APPLICATION_OCTET_STREAM,
         )
 
@@ -182,8 +181,8 @@ class PnmFileService:
 
         files_to_archive: list[Path] = []
         for rec in txn_models:
-            src_path = Path(self.pnm_dir) / Path(rec.filename)
-            if not src_path.is_file():
+            src_path = self._resolve_pnm_artifact_path_optional(rec.transaction_id)
+            if src_path is None or not src_path.is_file():
                 self.logger.warning(
                     "Skipping missing file for transaction %s at %s",
                     rec.transaction_id,
@@ -252,8 +251,8 @@ class PnmFileService:
 
         files_to_archive: list[Path] = []
         for rec in records:
-            src_path = Path(self.pnm_dir) / Path(rec.filename)
-            if not src_path.is_file():
+            src_path = self._resolve_pnm_artifact_path_optional(rec.transaction_id)
+            if src_path is None or not src_path.is_file():
                 self.logger.warning(
                     "Skipping missing file for transaction %s: %s",
                     rec.transaction_id,
@@ -321,11 +320,21 @@ class PnmFileService:
         mac_address = params.mac_address or MacAddress.null()
         pnm_file_type: PnmFileType = params.file_type
 
-        transaction_id = PnmFileTransaction().set_file_by_user(
-            mac_address=MacAddress(mac_address),
-            pnm_test_type=PnmFileTypeMapper.get_test_type(pnm_file_type),
-            filename=filename,
-        )
+        try:
+            transaction_id = PnmFileTransaction().set_file_by_user(
+                mac_address=MacAddress(mac_address),
+                pnm_test_type=PnmFileTypeMapper.get_test_type(pnm_file_type),
+                filename=filename,
+            )
+        except (FileNotFoundError, RuntimeError) as exc:
+            self.logger.error(
+                "Failed to register uploaded file artifact for %s: %s",
+                filename,
+                exc,
+            )
+            raise HTTPException(
+                status_code=500, detail="Failed to register uploaded file artifact."
+            ) from exc
 
         return UploadFileResponse(
             mac_address=MacAddress(mac_address).mac_address,
@@ -390,30 +399,16 @@ class PnmFileService:
         Tuple[ParserAnalysisModelReturn, PnmFileType]
             A tuple containing the analysis model and the PNM file type.
         """
-        txn_rec = PnmFileTransaction().get_record(req.search.transaction_id)
-        if not txn_rec:
-            raise HTTPException(
-                status_code=404, detail="Transaction ID not found for analysis."
-            )
-
-        filename = txn_rec.get("filename")
-        if not filename:
-            raise HTTPException(
-                status_code=404, detail="Filename not found in transaction record."
-            )
+        file_path = self._resolve_pnm_artifact_path(req.search.transaction_id)
+        filename = file_path.name
 
         self.logger.info(
-            f"Starting analysis for transaction ID {req.search.transaction_id} on file: {self.pnm_dir}/{filename}"
+            "Starting analysis for transaction ID %s on file: %s",
+            req.search.transaction_id,
+            file_path,
         )
 
-        # Get binary file
-        file_path = f"{self.pnm_dir}/{filename}"
-
-        if not Path(file_path).is_file():
-            raise HTTPException(
-                status_code=404, detail="PNM file not found on disk for analysis."
-            )
-        fp = FileProcessor(file_path).read_file()
+        fp = FileProcessor(str(file_path)).read_file()
 
         # Get PnmHeader to Determine PnmFileType
         from pypnm.pnm.parser.pnm_parameter import GetPnmParserAndParameters
@@ -421,7 +416,10 @@ class PnmFileService:
         parser, model = GetPnmParserAndParameters(fp).get_parser()
 
         self.logger.info(
-            f"Performing {model.file_type.name} analysis for transaction {req.search.transaction_id} on file {filename}"
+            "Performing %s analysis for transaction %s on file %s",
+            model.file_type.name,
+            req.search.transaction_id,
+            filename,
         )
 
         return self.__get_analysis(parser, model)
@@ -443,36 +441,10 @@ class PnmFileService:
         Raises
         ------
         HTTPException
-            If the transaction record does not exist, the filename is missing,
-            or the file is not present on disk.
+            If no artifact is linked to the transaction, or the file is not
+            present on disk.
         """
-        txn_data = PnmFileTransaction().get_record(transaction_id)
-        if not txn_data:
-            raise HTTPException(status_code=404, detail="Transaction ID not found.")
-
-        filename = txn_data.get("filename")
-        if not filename:
-            raise HTTPException(
-                status_code=404, detail="Filename not found in transaction record."
-            )
-
-        full_path = Path(self.pnm_dir) / str(filename)
-
-        self.logger.info(
-            "Resolving PNM file for transaction %s at %s",
-            transaction_id,
-            full_path,
-        )
-
-        if not full_path.exists() or not full_path.is_file():
-            self.logger.warning(
-                "PNM file not found on disk for transaction %s at %s",
-                transaction_id,
-                full_path,
-            )
-            raise HTTPException(status_code=404, detail="PNM file not found on disk.")
-
-        return full_path
+        return self._resolve_pnm_artifact_path(transaction_id)
 
     def get_hexdump_by_transaction_id(
         self, transaction_id: TransactionId, bytes_per_line: int
@@ -518,6 +490,31 @@ class PnmFileService:
             bytes_per_line=bytes_per_line,
             lines=lines,
         )
+
+    def _resolve_pnm_artifact_path(self, transaction_id: TransactionId) -> Path:
+        path = self._artifact_repo.resolve_transaction_artifact_path(
+            transaction_id,
+            roles=(ROLE_PNM_RAW, ROLE_PNM_UPLOADED_RAW),
+        )
+        if path is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Transaction ID not found.",
+            )
+        if not path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail="File not found on disk.",
+            )
+        return path
+
+    def _resolve_pnm_artifact_path_optional(
+        self, transaction_id: TransactionId
+    ) -> Path | None:
+        try:
+            return self._resolve_pnm_artifact_path(transaction_id)
+        except HTTPException:
+            return None
 
     def __get_analysis(
         self, parser: PnmParsers, model: PnmParserParametersModel

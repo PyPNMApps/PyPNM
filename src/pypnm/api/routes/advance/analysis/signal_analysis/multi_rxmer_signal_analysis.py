@@ -531,7 +531,9 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 temporal_mapping[capture_time] = dorm
                 model = dorm.to_model()
                 self.register_models_for_json_archive_files(
-                    model, [str(model.channel_id), "CmDsOfdmRxMer"]
+                    model,
+                    [str(model.channel_id), "CmDsOfdmRxMer"],
+                    transaction_id=tcm.transaction_id,
                 )
                 continue
 
@@ -549,7 +551,9 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 temporal_mapping[capture_time] = dofs
                 model = dofs.to_model()
                 self.register_models_for_json_archive_files(
-                    model, [str(model.channel_id), "CmDsOfdmFecSummary"]
+                    model,
+                    [str(model.channel_id), "CmDsOfdmFecSummary"],
+                    transaction_id=tcm.transaction_id,
                 )
                 continue
 
@@ -567,7 +571,9 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 temporal_mapping[capture_time] = domp
                 model = domp.to_model()
                 self.register_models_for_json_archive_files(
-                    model, [str(model.channel_id), "CmDsOfdmModulationProfile"]
+                    model,
+                    [str(model.channel_id), "CmDsOfdmModulationProfile"],
+                    transaction_id=tcm.transaction_id,
                 )
                 continue
 

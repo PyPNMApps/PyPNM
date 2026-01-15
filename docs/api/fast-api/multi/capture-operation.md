@@ -1,20 +1,22 @@
 # Multi‑Capture Operation Overview
 
-When you initiate a **multi-capture** session (e.g., Multi‑RxMER or Multi‑DS‑Channel‑Estimation), PyPNM maintains a lightweight file‑based tracking system and stages resulting PNM binaries for downstream workflows.
+When you initiate a **multi-capture** session (e.g., Multi‑RxMER or Multi‑DS‑Channel‑Estimation), PyPNM maintains a DB-backed tracking system and stages resulting PNM binaries for downstream workflows.
 
 **Directory Layout**:
 
 ```text
 .data/
 ├── db/
-│   ├── operation_capture.json      # Maps operations to capture groups
-│   ├── capture_group.json          # Records capture groups
-│   └── transactions.json           # Lists each staged file transaction
+│   ├── pypnm.sqlite3               # SQLite DB (when backend=sqlite)
 ├── operations/
 │   └── <operation_id>.json         # Status + progress for async operations
+├── json/
+│   └── <*.json>                    # JSON exports (metadata tracked in DB)
 └── pnm/
     └── <.bin files>                # Raw PNM captures retrieved via TFTP
 ```
+
+Capture metadata is stored in the DB (`transaction_records`, `capture_groups`, `capture_group_transactions`, `operation_captures`). Postgres deployments use the configured external DSN instead of a local SQLite file.
 
 ## 1. Operation Status Registry (`operations/<operation_id>.json`)
 
@@ -38,55 +40,34 @@ Each operation has its own status file to support `status`, `result`, and `cance
 }
 ```
 
-## 2. Operation Database (`operation_capture.json`)
+## 2. Operation Mapping (DB: `operation_captures`)
 
-Records each background **operation** and its connection to a capture group.
+Operation-to-capture-group links are stored in the `operation_captures` table.
 
-**Example**:
+Fields:
 
-```json
-{
-  "f6afb2d7df2c4a5c": {
-    "capture_group_id": "10b6ea239641487c",
-    "created": 1748280293
-  }
-}
-```
+* **operation_id**: Operation identifier (primary key).
+* **capture_group_id**: Associated capture group (foreign key).
+* **created_epoch**: Unix timestamp when the operation started.
 
-* **Key**: `operation_id` (e.g., `f6afb2d7df2c4a5c`).
-* **capture\_group\_id**: Associated `capture_group_id`.
-* **created**: Unix timestamp when the operation started.
-* **legacy**: Older records may use `capture_group` and are still read for compatibility.
+Legacy JSON key `capture_group` is accepted only during offline migration; runtime resolution uses the DB.
 
-## 3. Capture Group Database (`capture_group.json`)
+## 3. Capture Group Registry (DB: `capture_groups` + `capture_group_transactions`)
 
-Tracks each high‑level invocation as a distinct **capture group**.
+Capture groups live in `capture_groups`, with ordered membership in `capture_group_transactions`.
 
-**Example**:
+Fields:
 
-```json
-{
-  "10b6ea239641487c": {
-    "created": 1748280293,
-    "transactions": [
-      "2ee6138bbc1b3c3d",
-      "65c04a28d0add931",
-      "df4d2b3e3146ef30",
-      "6773c9ebc097a579"
-    ]
-  }
-}
-```
+* **capture_group_id**: Capture group identifier (primary key).
+* **created_epoch**: Unix timestamp when the group was created.
+* **transaction_id**: Linked transaction identifier (foreign key).
+* **position**: Ordering index for deterministic listing.
 
-* **Key**: `capture_group_id` (e.g., `10b6ea239641487c`).
-* **created**: Unix timestamp when the group was created.
-* **transactions**: List of associated `transaction_id`s (one per file).
+## 4. Transaction Records (DB: `transaction_records` + `transaction_artifacts`)
 
-## 4. Transactions Manifest (`transactions.json`)
+Transaction metadata is stored in `transaction_records`, while on-disk files are resolved via `transaction_artifacts` and `file_artifacts`.
 
-A detailed manifest of every PNM file moved into `.data/pnm/` during the capture.
-
-**Example**:
+**Example (logical record shape)**:
 
 ```json
 {
@@ -112,7 +93,7 @@ A detailed manifest of every PNM file moved into `.data/pnm/` during the capture
 * **timestamp**: Unix epoch when the file was staged.
 * **mac\_address**: Sanitized MAC of the target modem.
 * **pnm\_test\_type**: Identifier of the PNM capture type.
-* **filename**: Name of the `.bin` file in `.data/pnm/`.
+* **filename**: Name of the `.bin` file in `.data/pnm/` (recorded for reference).
 * **device\_details.system\_description**: Snapshot of modem metadata at capture time.
 
 Transaction IDs must be non-empty. Blank or whitespace-only IDs are dropped with a warning and are never persisted.
@@ -311,8 +292,8 @@ Status semantics:
 
 1. **Start Multi‑Capture**: System generates a new `operation_id` linked to a new `capture_group_id`.
 2. **Periodic Triggers**: SNMP instructs the modem to TFTP-upload the PNM blob.
-3. **File Staging**: PyPNM copies each `.bin` into `.data/pnm/` and appends a JSON entry.
-4. **Database Updates**: Timestamps and transaction lists are updated in both `operation_capture.json` and `capture_group.json`.
-5. **Completion**: After the capture ends, the three JSON tables fully describe what was captured, when, and for which operation/group.
+3. **File Staging**: PyPNM copies each `.bin` into `.data/pnm/` and inserts DB metadata (transaction record + artifact linkage).
+4. **Database Updates**: `operation_captures`, `capture_groups`, and `capture_group_transactions` reflect the capture state.
+5. **Completion**: After the capture ends, the DB tables fully describe what was captured, when, and for which operation/group.
 
-> Downstream tools can monitor `transactions.json` as a manifest to automatically discover and process new PNM files—no manual polling required.
+> Downstream tools should query the DB-backed APIs (for example, `searchFiles` or `getMacAddresses`) to discover new PNM files.

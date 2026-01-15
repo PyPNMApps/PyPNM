@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import uuid
 from pathlib import Path
 
 import pytest
+from tests.postgres_test_utils import require_postgres
 
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
@@ -186,15 +186,7 @@ def test_operation_capture_repository_legacy_column_detection(
 def test_operation_capture_repository_fk_enforced_on_missing_capture_group_postgres(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    dsn_env = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn_env:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    try:
-        import psycopg
-    except ImportError:
-        pytest.skip("psycopg not installed")
-
-    postgres_dsn = DatabaseDsn(dsn_env)
+    postgres_dsn, psycopg = require_postgres()
     _configure_operation_capture_postgres(tmp_path, monkeypatch, postgres_dsn)
     suffix = _unique_suffix()
     capture_group_id = GroupId(f"cg-op-missing-{suffix}")

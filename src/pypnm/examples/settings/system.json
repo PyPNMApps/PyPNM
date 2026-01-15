@@ -1,7 +1,7 @@
 {
     "FastApiRequestDefault": {
         "mac_address": "aa:bb:cc:dd:ee:ff",
-        "ip_address": "192.168.0.1"
+        "ip_address": "192.168.0.100"
     },
     "SNMP": {
         "timeout": 2,
@@ -48,11 +48,6 @@
         "png_dir": ".data/png",
         "archive_dir": ".data/archive",
         "msg_rsp_dir": ".data/msg_rsp",
-        "transaction_db": ".data/db/transactions.json",
-        "capture_group_db": ".data/db/capture_group.json",
-        "session_group_db": ".data/db/session_group.json",
-        "operation_db": ".data/db/operation_capture.json",
-        "json_transaction_db": ".data/db/json_transactions.json",
         "retries": 5,
         "retrieval_method": {
             "method": "local",

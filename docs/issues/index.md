@@ -16,12 +16,12 @@ sanitize sensitive information before sharing it with the PyPNM support team.
 
 ## FAQ
 
-### Multi-capture results return 404 with legacy operation_capture.json
+### Multi-capture results return 404 with legacy operation capture ledger
 
-Runtime no longer reads `operation_capture.json` after the DB cutover, so legacy
-keys are not accepted by live endpoints. Use the offline migrator or re-run the
-capture workflow on a DB-backed build to populate the operation-to-group
-mapping in the database.
+Runtime no longer reads legacy operation-capture ledgers after the DB cutover,
+so legacy keys are not accepted by live endpoints. Use the offline migrator or
+re-run the capture workflow on a DB-backed build to populate the
+operation-to-group mapping in the database.
 
 ### Session group mappings missing after upgrade
 

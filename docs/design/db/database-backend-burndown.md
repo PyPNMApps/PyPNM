@@ -11,8 +11,8 @@
 - [Phase 0 · Guardrails And Release Hygiene (M0)](#phase-0--guardrails-and-release-hygiene-m0)
 - [Phase 1 · Install-Time Backend Selection And Config Contract (M1)](#phase-1--install-time-backend-selection-and-config-contract-m1)
 - [Phase 2 · Schema Introduction And DB Abstraction Layer (M2)](#phase-2--schema-introduction-and-db-abstraction-layer-m2)
-- [Phase 3 · Transactions Migration (Replace `transactions.json`) (M3)](#phase-3--transactions-migration-replace-transactionsjson-m3)
-- [Phase 4 · Capture Group And Operation Migration (Replace `capture_group.json`, `operation_capture.json`) (M4)](#phase-4--capture-group-and-operation-migration-replace-capture_groupjson-operation_capturejson-m4)
+- [Phase 3 · Transactions Migration (DB-Backed Transactions) (M3)](#phase-3--transactions-migration-db-backed-transactions-m3)
+- [Phase 4 · Capture Group And Operation Migration (DB-Backed Capture Groups) (M4)](#phase-4--capture-group-and-operation-migration-db-backed-capture-groups-m4)
 - [Phase 5 · Artifact Linkage (Filesystem References) (M5)](#phase-5--artifact-linkage-filesystem-references-m5)
 - [Phase 6 · Remove Ledger JSON Design And Code (M6)](#phase-6--remove-ledger-json-design-and-code-m6)
 - [Phase 7 · Pytest And GitHub Actions Migration (M7)](#phase-7--pytest-and-github-actions-migration-m7)
@@ -55,7 +55,7 @@ Work completed since the last burndown sync (per Agent Review Bundles and the cu
   - Seeds `UNKNOWN` sysDescr row idempotently.
   - Seeds default `artifact_stores` rows idempotently (at least the primary/prod default).
 
-- **M3 complete (transactions are DB-backed; `transactions.json` no longer required at runtime):**
+- **M3 complete (transactions and JSON export artifacts are DB-backed; legacy ledgers removed from runtime):**
   - Introduced repository helpers for sysDescr/device_details dimensions and transaction_records.
   - Wired `PnmFileTransaction` reads/writes to DB while preserving legacy payload shapes.
   - Updated file manager reads (`search_files`, `get_mac_addresses`) to query DB-backed repositories.
@@ -177,7 +177,7 @@ Milestone status (as of 2026-01-11):
 - M0: In progress (docs updated; packaging/docker hygiene still open)
 - M1: In progress (installer selection landed; config template + settings accessors still open)
 - M2: Complete (DB schema init + backend-aware connection path landed; schema manager in use)
-- M3: Complete (transactions are DB-backed; `transactions.json` is no longer a runtime write/read dependency)
+- M3: Complete (transactions and JSON export artifacts are DB-backed; legacy ledger paths are not used at runtime)
 - M4: In progress (capture groups + operation linkage repositories exist; JSON ledger cutover and endpoint wiring still open)
 - M5: Not started (artifact linkage; DB becomes authoritative for path resolution)
 - M6: Not started (delete ledger code paths and ledger docs)
@@ -300,16 +300,16 @@ Introduce both schemas and a stable DB API that hides backend differences.
 - [x] `UNKNOWN` sysDescr exists after init.
 - [x] Schema version mismatch fails fast with an actionable error.
 
-## Phase 3 · Transactions Migration (Replace `transactions.json`) (M3)
+## Phase 3 · Transactions Migration (DB-Backed Transactions) (M3)
 
 ### Goal
 
-Replace JSON transactions ledger with DB-backed `transaction_records` plus de-dup dimensions, and update endpoint read paths.
+Replace the legacy JSON transaction ledger with DB-backed `transaction_records` plus de-dup dimensions, and update endpoint read paths.
 
 Cutover note:
 
-- Runtime must stop writing and reading `transactions.json` once DB-backed transactions are enabled.
-- Other ledgers (`capture_group.json`, `operation_capture.json`) remain until M4.
+- Runtime must stop writing and reading legacy JSON transaction ledgers once DB-backed transactions are enabled.
+- Other legacy ledgers remain until M4.
 
 ### Tasks
 
@@ -323,10 +323,12 @@ Cutover note:
   - [x] Rely on DB CHECK constraints for MAC format enforcement
 
 - [x] Update transaction creation/read code to use DB:
-  - [x] Stop writing `transactions.json`
+  - [x] Stop writing legacy JSON transaction ledgers
   - [x] Preserve external API shapes as needed by current services/endpoints
 
-- [x] Update file-manager endpoints to query DB (no `transactions.json` traversal):
+- [x] Track JSON export artifacts in DB (file_artifacts + transaction_artifacts; no JSON ledger)
+
+- [x] Update file-manager endpoints to query DB (no JSON ledger traversal):
   - [x] `getMacAddresses`
   - [x] `searchFiles/{mac_address}`
   - [x] `download/transactionID/{transaction_id}` resolves filename via DB record (artifact linkage becomes authoritative in M5)
@@ -339,11 +341,12 @@ Cutover note:
 
 ### Acceptance Criteria
 
-- [x] Captures produce DB rows instead of writing `transactions.json`.
+- [x] Captures produce DB rows instead of writing legacy JSON ledgers.
 - [x] File manager flows can fetch transactions from DB (no JSON ledger traversal for transactions).
-- [x] There is no runtime write/read path that touches `transactions.json`.
+- [x] There is no runtime write/read path that touches legacy JSON ledgers.
+- [x] JSON export artifacts are tracked in DB without JSON ledger files.
 
-## Phase 4 · Capture Group And Operation Migration (Replace `capture_group.json`, `operation_capture.json`) (M4)
+## Phase 4 · Capture Group And Operation Migration (DB-Backed Capture Groups) (M4)
 
 ### Goal
 
@@ -367,8 +370,8 @@ Cutover note:
   - [x] Support legacy schema compatibility (`operation_id` vs `operation_capture_id`) without branching call sites
 
 - [ ] Update existing grouping/operation services to use DB end-to-end:
-  - [ ] Stop writing `.data/db/capture_group.json`
-  - [ ] Stop writing `.data/db/operation_capture.json`
+  - [ ] Stop writing legacy capture-group ledgers
+  - [ ] Stop writing legacy operation-capture ledgers
   - [ ] Stop reading capture/operation ledgers from runtime paths
   - [ ] Ensure multi-capture start/status/result endpoints resolve operation/group via DB only
 
@@ -453,9 +456,7 @@ Delete ledger JSON code paths and remove ledger JSON design from documentation, 
 
 - [ ] Documentation cleanup (explicit requirement):
   - [ ] Remove/replace all doc references to:
-    - [ ] `.data/db/transactions.json`
-    - [ ] `.data/db/capture_group.json`
-    - [ ] `.data/db/operation_capture.json`
+    - [ ] legacy JSON ledger paths for transactions, capture groups, and operations
   - [ ] Update file-manager docs to state DB-backed persistence for transactions/groups/operations
   - [ ] Ensure diagrams and examples reflect DB-backed persistence and artifact linkage
 

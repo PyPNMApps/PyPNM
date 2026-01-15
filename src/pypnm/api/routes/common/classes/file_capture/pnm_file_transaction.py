@@ -1,19 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
 import hashlib
 import logging
 import time
+from pathlib import Path
 from typing import cast
 
 from pypnm.api.routes.common.classes.file_capture.types import (
     DeviceDetailsModel,
     TransactionRecordModel,
 )
+from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.db.artifact_repository import (
+    ROLE_PNM_UPLOADED_RAW,
+    ArtifactRepository,
+)
 from pypnm.lib.db.transaction_repository import (
     DeviceDetailsRepository,
     SystemDescriptionRepository,
@@ -69,6 +75,7 @@ class PnmFileTransaction:
         self._sysdescr_repo = SystemDescriptionRepository.from_system_config()
         self._device_details_repo = DeviceDetailsRepository.from_system_config()
         self._transaction_repo = TransactionRepository.from_system_config()
+        self._artifact_repo = ArtifactRepository.from_system_config()
 
     async def insert(
         self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str
@@ -140,11 +147,51 @@ class PnmFileTransaction:
             Newly generated transaction identifier bound to the uploaded file.
         """
         txn = PnmFileTransaction()
-        return txn._insert_generic(
+        transaction_id = txn._insert_generic(
             mac_address=mac_address,
             pnm_test_type=pnm_test_type,
             filename=filename,
         )
+        if str(transaction_id).strip():
+            txn.register_pnm_artifact(transaction_id, filename, ROLE_PNM_UPLOADED_RAW)
+        return transaction_id
+
+    def register_pnm_artifact(
+        self, transaction_id: TransactionId, filename: FileName | str, role: str
+    ) -> None:
+        """
+        Register a stored PNM file artifact for a transaction.
+
+        Parameters
+        ----------
+        transaction_id:
+            Transaction identifier to bind to the artifact record.
+        filename:
+            File name or relative path of the stored PNM file under the
+            configured artifact store root.
+        role:
+            Artifact role used for resolution (for example: pnm_raw or
+            pnm_uploaded_raw).
+        """
+        if not str(transaction_id).strip():
+            self.logger.warning(
+                "Skipping artifact registration for empty transaction_id (filename=%s)",
+                filename,
+            )
+            return
+        file_path = self._resolve_pnm_path(filename)
+        created_epoch = TimestampSec(int(time.time()))
+        self._artifact_repo.register_transaction_artifact(
+            transaction_id=transaction_id,
+            file_path=file_path,
+            role=role,
+            created_epoch=created_epoch,
+        )
+
+    @staticmethod
+    def _resolve_pnm_path(filename: FileName | str) -> Path:
+        pnm_dir = SystemConfigSettings.pnm_dir()
+        return Path(pnm_dir) / str(filename)
 
     def get_record(self, transaction_id: TransactionId) -> dict | None:
         """

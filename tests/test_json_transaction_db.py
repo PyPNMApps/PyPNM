@@ -1,258 +1,178 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
-import hashlib
-import json
+import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from pypnm.config.pnm_config_manager import SystemConfigSettings
-from pypnm.lib.db.json_transaction import JsonTransactionDb
-from pypnm.lib.db.model.json_trans_model import (
-    JsonReturnModel,
-    JsonTransactionDbModel,
-    JsonTransactionRecordModel,
+from pypnm.lib.db.artifact_repository import ROLE_JSON_EXPORT
+from pypnm.lib.db.db_schema_manager import (
+    JSON_ARTIFACT_STORE_NAME,
+    DatabaseSchemaManager,
 )
-from pypnm.lib.types import HashStr, TimeStamp, TransactionId
+from pypnm.lib.db.json_transaction import JsonTransactionDb
+from pypnm.lib.db.transaction_repository import (
+    DeviceDetailsRepository,
+    SystemDescriptionRepository,
+    TransactionRepository,
+)
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import (
+    DatabaseBackend,
+    DatabaseDsn,
+    DatabasePath,
+    FileName,
+    HashStr,
+    TimestampSec,
+    TransactionId,
+)
 
-# ────────────────────────────────────────────────────────────────────────────────
-# Model Tests
-# ────────────────────────────────────────────────────────────────────────────────
-
-
-def test_json_transaction_record_model_valid() -> None:
-    timestamp: TimeStamp = TimeStamp(1_700_000_000)
-    filename: str = "example.json"
-    byte_size: int = 128
-    sha256: HashStr = HashStr("a" * 64)
-
-    record = JsonTransactionRecordModel(
-        timestamp=timestamp,
-        filename=filename,
-        byte_size=byte_size,
-        sha256=sha256,
-    )
-
-    assert record.timestamp == timestamp
-    assert record.filename == filename
-    assert record.byte_size == byte_size
-    assert record.sha256 == sha256
-
-
-def test_json_transaction_db_model_add_and_access() -> None:
-    tx_id: TransactionId = TransactionId("tx-123")
-    record = JsonTransactionRecordModel(
-        timestamp=TimeStamp(1_700_000_001),
-        filename="payload.json",
-        byte_size=256,
-        sha256=HashStr("b" * 64),
-    )
-
-    db_model = JsonTransactionDbModel()
-    db_model.records[tx_id] = record
-
-    assert tx_id in db_model.records
-    assert db_model.records[tx_id].filename == "payload.json"
+SYS_DESCR: dict[str, str] = {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+}
+DEVICE_DETAILS: dict[str, object] = {"system_description": SYS_DESCR}
+DEFAULT_MAC = MacAddress("aa:bb:cc:dd:ee:ff")
+DEFAULT_TEST_TYPE = "DS_RXMER"
 
 
-def test_json_return_model_inherits_metadata_and_adds_data() -> None:
-    base_record = JsonTransactionRecordModel(
-        timestamp=TimeStamp(1_700_000_002),
-        filename="payload.json",
-        byte_size=512,
-        sha256=HashStr("c" * 64),
-    )
-
-    payload_text: str = '{"key": "value"}'
-    ret_model = JsonReturnModel(
-        timestamp=base_record.timestamp,
-        filename=base_record.filename,
-        byte_size=base_record.byte_size,
-        sha256=base_record.sha256,
-        data=payload_text,
-    )
-
-    assert ret_model.timestamp == base_record.timestamp
-    assert ret_model.filename == base_record.filename
-    assert ret_model.byte_size == base_record.byte_size
-    assert ret_model.sha256 == base_record.sha256
-    assert ret_model.data == payload_text
-
-
-# ────────────────────────────────────────────────────────────────────────────────
-# JsonTransactionDb Tests
-# ────────────────────────────────────────────────────────────────────────────────
-
-
-def _make_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> JsonTransactionDb:
-    """
-    Helper To Construct JsonTransactionDb With A Temporary Filesystem Root.
-
-    The DB file is placed directly under tmp_path as 'transactions.json' and
-    the json_dir is tmp_path / 'json' to keep payloads under a dedicated
-    directory for tests.
-    """
-    json_dir: Path = tmp_path / "json"
+def _configure_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    db_path = tmp_path / "pypnm.sqlite3"
+    json_dir = tmp_path / "json"
     json_dir.mkdir(parents=True, exist_ok=True)
-
-    db_path: Path = tmp_path / "transactions.json"
-
-    def _fake_json_db(cls: type[SystemConfigSettings]) -> str:
-        return str(db_path)
-
-    def _fake_json_dir(cls: type[SystemConfigSettings]) -> str:
-        return str(json_dir)
 
     monkeypatch.setattr(
         SystemConfigSettings,
-        "json_db",
-        classmethod(_fake_json_db),
-        raising=False,
+        "pnm_dir",
+        classmethod(lambda cls: str(tmp_path / "pnm")),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
         "json_dir",
-        classmethod(_fake_json_dir),
-        raising=False,
+        classmethod(lambda cls: str(json_dir)),
     )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(db_path))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
+    )
+
+    DatabaseSchemaManager.from_system_config().initialize_schema()
+    return db_path, json_dir
+
+
+def _seed_transaction(db_path: Path, transaction_id: TransactionId) -> None:
+    sqlite_path = DatabasePath(str(db_path))
+    postgres_dsn = DatabaseDsn("")
+    sys_repo = SystemDescriptionRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+    device_repo = DeviceDetailsRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+    txn_repo = TransactionRepository.from_overrides(
+        DatabaseBackend.SQLITE, sqlite_path, postgres_dsn
+    )
+    sysdescr_id = sys_repo.get_or_create_sysdescr_id(SYS_DESCR)
+    device_detail_id = device_repo.get_or_create_device_detail_id(
+        DEVICE_DETAILS, sysdescr_id
+    )
+    txn_repo.insert_transaction(
+        transaction_id=transaction_id,
+        timestamp_epoch=TimestampSec(1234),
+        mac_address=DEFAULT_MAC,
+        pnm_test_type=DEFAULT_TEST_TYPE,
+        filename=FileName("rxmer.bin"),
+        device_detail_id=device_detail_id,
+    )
+
+
+def test_write_json_registers_json_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path, json_dir = _configure_db(tmp_path, monkeypatch)
+    payload: Mapping[str, object] = {"foo": "bar", "value": 42}
 
     db = JsonTransactionDb()
-    return db
+    path = db.write_json(payload, fname="payload", extension="json")
+
+    assert path.exists()
+    assert path.parent == json_dir
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            "SELECT store_id FROM artifact_stores WHERE store_name = ?;",
+            (JSON_ARTIFACT_STORE_NAME,),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        store_id = int(row[0])
+
+        cursor = conn.execute(
+            "SELECT filename, relative_path, sha256 FROM file_artifacts WHERE store_id = ?;",
+            (store_id,),
+        )
+        artifact_row = cursor.fetchone()
+        assert artifact_row is not None
+        filename, relative_path, sha256 = artifact_row
+        assert filename == path.name
+        assert relative_path.endswith(path.name)
+        assert isinstance(sha256, str)
+        assert len(sha256) == len(HashStr("a" * 64))
 
 
-def test_write_json_creates_payload_and_updates_db(
+def test_write_json_links_transaction_artifact_when_provided(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fixed_time: TimeStamp = TimeStamp(1_700_000_010)
+    db_path, _ = _configure_db(tmp_path, monkeypatch)
+    transaction_id = TransactionId("txn-json-export")
+    _seed_transaction(db_path, transaction_id)
 
-    monkeypatch.setattr(
-        "pypnm.lib.db.json_transaction.time.time",
-        lambda: int(fixed_time),
+    db = JsonTransactionDb()
+    db.write_json(
+        {"alpha": 1},
+        fname="payload",
+        extension="json",
+        transaction_id=transaction_id,
     )
 
-    db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
-
-    payload: Mapping[str, Any] = {"foo": "bar", "value": 42}
-
-    updated_db: JsonTransactionDbModel = db.write_json(
-        payload, fname="payload", extension="json"
-    )
-    assert isinstance(updated_db, JsonTransactionDbModel)
-    assert len(updated_db.records) == 1
-
-    tx_id, record = next(iter(updated_db.records.items()))
-
-    db_path: Path = tmp_path / "transactions.json"
-    payload_path: Path = tmp_path / "json" / str(record.filename)
-
-    assert isinstance(tx_id, str)
-    assert payload_path.exists()
-    assert db_path.exists()
-
-    assert record.byte_size == payload_path.stat().st_size
-    assert record.timestamp == fixed_time
-
-    digest = hashlib.sha256()
-    with open(payload_path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(8192), b""):
-            digest.update(chunk)
-    digest.update(str(int(fixed_time)).encode("utf-8"))
-    expected_hash: HashStr = HashStr(digest.hexdigest())
-
-    assert record.sha256 == expected_hash
-
-    db_text: str = db_path.read_text(encoding="utf-8")
-    db_json: dict[str, Any] = json.loads(db_text)
-    assert list(db_json.keys()) == [tx_id]
-
-
-def test_read_json_roundtrip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    fixed_time: TimeStamp = TimeStamp(1_700_000_020)
-    monkeypatch.setattr(
-        "pypnm.lib.db.json_transaction.time.time",
-        lambda: int(fixed_time),
-    )
-
-    db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
-
-    payload: Mapping[str, Any] = {"alpha": 1, "beta": True, "gamma": "text"}
-    updated_db: JsonTransactionDbModel = db.write_json(
-        payload, fname="roundtrip", extension="json"
-    )
-
-    tx_id, record = next(iter(updated_db.records.items()))
-
-    result: JsonReturnModel = db.read_json(tx_id)
-    assert isinstance(result, JsonReturnModel)
-
-    assert result.timestamp == record.timestamp
-    assert result.filename == str(record.filename)
-    assert result.byte_size == record.byte_size
-    assert result.sha256 == record.sha256
-
-    parsed_payload: dict[str, Any] = json.loads(result.data)
-    assert parsed_payload == dict(payload)
-
-
-def test_read_json_missing_transaction_returns_empty(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
-
-    missing_id: TransactionId = TransactionId("non-existent-transaction-id")
-    result: JsonReturnModel = db.read_json(missing_id)
-
-    assert result.timestamp == TimeStamp(0)
-    assert result.filename == ""
-    assert result.byte_size == 0
-    assert result.sha256 == HashStr("")
-    assert result.data == ""
-
-
-def test_read_json_hash_mismatch_returns_empty_data(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fixed_time: TimeStamp = TimeStamp(1_700_000_030)
-    monkeypatch.setattr(
-        "pypnm.lib.db.json_transaction.time.time",
-        lambda: int(fixed_time),
-    )
-
-    db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
-
-    payload: Mapping[str, Any] = {"key": "original"}
-    updated_db: JsonTransactionDbModel = db.write_json(
-        payload, fname="corrupt_me", extension="json"
-    )
-
-    tx_id, record = next(iter(updated_db.records.items()))
-    payload_path: Path = tmp_path / "json" / str(record.filename)
-
-    with open(payload_path, "ab") as handle:
-        handle.write(b"\nCORRUPTED")
-
-    result: JsonReturnModel = db.read_json(tx_id)
-
-    assert result.timestamp == record.timestamp
-    assert result.filename == str(record.filename)
-    assert result.byte_size == record.byte_size
-    assert result.sha256 == record.sha256
-    assert result.data == ""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            "SELECT role FROM transaction_artifacts WHERE transaction_id = ?;",
+            (str(transaction_id),),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        assert row[0] == ROLE_JSON_EXPORT
 
 
 def test_write_json_raises_on_non_serializable_data(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    db: JsonTransactionDb = _make_db(tmp_path, monkeypatch)
+    _configure_db(tmp_path, monkeypatch)
+    db = JsonTransactionDb()
 
     class _NonSerializable: ...
 
-    bad_payload: Mapping[str, Any] = {"obj": _NonSerializable()}
+    bad_payload: Mapping[str, object] = {"obj": _NonSerializable()}
 
     with pytest.raises(ValueError):
         db.write_json(bad_payload, fname="bad", extension="json")

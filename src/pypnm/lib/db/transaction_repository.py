@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -88,6 +89,9 @@ class _RepositoryBase:
                     row[0],
                 )
         return connection
+
+    def _resolve_app_root(self) -> Path:
+        return self._schema_manager._resolve_app_root()
 
     @staticmethod
     def _canonical_json(data: dict[str, object]) -> str:

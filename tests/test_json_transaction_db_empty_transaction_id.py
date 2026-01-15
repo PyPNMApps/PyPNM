@@ -3,81 +3,62 @@
 
 from __future__ import annotations
 
-import json
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from pypnm.config.pnm_config_manager import SystemConfigSettings
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
 from pypnm.lib.db.json_transaction import JsonTransactionDb
-from pypnm.lib.types import TransactionId
-from pypnm.lib.utils import Generate
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
 
 
-def _configure_json_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> tuple[Path, Path]:
+def _configure_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    db_path = tmp_path / "pypnm.sqlite3"
     json_dir = tmp_path / "json"
     json_dir.mkdir(parents=True, exist_ok=True)
-    json_db = tmp_path / "transactions.json"
+
     monkeypatch.setattr(
         SystemConfigSettings,
-        "json_db",
-        classmethod(lambda cls: str(json_db)),
+        "pnm_dir",
+        classmethod(lambda cls: str(tmp_path / "pnm")),
     )
     monkeypatch.setattr(
         SystemConfigSettings,
         "json_dir",
         classmethod(lambda cls: str(json_dir)),
     )
-    return json_db, json_dir
-
-
-@pytest.mark.parametrize("raw_id", ["", "   "])
-def test_write_json_skips_empty_transaction_id(
-    raw_id: str,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    json_db, json_dir = _configure_json_paths(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        Generate,
-        "transaction_id",
-        staticmethod(lambda seed=None, length=24: TransactionId(raw_id)),
+        SystemConfigSettings,
+        "database_backend",
+        classmethod(lambda cls: DatabaseBackend.SQLITE),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_sqlite_path",
+        classmethod(lambda cls: DatabasePath(str(db_path))),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "database_postgres_dsn",
+        classmethod(lambda cls: DatabaseDsn("")),
     )
 
-    db = JsonTransactionDb()
-    caplog.set_level("WARNING")
-    model = db.write_json({"alpha": 1}, "payload")
-
-    assert not (json_dir / "payload").exists()
-    assert model.records == {}
-    assert "Skipping DB insert for empty transaction_id" in caplog.text
-
-    if json_db.exists():
-        with json_db.open("r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        assert data == {}
+    DatabaseSchemaManager.from_system_config().initialize_schema()
+    return db_path
 
 
-def test_write_json_persists_valid_transaction_id(
+def test_write_json_without_transaction_id_does_not_link(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    json_db, json_dir = _configure_json_paths(tmp_path, monkeypatch)
-    monkeypatch.setattr(
-        Generate,
-        "transaction_id",
-        staticmethod(lambda seed=None, length=24: TransactionId("txn-1")),
-    )
-
+    db_path = _configure_db(tmp_path, monkeypatch)
     db = JsonTransactionDb()
-    model = db.write_json({"alpha": 1}, "payload")
 
-    payload_path = json_dir / "payload"
-    assert payload_path.exists()
-    assert "txn-1" in {str(tx_id) for tx_id in model.records}
+    db.write_json({"alpha": 1}, fname="payload", extension="json")
 
-    with json_db.open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    assert "txn-1" in data
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT COUNT(*) FROM transaction_artifacts;")
+        row = cursor.fetchone()
+        assert row is not None
+        assert int(row[0]) == 0

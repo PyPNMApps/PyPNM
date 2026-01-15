@@ -137,11 +137,6 @@ Runtime DB location policy: SQLite DB files live under `.data/db/` (demo uses `d
   "png_dir": ".data/png",
   "archive_dir": ".data/archive",
   "msg_rsp_dir": ".data/msg_rsp",
-  "transaction_db": ".data/db/transactions.json",
-  "capture_group_db": ".data/db/capture_group.json",
-  "session_group_db": ".data/db/session_group.json",
-  "operation_db": ".data/db/operation_capture.json",
-  "json_transaction_db": ".data/db/json_transactions.json",
   "retries": 5,
   "retrieval_method": {
     "method": "local",
@@ -186,7 +181,7 @@ Runtime DB location policy: SQLite DB files live under `.data/db/` (demo uses `d
 ```
 
 `password_enc` is the preferred password field for file retrieval methods. Plaintext `password` is supported only as a legacy fallback and is deprecated.
-Legacy JSON ledger paths remain for offline migration or diagnostics only. Runtime persistence for transactions, capture groups, operation mappings, and session groups is DB-backed.
+Deprecated JSON ledger keys are ignored at runtime; session groups are DB-backed and legacy JSON maps are supported only via the offline migrator.
 
 **Directories And Databases**
 
@@ -199,11 +194,11 @@ Legacy JSON ledger paths remain for offline migration or diagnostics only. Runti
 | png_dir             | string | Local storage for generated PNGs.            |
 | archive_dir         | string | Local storage for analysis ZIP archives.     |
 | msg_rsp_dir         | string | Local storage for message/response metadata. |
-| transaction_db      | string | Legacy JSON ledger for file transactions (migration only). |
-| capture_group_db    | string | Legacy JSON map of grouped transactions (migration only).  |
-| session_group_db    | string | Legacy JSON map of session groups (migration only).        |
-| operation_db        | string | Legacy JSON map of operation to capture group (migration only). |
-| json_transaction_db | string | Legacy JSON map of JSON transaction metadata (migration only). |
+| transaction_db      | string | Deprecated and ignored at runtime; remove from config. |
+| capture_group_db    | string | Deprecated and ignored at runtime; remove from config. |
+| session_group_db    | string | Deprecated and ignored at runtime; use offline migrator for legacy session-group JSON. |
+| operation_db        | string | Deprecated and ignored at runtime; remove from config. |
+| json_transaction_db | string | Deprecated and ignored at runtime; remove from config. |
 
 **Retrieval Settings**
 
@@ -240,7 +235,7 @@ Backend selection is set at install time (SQLite default; Postgres recommended f
 
 On startup, PyPNM applies the schema for the selected backend and seeds the canonical `UNKNOWN` sysDescr row and the default artifact store entry.
 
-DB backend migration is in progress; legacy ledger keys remain until Phase M6.
+DB backend migration is in progress; legacy ledger keys are retained for migration tooling and ignored at runtime.
 
 ## 6. Logging
 

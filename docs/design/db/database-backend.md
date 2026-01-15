@@ -17,10 +17,11 @@
   - [7.2 Configuration Keys](#72-configuration-keys)
   - [7.3 DB Location Policy](#73-db-location-policy)
   - [7.4 PostgreSQL Authentication And Secrets](#74-postgresql-authentication-and-secrets)
+  - [7.5 Adapter Contract And Bootstrap](#75-adapter-contract-and-bootstrap)
 - [8. Release Hygiene Requirements](#8-release-hygiene-requirements)
   - [8.1 Git Ignore And Packaging Exclusions](#81-git-ignore-and-packaging-exclusions)
   - [8.2 Docker And Container Image Hygiene](#82-docker-and-container-image-hygiene)
-- [9. Data Model](#9-data-model)
+- [9. Target Schema (Planned)](#9-target-schema-planned)
   - [9.1 Dimensions](#91-dimensions)
   - [9.2 Fact Tables](#92-fact-tables)
   - [9.3 Grouping Constructs](#93-grouping-constructs)
@@ -61,7 +62,7 @@
 
 This section is a working marker so you can see progress against the design while the DB cutover is in-flight.
 
-Work completed that supports DB-backed persistence:
+Work completed toward the DB bootstrap contract:
 
 - Unified operation workflow payload shape across newer registry-style endpoints:
   - Dual-status support (legacy `status` string plus canonical `service_status`)
@@ -71,24 +72,26 @@ Work completed that supports DB-backed persistence:
   - Multi-ChannelEstimation `/advance/multiChannelEstimation/status` (POST)
 - Test coverage added to lock in the above contract behavior and keep the validation gate green.
 
-Cutover statement:
+Bootstrap status:
 
-- Transactions, capture groups, and operation mappings are DB-backed and authoritative.
-- JSON ledgers for capture groups and operations are deprecated and not used at runtime.
-- The remaining cutover work focuses on artifact linkage and any residual ledger cleanup.
+- The adapter contract and schema bootstrap readiness check are implemented.
+- The full schema and data migrations remain planned work.
 
 ## 1. Purpose
 
-PyPNM historically persisted transaction metadata using JSON “ledger” files under `.data/db/` (for example
-`transactions.json`, `capture_group.json`, and `operation_capture.json`). The DB backend is now authoritative for
-transactions, capture groups, and operation mappings, and the JSON ledgers are deprecated. This design defines the
-target state for replacing the ledger with a relational database while preserving PyPNM’s operational model
+PyPNM historically persisted transaction metadata using JSON “ledger” files under `.data/db/`. The DB backend is
+being introduced incrementally; the JSON ledgers are deprecated, but the DB is not yet authoritative for
+transactions, capture groups, or operations. This design defines the target state for replacing the ledger with a
+relational database while preserving PyPNM’s operational model
 (filesystem-based binary artifacts plus lightweight metadata persistence).
 
 This document is authoritative for:
 
 - PyPNM (authoritative engine and persistence owner)
 - PyPNM-CMTS (consumer of PyPNM; inherits PyPNM’s backend choice)
+
+The current implementation only provides a minimal bootstrap contract; see [Bootstrap Contract](bootstrap-contract.md)
+for implemented behavior. The schema and workflow sections below are forward-looking until later phases land.
 
 ## 2. Scope
 
@@ -203,7 +206,7 @@ The DB stores metadata and references to those artifacts.
 
 ### 6.3 What Moves Into The DB
 
-Replace the JSON ledgers with DB-backed tables:
+Planned changes for later phases:
 
 - Transaction metadata
 - Capture group membership and ordering
@@ -269,7 +272,7 @@ Recommended environment variable keys (contract):
 
 Implementation note:
 
-- As of 2026-01-11, the design contract is stable, but `settings/system.json.template` and `SystemConfigSettings` accessors still need to be updated to fully reflect this configuration surface.
+- The template and SystemConfigSettings accessors align to this contract; installer output preserves the same keys.
 
 ### 7.3 DB Location Policy
 
@@ -310,6 +313,28 @@ PyPNM must treat DSN strings as secrets:
 
 - Do not log full DSNs at INFO level (mask or omit password portion).
 - If diagnostics need to report connectivity, log only host, port, dbname, user, and SSL mode.
+- Postgres driver support is optional and provided by the `postgres` extra (install with `pypnm-docsis[postgres]`).
+
+### 7.5 Adapter Contract And Bootstrap
+
+The DB adapter contract provides a minimal lifecycle interface: `connect`, `apply_schema`, `healthcheck`, and `close`.
+Adapters must remain policy-neutral and focused on the bootstrap path only.
+
+Backend selection precedence (contract):
+
+1) Environment overrides (`PYPNM_DB_BACKEND`, `PYPNM_DB_POSTGRES_DSN`)
+2) Configuration file values (`Database.backend`, `Database.postgres.dsn`)
+3) Defaults (SQLite)
+
+DatabaseManager selection may fall back to SQLite without raising if the Postgres DSN is invalid or blank. The
+schema manager is fail-fast: when backend is postgres and the DSN is invalid or blank, it raises a clear error.
+
+Schema bootstrap scope (current phase):
+
+- `schema_meta` and the baseline tables are applied to support transactions, grouping, and artifact metadata.
+- `initialize()` connects, applies schema/seed rows idempotently, and checks health.
+- `close()` tears down the adapter and clears the cached instance for re-selection.
+- Schema DDL assets are loaded from package data (via importlib.resources); docs copies are reference-only.
 
 ## 8. Release Hygiene Requirements
 
@@ -332,7 +357,10 @@ Concrete safeguards:
 - `.dockerignore` includes `.data/`, `demo/.data/`, `*.sqlite3`, `*.db`
 - Dockerfiles do not `COPY` `.data/` or demo datasets into image layers (data must come from runtime volumes)
 
-## 9. Data Model
+## 9. Target Schema (Planned)
+
+This section describes the planned target schema and workflow contracts. It is not implemented yet beyond the
+bootstrap table used for readiness checks.
 
 ### 9.1 Dimensions
 
@@ -554,11 +582,11 @@ flowchart TD
 
 ### 13.1 Remove Ledger JSON Design From Docs
 
-Documentation changes required:
+Documentation changes required (planned, not yet complete):
 
 - Remove or clearly mark deprecated any documentation that describes JSON ledger persistence as the design
-- Update file manager docs to state: transactions capture groups operations are DB-backed; binaries remain on disk
-- Update any docs that mention `.data/db/transactions.json`, `.data/db/capture_group.json`, or `.data/db/operation_capture.json`
+- When the DB becomes authoritative (Phase 3+), update file manager docs to state: transactions capture groups operations are DB-backed; binaries remain on disk
+- Update any docs that still imply JSON ledger authority for transaction/group/operation metadata
 - Ensure examples and diagrams in docs reflect DB-backed persistence and artifact linkage
 
 ### 13.2 Add Mermaid Support To MkDocs And pyproject
@@ -588,7 +616,7 @@ If your current docs stack already supports Mermaid via existing extensions, tre
 
 Schema versioning posture:
 
-- The initial DB-backed release is `schema_version = 1` (persisted via `schema_meta`).
+- The initial DB-backed release is `schema_meta.schema_version = 1`.
 - PyPNM is permitted to perform idempotent initialization (create tables, seed rows) but is not permitted to perform
   destructive migrations at runtime.
 - If a future schema change is required, it must be implemented as an explicit migration step (CLI tool or install-time

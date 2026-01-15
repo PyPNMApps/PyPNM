@@ -44,6 +44,46 @@ class DatabaseSettings(BaseModel):
         default_factory=DatabasePostgresSettings, description="Postgres settings"
     )
 
+    @classmethod
+    def from_sources(
+        cls,
+        backend_value: str | None,
+        env_backend: str,
+        sqlite_value: str | None,
+        postgres_value: str | None,
+        env_postgres_dsn: str,
+    ) -> DatabaseSettings:
+        backend = ""
+        if backend_value is not None:
+            backend = str(backend_value).strip()
+        if env_backend != "":
+            backend = env_backend
+
+        if sqlite_value is None:
+            sqlite_path = DEFAULT_SQLITE_DB_PATH
+        else:
+            sqlite_path = DatabasePath(str(sqlite_value))
+
+        if postgres_value is None:
+            postgres_dsn = DEFAULT_POSTGRES_DSN
+        else:
+            postgres_dsn = DatabaseDsn(str(postgres_value))
+
+        if env_postgres_dsn != "":
+            postgres_dsn = DatabaseDsn(env_postgres_dsn)
+
+        if backend == "":
+            return cls(
+                sqlite=DatabaseSqliteSettings(path=sqlite_path),
+                postgres=DatabasePostgresSettings(dsn=postgres_dsn),
+            )
+
+        return cls(
+            backend=backend,
+            sqlite=DatabaseSqliteSettings(path=sqlite_path),
+            postgres=DatabasePostgresSettings(dsn=postgres_dsn),
+        )
+
     @model_validator(mode="after")
     def _validate_backend_config(self) -> DatabaseSettings:
         if str(self.sqlite.path).strip() == "":

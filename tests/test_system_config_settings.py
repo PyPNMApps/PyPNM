@@ -38,6 +38,7 @@ def _reset_cfg(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     fake = FakeConfigManager()
     monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+    monkeypatch.setattr(SystemConfigSettings, "_deprecated_ledger_warned", set())
 
 
 def test_default_mac_address_from_config(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -219,6 +220,24 @@ def test_database_settings_env_override_for_postgres_dsn(
     assert settings.postgres.dsn == "postgresql://pypnm@localhost:5432/pypnm"
 
 
+def test_database_settings_reads_config_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeConfigManager(
+        {
+            "Database.backend": "postgres",
+            "Database.sqlite.path": ".data/db/test.sqlite3",
+            "Database.postgres.dsn": "postgresql://pypnm@localhost:5432/pypnm",
+        }
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    settings = SystemConfigSettings.database_settings()
+    assert settings.backend == DatabaseBackend.POSTGRES
+    assert settings.sqlite.path == ".data/db/test.sqlite3"
+    assert settings.postgres.dsn == "postgresql://pypnm@localhost:5432/pypnm"
+
+
 def test_database_settings_blank_postgres_dsn_without_env_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -320,6 +339,55 @@ def test_reload_calls_config_reload_and_initializes_directories(
     base = tmp_path
     assert (base / ".data" / "pnm").is_dir()
     assert (base / "logs").is_dir()
+
+
+def test_deprecated_ledger_keys_warn_once_and_ignore(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake = FakeConfigManager(
+        {
+            "PnmFileRetrieval.transaction_db": "legacy-transaction",
+            "PnmFileRetrieval.capture_group_db": "legacy-capture-group",
+            "PnmFileRetrieval.session_group_db": "legacy-session-group",
+            "PnmFileRetrieval.operation_db": "legacy-operation",
+            "PnmFileRetrieval.json_transaction_db": "legacy-json",
+        }
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+    monkeypatch.setattr(SystemConfigSettings, "_deprecated_ledger_warned", set())
+    monkeypatch.chdir(tmp_path)
+
+    logger_name = "SystemConfigSettings"
+    with caplog.at_level(logging.WARNING, logger=logger_name):
+        SystemConfigSettings.initialize_directories()
+
+        assert SystemConfigSettings.transaction_db() == ""
+        assert SystemConfigSettings.capture_group_db() == ""
+        assert SystemConfigSettings.session_group_db() == ""
+        assert SystemConfigSettings.operation_db() == ""
+        assert SystemConfigSettings.json_db() == ""
+
+        assert SystemConfigSettings.transaction_db() == ""
+        assert SystemConfigSettings.capture_group_db() == ""
+        assert SystemConfigSettings.session_group_db() == ""
+        assert SystemConfigSettings.operation_db() == ""
+        assert SystemConfigSettings.json_db() == ""
+
+    expected_keys = [
+        "transaction_db",
+        "capture_group_db",
+        "session_group_db",
+        "operation_db",
+        "json_transaction_db",
+    ]
+    for key in expected_keys:
+        expected = (
+            f"Configuration key 'PnmFileRetrieval.{key}' is deprecated and ignored "
+            "at runtime; remove it from system.json"
+        )
+        assert caplog.text.count(expected) == 1
 
 
 def test_scp_settings_use_config_values(monkeypatch: pytest.MonkeyPatch) -> None:

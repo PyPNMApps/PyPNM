@@ -77,10 +77,7 @@ If these items are not already explicit in the burndown, add them so Codex canno
 
 ### Phase 6 (M6) · Docs + Mermaid
 
-- [ ] Remove/replace all doc references to:
-  - `.data/db/transactions.json`
-  - `.data/db/capture_group.json`
-  - `.data/db/operation_capture.json`
+- [ ] Remove/replace any remaining doc references to legacy JSON ledgers now that the DB is authoritative.
 - [ ] Add Mermaid support for docs builds:
   - [ ] Add Mermaid plugin dependency to docs extras in `pyproject.toml` (example: `mkdocs-mermaid2-plugin`)
   - [ ] Update MkDocs config to render Mermaid fences (`pymdownx.superfences` mermaid custom fence)

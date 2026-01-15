@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
-import os
 import sqlite3
+from importlib import resources
 from pathlib import Path
 from typing import cast
 
 import pytest
+from tests.postgres_test_utils import require_postgres
 
 from pypnm.lib.db.db_schema_manager import (
     BEGIN_STATEMENT,
@@ -27,6 +28,7 @@ EXPECTED_UNKNOWN_COUNT: int = 1
 EXPECTED_SCHEMA_STATEMENTS_MIN: int = 1
 EXPECTED_SQLITE_JOURNAL_MODE: str = SQLITE_JOURNAL_MODE.lower()
 UNSUPPORTED_SCHEMA_VERSION: int = SCHEMA_VERSION + 1
+INVALID_DSN_VALUE: str = "   "
 INDEX_CG_TX_TABLE: str = "capture_group_transactions"
 INDEX_OPERATION_CAPTURES_TABLE: str = "operation_captures"
 INDEX_CG_TX_CAPTURE_GROUP_POSITION: str = "idx_cg_tx_capture_group_position"
@@ -213,7 +215,7 @@ def test_split_sql_statements_rejects_invalid_dollar_tag() -> None:
 
 
 def test_split_schema_postgres_contains_schema_meta() -> None:
-    ddl_path = Path("docs/design/db/schema_postgres.sql")
+    ddl_path = resources.files("pypnm.db.schema.sql").joinpath("schema_postgres.sql")
     ddl_sql = ddl_path.read_text(encoding="utf-8")
     statements = DatabaseSchemaManager._split_sql_statements(ddl_sql)
     assert len(statements) >= EXPECTED_SCHEMA_STATEMENTS_MIN
@@ -221,11 +223,45 @@ def test_split_schema_postgres_contains_schema_meta() -> None:
     assert "CREATE TABLE IF NOT EXISTS schema_meta" in joined
 
 
+def test_schema_sql_assets_load_from_package() -> None:
+    sqlite_sql = (
+        resources.files("pypnm.db.schema.sql")
+        .joinpath("schema_sqlite.sql")
+        .read_text(encoding="utf-8")
+    )
+    postgres_sql = (
+        resources.files("pypnm.db.schema.sql")
+        .joinpath("schema_postgres.sql")
+        .read_text(encoding="utf-8")
+    )
+    assert "CREATE TABLE IF NOT EXISTS schema_meta" in sqlite_sql
+    assert "CREATE TABLE IF NOT EXISTS schema_meta" in postgres_sql
+
+
+def test_postgres_schema_init_requires_dsn(tmp_path: Path) -> None:
+    sqlite_path = cast(DatabasePath, str(tmp_path / "unused.sqlite3"))
+    postgres_dsn = cast(DatabaseDsn, "")
+    manager = DatabaseSchemaManager.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+
+    with pytest.raises(ValueError, match="Database.postgres.dsn cannot be blank"):
+        manager.connect()
+
+
+def test_postgres_schema_init_requires_non_blank_dsn(tmp_path: Path) -> None:
+    sqlite_path = cast(DatabasePath, str(tmp_path / "unused.sqlite3"))
+    postgres_dsn = cast(DatabaseDsn, INVALID_DSN_VALUE)
+    manager = DatabaseSchemaManager.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+
+    with pytest.raises(ValueError, match="Database.postgres.dsn cannot be blank"):
+        manager.connect()
+
+
 def test_postgres_schema_init_optional() -> None:
-    dsn = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    postgres_dsn = cast(DatabaseDsn, dsn)
+    postgres_dsn, _ = require_postgres()
     sqlite_path = cast(DatabasePath, ".data/db/pypnm.sqlite3")
     manager = DatabaseSchemaManager.from_overrides(
         DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
@@ -236,17 +272,7 @@ def test_postgres_schema_init_optional() -> None:
 
 
 def test_postgres_capture_group_indexes_optional() -> None:
-    dsn = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    try:
-        from importlib.util import find_spec
-    except ImportError:
-        pytest.skip("importlib.util not available")
-    if find_spec("psycopg") is None:
-        pytest.skip("psycopg not installed")
-
-    postgres_dsn = cast(DatabaseDsn, dsn)
+    postgres_dsn, _ = require_postgres()
     sqlite_path = cast(DatabasePath, ".data/db/pypnm.sqlite3")
     manager = DatabaseSchemaManager.from_overrides(
         DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn

@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import uuid
 from pathlib import Path
 
 import pytest
+from tests.postgres_test_utils import require_postgres
 
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.capture_group_repository import CaptureGroupRepository
@@ -290,15 +290,7 @@ def test_capture_group_repository_enforces_fk_integrity(
 def test_capture_group_repository_enforces_fk_integrity_postgres(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    dsn_env = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn_env:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    try:
-        import psycopg
-    except ImportError:
-        pytest.skip("psycopg not installed")
-
-    postgres_dsn = DatabaseDsn(dsn_env)
+    postgres_dsn, psycopg = require_postgres()
     sqlite_placeholder = _configure_capture_group_postgres(
         tmp_path, monkeypatch, postgres_dsn
     )
@@ -331,15 +323,7 @@ def test_capture_group_repository_enforces_fk_integrity_postgres(
 def test_capture_group_repository_rejects_duplicate_position_postgres(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    dsn_env = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn_env:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    try:
-        import psycopg
-    except ImportError:
-        pytest.skip("psycopg not installed")
-
-    postgres_dsn = DatabaseDsn(dsn_env)
+    postgres_dsn, psycopg = require_postgres()
     sqlite_placeholder = _configure_capture_group_postgres(
         tmp_path, monkeypatch, postgres_dsn
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -23,6 +24,7 @@ SCHEMA_VERSION: int = 1
 SCHEMA_META_ID: int = 1
 UNKNOWN_SYSDESCR_HASH: str = "UNKNOWN"
 DEFAULT_ARTIFACT_STORE_NAME: str = "default"
+JSON_ARTIFACT_STORE_NAME: str = "json"
 DEFAULT_ARTIFACT_STORE_ROOT: str = ".data/pnm"
 SQLITE_JOURNAL_MODE: str = "WAL"
 SQLITE_BUSY_TIMEOUT_MS: int = 5000
@@ -32,6 +34,7 @@ COMMIT_STATEMENT: str = "COMMIT"
 
 _SQLITE_DDL_FILE: str = "schema_sqlite.sql"
 _POSTGRES_DDL_FILE: str = "schema_postgres.sql"
+_SCHEMA_SQL_PACKAGE: str = "pypnm.db.schema.sql"
 
 _REQUIRED_TABLES: tuple[str, ...] = (
     "schema_meta",
@@ -108,6 +111,7 @@ class DatabaseSchemaManager:
             self._apply_schema(connection)
             self._seed_unknown_sysdescr(connection)
             self._seed_default_artifact_store(connection)
+            self._seed_json_artifact_store(connection)
             self._ensure_schema_version(connection)
         finally:
             connection.close()
@@ -258,6 +262,32 @@ class DatabaseSchemaManager:
                     )
                 pg_conn.commit()
 
+    def _seed_json_artifact_store(self, connection: DbConnection) -> None:
+        root_path = self._normalize_root_path(SystemConfigSettings.json_dir())
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                sqlite_conn.execute(
+                    """
+                    INSERT OR IGNORE INTO artifact_stores (store_name, root_path)
+                    VALUES (?, ?);
+                    """,
+                    (JSON_ARTIFACT_STORE_NAME, root_path),
+                )
+                sqlite_conn.commit()
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO artifact_stores (store_name, root_path)
+                        VALUES (%s, %s)
+                        ON CONFLICT (store_name) DO NOTHING;
+                        """,
+                        (JSON_ARTIFACT_STORE_NAME, root_path),
+                    )
+                pg_conn.commit()
+
     def _ensure_schema_version(self, connection: DbConnection) -> None:
         schema_version = self._fetch_schema_version(connection)
         if schema_version != SCHEMA_VERSION:
@@ -384,13 +414,12 @@ class DatabaseSchemaManager:
         return root_path
 
     def _load_schema_sql(self) -> str:
-        ddl_dir = self._resolve_ddl_dir()
         ddl_file = (
             _SQLITE_DDL_FILE
             if self._backend == DatabaseBackend.SQLITE
             else _POSTGRES_DDL_FILE
         )
-        ddl_path = ddl_dir / ddl_file
+        ddl_path = resources.files(_SCHEMA_SQL_PACKAGE).joinpath(ddl_file)
         return ddl_path.read_text(encoding="utf-8")
 
     @staticmethod
@@ -516,15 +545,6 @@ class DatabaseSchemaManager:
             return False
         body = tag[1:-1]
         return all(ch_token.isalnum() or ch_token == "_" for ch_token in body)
-
-    def _resolve_ddl_dir(self) -> Path:
-        candidates = [Path(__file__).resolve(), Path.cwd().resolve()]
-        for candidate in candidates:
-            for parent in [candidate] + list(candidate.parents):
-                ddl_dir = parent / "docs" / "design" / "db"
-                if ddl_dir.is_dir():
-                    return ddl_dir
-        raise FileNotFoundError("Unable to locate docs/design/db for DDL assets")
 
     def _resolve_app_root(self) -> Path:
         cwd = Path.cwd().resolve()

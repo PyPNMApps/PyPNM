@@ -18,6 +18,7 @@ from pypnm.api.routes.common.classes.analysis.analysis import SpecAnCapturePara
 from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
     PnmFileTransaction,
 )
+from pypnm.lib.db.artifact_repository import ROLE_PNM_RAW
 from pypnm.api.routes.common.extended.common_measure_schema import (
     DownstreamOfdmParameters,
     UpstreamOfdmaParameters,
@@ -246,6 +247,20 @@ class CommonMeasureService(CommonMessagingService):
                 self.logger.debug(f'SpectrumAmplitudeData: - FNAME: {filename} - Length:{len(amp_data)} - TransactionID: {tx_id}')
 
                 FileProcessor(fpath).write_file(amp_data)
+                try:
+                    PnmFileTransaction().register_pnm_artifact(
+                        tx_id,
+                        filename,
+                        ROLE_PNM_RAW,
+                    )
+                except (FileNotFoundError, RuntimeError) as exc:
+                    self.logger.error(
+                        "%s - Failed to register PNM artifact for transaction %s: %s",
+                        self.log_prefix,
+                        tx_id,
+                        exc,
+                    )
+                    return self.build_send_msg(ServiceStatusCode.PNM_FILE_RETRIEVAL_ERROR)
                 #################################################################################################
                 # Build binary filename and save file - END
                 #################################################################################################
@@ -711,6 +726,20 @@ class CommonMeasureService(CommonMessagingService):
                     return ServiceStatusCode.PNM_FILE_TRANSACTION_ID_NOT_FOUND
                 
                 self.logger.debug(f'{self.log_prefix} - TransID: {trans_id} -> Filename: {pnm_fname}')
+                try:
+                    PnmFileTransaction().register_pnm_artifact(
+                        trans_id,
+                        pnm_fname,
+                        ROLE_PNM_RAW,
+                    )
+                except (FileNotFoundError, RuntimeError) as exc:
+                    self.logger.error(
+                        "%s - Failed to register PNM artifact for transaction %s: %s",
+                        self.log_prefix,
+                        trans_id,
+                        exc,
+                    )
+                    return ServiceStatusCode.PNM_FILE_RETRIEVAL_ERROR
                 self.build_transaction_msg(trans_id, pnm_fname)
 
         return ServiceStatusCode.SUCCESS

@@ -38,6 +38,7 @@ class SystemConfigSettings:
 
     _cfg = ConfigManager()
     _logger = logging.getLogger("SystemConfigSettings")
+    _deprecated_ledger_warned: set[str] = set()
 
     _DEFAULT_IP_ADDRESS: InetAddressStr = cast(InetAddressStr, "192.168.0.100")
     _DEFAULT_SNMP_RETRIES: int = 5
@@ -460,34 +461,22 @@ class SystemConfigSettings:
 
     @classmethod
     def database_settings(cls) -> DatabaseSettings:
-        data: dict[str, object] = {}
-
         backend_value = cls._cfg.get("Database", "backend")
-        if backend_value is not None:
-            data["backend"] = str(backend_value).strip()
         env_backend = cls._db_backend_env_override()
-        if env_backend != "":
-            data["backend"] = env_backend
 
         sqlite_value = cls._cfg.get("Database", "sqlite", "path")
-        if sqlite_value is None:
-            sqlite_path = str(cls._DEFAULT_SQLITE_DB_PATH)
-        else:
-            sqlite_path = str(sqlite_value)
-        data["sqlite"] = {"path": sqlite_path}
-
         postgres_value = cls._cfg.get("Database", "postgres", "dsn")
-        if postgres_value is None:
-            postgres_dsn = str(cls._DEFAULT_POSTGRES_DSN)
-        else:
-            postgres_dsn = str(postgres_value)
-
         env_override = cls._postgres_dsn_env_override()
-        if env_override != "":
-            postgres_dsn = env_override
-        data["postgres"] = {"dsn": postgres_dsn}
 
-        return DatabaseSettings.model_validate(data)
+        return DatabaseSettings.from_sources(
+            backend_value=str(backend_value).strip()
+            if backend_value is not None
+            else None,
+            env_backend=env_backend,
+            sqlite_value=str(sqlite_value) if sqlite_value is not None else None,
+            postgres_value=str(postgres_value) if postgres_value is not None else None,
+            env_postgres_dsn=env_override,
+        )
 
     @classmethod
     def database_backend(cls) -> DatabaseBackend:
@@ -740,23 +729,28 @@ class SystemConfigSettings:
 
     @classmethod
     def transaction_db(cls) -> str:
-        return cls._get_str("", "PnmFileRetrieval", "transaction_db")
+        cls._warn_deprecated_ledger_key("transaction_db")
+        return ""
 
     @classmethod
     def capture_group_db(cls) -> str:
-        return cls._get_str("", "PnmFileRetrieval", "capture_group_db")
+        cls._warn_deprecated_ledger_key("capture_group_db")
+        return ""
 
     @classmethod
     def session_group_db(cls) -> str:
-        return cls._get_str("", "PnmFileRetrieval", "session_group_db")
+        cls._warn_deprecated_ledger_key("session_group_db")
+        return ""
 
     @classmethod
     def operation_db(cls) -> str:
-        return cls._get_str("", "PnmFileRetrieval", "operation_db")
+        cls._warn_deprecated_ledger_key("operation_db")
+        return ""
 
     @classmethod
     def json_db(cls) -> str:
-        return cls._get_str("", "PnmFileRetrieval", "json_transaction_db")
+        cls._warn_deprecated_ledger_key("json_transaction_db")
+        return ""
 
     @classmethod
     def file_retrieval_retries(cls) -> int:
@@ -1346,6 +1340,7 @@ class SystemConfigSettings:
         """
         Create necessary directories if they do not exist.
         """
+        cls._warn_deprecated_ledger_paths()
         directories = [
             cls.pnm_dir(),
             cls.csv_dir(),
@@ -1358,6 +1353,35 @@ class SystemConfigSettings:
         ]
         for directory in directories:
             Path(directory).mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def _warn_deprecated_ledger_paths(cls) -> None:
+        cls._warn_deprecated_ledger_key("transaction_db")
+        cls._warn_deprecated_ledger_key("capture_group_db")
+        cls._warn_deprecated_ledger_key("session_group_db")
+        cls._warn_deprecated_ledger_key("operation_db")
+        cls._warn_deprecated_ledger_key("json_transaction_db")
+
+    @classmethod
+    def _warn_deprecated_ledger_key(cls, key: str) -> None:
+        if key in cls._deprecated_ledger_warned:
+            return
+        value = cls._cfg.get("PnmFileRetrieval", key)
+        if value is None:
+            return
+        if isinstance(value, str):
+            if value == "":
+                return
+            configured = value
+        else:
+            configured = str(value)
+            if configured == "":
+                return
+        cls._logger.warning(
+            "Configuration key 'PnmFileRetrieval.%s' is deprecated and ignored at runtime; remove it from system.json",
+            key,
+        )
+        cls._deprecated_ledger_warned.add(key)
 
     @classmethod
     def reload(cls) -> None:

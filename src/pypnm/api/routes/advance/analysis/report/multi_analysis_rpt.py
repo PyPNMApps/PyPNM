@@ -24,7 +24,14 @@ from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.db.json_transaction import JsonTransactionDb
 from pypnm.lib.mac_address import MacAddress, cast
 from pypnm.lib.matplot.manager import MatplotManager
-from pypnm.lib.types import ChannelId, JsonScalar, PathArray, PathLike, TimeStamp
+from pypnm.lib.types import (
+    ChannelId,
+    JsonScalar,
+    PathArray,
+    PathLike,
+    TimeStamp,
+    TransactionId,
+)
 from pypnm.lib.utils import Generate, TimeUnit
 
 
@@ -257,9 +264,15 @@ class MultiAnalysisRpt(ABC):
         return self._trans_collect
 
     def register_models_for_json_archive_files(
-        self, model: BaseModel, filename_tags: list[str], append_timestamp: bool = True
+        self,
+        model: BaseModel,
+        filename_tags: list[str],
+        append_timestamp: bool = True,
+        transaction_id: TransactionId | None = None,
     ) -> None:
-        """Register a Pydantic model to be serialized as JSON and included in the report archive."""
+        """
+        Register a Pydantic model to be serialized as JSON and included in the report archive.
+        """
 
         # model is a Pydantic BaseModel instance, but it can be any subclass
         # We need to make sure its initial derive is from BaseModel
@@ -272,7 +285,9 @@ class MultiAnalysisRpt(ABC):
         full_path_fname = self.create_json_fname(tags=filename_tags)
 
         JsonTransactionDb().write_json(
-            data=model.model_dump(), fname=Path(full_path_fname).parts[-1]
+            data=model.model_dump(),
+            fname=Path(full_path_fname).parts[-1],
+            transaction_id=transaction_id,
         )
 
         self.json_files.append(full_path_fname)

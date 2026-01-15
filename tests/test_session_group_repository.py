@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import uuid
 from pathlib import Path
 
 import pytest
+from tests.postgres_test_utils import require_postgres
 
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
@@ -198,15 +198,7 @@ def test_session_group_repository_enforces_fk_integrity(
 def test_session_group_repository_enforces_fk_integrity_postgres(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    dsn_env = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
-    if not dsn_env:
-        pytest.skip("PYPNM_DB_POSTGRES_DSN not set")
-    try:
-        import psycopg
-    except ImportError:
-        pytest.skip("psycopg not installed")
-
-    postgres_dsn = DatabaseDsn(dsn_env)
+    postgres_dsn, psycopg = require_postgres()
     sqlite_placeholder = DatabasePath(str(tmp_path / "unused.sqlite3"))
     suffix = uuid.uuid4().hex[:8]
     monkeypatch.setattr(

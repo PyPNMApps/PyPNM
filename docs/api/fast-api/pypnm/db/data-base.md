@@ -9,7 +9,7 @@ Overview of how PyPNM stores, organizes, and links measurement data for traceabi
 - [Operation Capture Linking](#operation-capture-linking)
 - [Capture Group Registry](#capture-group-registry)
 - [Transaction Records](#transaction-records)
-- [JSON Capture Ledger](#json-capture-ledger)
+- [JSON Export Artifacts](#json-export-artifacts)
 - [Summary Of Relationships](#summary-of-relationships)
 
 ## Data Repository Layout
@@ -28,10 +28,7 @@ The `.data` tree is the on-disk workspace for all PyPNM captures, intermediate a
 │   ├── aabbccddeeff_lcpet3_1760940313_ofdm_profile_perf_1_ch34_pid1.csv
 │   └── aabbccddeeff_lcpet3_1760940313_ofdm_profile_perf_1_ch34_pid3.csv
 ├── db
-│   ├── capture_group.json
-│   ├── json_transactions.json
-│   ├── operation_capture.json
-│   └── transactions.json
+│   ├── pypnm.sqlite3
 ├── json
 │   ├── aabbccddeeff_example_run_1760940313_33_cmdsofdmrxmer_1760940313000000000.json
 │   └── aabbccddeeff_example_run_1760940313_34_cmdsofdmrxmer_1760940313999999999.json
@@ -62,9 +59,8 @@ Each subdirectory has a well-defined role. The table below summarizes typical co
 | ---------- | --------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `archive/` | ZIP archives combining multi-file outputs (CSV, PNG, summaries) | `aabbccddeeff_lcpet3_1760940313.zip`                                  | One-stop bundle for download/sharing and offline review.                                          |
 | `csv/`     | Per-measurement CSV exports                                     | `aabbccddeeff_lcpet3_1760940313_ofdm_profile_perf_1_ch34_pid1.csv`    | Tabular data for analysis, BI tools, and spreadsheets.                                            |
-| `db/`      | JSON ledgers and indexes                                        | `transactions.json`, `operation_capture.json`, `capture_group.json`   | Traceability: transactions, operation-to-group links, and grouped captures.                       |
-| `db/`      | JSON capture ledger                                             | `json_transactions.json`                                              | Index of processed JSON capture files (under `.data/json/`), including size and SHA-256 hashes.  |
-| `json/`    | Raw/processed JSON outputs (when enabled)                       | `aabbccddeeff_example_run_1760940313_33_cmdsofdmrxmer_*.json`         | Structured artifacts for programmatic consumption; filenames are recorded in `json_transactions`. |
+| `db/`      | SQLite DB (or external Postgres via DSN)                        | `pypnm.sqlite3`                                                       | DB-backed metadata: transactions, capture groups, operation mappings, and artifacts.             |
+| `json/`    | Raw/processed JSON outputs (when enabled)                       | `aabbccddeeff_example_run_1760940313_33_cmdsofdmrxmer_*.json`         | Structured artifacts for programmatic consumption; metadata is tracked in the DB artifact tables. |
 | `msg_rsp/` | Request/response message snapshots (optional)                   | —                                                                     | Diagnostics and audit of REST or SNMP exchanges.                                                  |
 | `png/`     | Visualization images per capture/profile/channel                | `aabbccddeeff_lcpet3_1760940313_34_profile_1_ofdm_profile_perf_1.png` | Quick-look plots for reports and UIs.                                                             |
 | `pnm/`     | Binary PNM files pulled from devices or uploads                 | `ds_ofdm_rxmer_per_subcar_aabbccddeeff_33_1760940252.bin`             | Source files used by analyses; include the embedded `pnm_header`.                                |
@@ -72,22 +68,16 @@ Each subdirectory has a well-defined role. The table below summarizes typical co
 
 ## Operation Capture Linking
 
-The `.data/db/operation_capture.json` file links a multi-measurement **operation** to a single **capture group**.
+Operation-to-capture-group mapping is stored in the `operation_captures` DB table.
 An operation represents a higher-level request that may include different PNM test types (RxMER, FEC Summary, Modulation Profile).
-
-```json
-"6bc3877d9b374039": {
-  "capture_group_id": "91d93f5309944ac8",
-  "created": 1751950063
-}
-```
 
 ### Field Overview
 
 | Field              | Type    | Description                                   |
 | ------------------ | ------- | --------------------------------------------- |
+| `operation_id`     | string  | Operation identifier (primary key).           |
 | `capture_group_id` | string  | Unique ID of the broader capture session.     |
-| `created`          | integer | Operation creation timestamp (epoch seconds). |
+| `created_epoch`    | integer | Operation creation timestamp (epoch seconds). |
 
 Common uses:
 
@@ -96,37 +86,21 @@ Common uses:
 
 ## Capture Group Registry
 
-The `.data/db/capture_group.json` file is the index of **grouped transactions**.
+Capture groups are stored in `capture_groups`, with ordered membership in `capture_group_transactions`.
 Capture groups can span multiple test types or measurements and underpin multi-file workflows (Excel generation, correlation, etc.).
-
-```json
-"91d93f5309944ac8": {
-  "created": 1751950063,
-  "transactions": [
-    "1e171e1f8ef5377a",
-    "3ed8cb029bbba404",
-    "d94ad704d79cfce9",
-    "53ee3282cef409b5",
-    "ce6b8d43b6c8bf0c",
-    "fa34f5dea580119b",
-    "41f23b8c451af271",
-    "2c228e79d86e6bf0",
-    "f446c7fec87e5ad3",
-    "3889d1976fb68feb"
-  ]
-}
-```
 
 ### Field Overview
 
-| Field          | Type    | Description                                                               |
-| -------------- | ------- | ------------------------------------------------------------------------- |
-| `created`      | integer | Group creation timestamp (epoch seconds; often the first operation time). |
-| `transactions` | array   | List of transaction IDs belonging to this capture group.                  |
+| Field              | Type    | Description                                                               |
+| ------------------ | ------- | ------------------------------------------------------------------------- |
+| `capture_group_id` | string  | Group identifier (primary key).                                           |
+| `created_epoch`    | integer | Group creation timestamp (epoch seconds; often the first operation time). |
+| `transaction_id`   | string  | Transaction ID linked to the group.                                       |
+| `position`         | integer | Ordering index for deterministic listing.                                 |
 
 ## Transaction Records
 
-The `.data/db/transactions.json` file is the ledger of all file captures and uploads tracked by PyPNM.
+Transactions are stored in the `transaction_records` table, with file resolution via `transaction_artifacts`.
 Each entry represents a single file **transaction**, whether:
 
 - Pulled automatically from a cable modem (for example, via TFTP), or
@@ -134,7 +108,7 @@ Each entry represents a single file **transaction**, whether:
 
 ### Structure
 
-Each transaction is indexed by a unique hash (for example, a digest of filename plus timestamp):
+Each transaction is indexed by a unique ID (16-char digest) and stored in the DB:
 
 ```json
 "1e171e1f8ef5377a": {
@@ -164,9 +138,11 @@ Each transaction is indexed by a unique hash (for example, a digest of filename 
 | `filename`       | string  | Saved binary filename in `.data/pnm/`.                                      |
 | `device_details` | object  | Parsed device metadata from SNMP when available (`sys_descr` fields shown). |
 
-## JSON Capture Ledger
+On-disk file resolution uses `transaction_artifacts` with role preference (`pnm_raw`, then `pnm_uploaded_raw`) and joins through `file_artifacts` and `artifact_stores`.
 
-The `.data/db/json_transactions.json` file is the ledger for JSON capture artifacts saved under `.data/json/`.
+## JSON Export Artifacts
+
+JSON exports are written under `.data/json/` and tracked in the DB-backed artifact tables (`artifact_stores`, `file_artifacts`, `transaction_artifacts`) when linked to a transaction.
 It lets PyPNM track processed JSON outputs separately from raw PNM files.
 
 Each entry is keyed by a transaction ID and points to a JSON file created from a particular capture session.
@@ -209,10 +185,10 @@ This allows you to map JSON artifacts back to their originating modem, run, and 
 ## Summary Of Relationships
 
 - **Operation Capture → Capture Group → Transaction (PNM binary)**  
-  An **operation** references a single **capture group**, which aggregates many **transactions** in `transactions.json`. Each transaction points to a PNM file in `.data/pnm/`.
+  An **operation** references a single **capture group**, which aggregates many **transactions** in `transaction_records`. Each transaction resolves to a PNM file via `transaction_artifacts`.
 
 - **Transactions (PNM) → JSON Captures**  
-  JSON exports derived from those PNM files are written to `.data/json/` and tracked in `json_transactions.json` with size and checksum metadata.
+  JSON exports derived from those PNM files are written to `.data/json/` and tracked in the DB artifact tables with size and checksum metadata.
 
 - **Reporting And REST Access**  
   Use the **operation ID** for API recall, the **capture group** for report generation and correlation across tests, and the **transaction IDs** (PNM and JSON) for raw file or artifact lookup.
