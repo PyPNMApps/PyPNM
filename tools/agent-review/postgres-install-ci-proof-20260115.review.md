@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Ensure Postgres install-time extras are installed when selected and CI runs Postgres-gated tests with clear diagnostics.
+- Changes: install.sh now installs `.[dev,docs,postgres]` when Postgres backend is selected; CI Postgres job sets `PYPNM_TEST_POSTGRES=1` and prints masked DSN + psycopg version before tests.
+- Files: install.sh; .github/workflows/daily-build.yml
+- Tests: python3 -m compileall src; ruff check .; ruff format --check .; pytest -q
+- Notes: pytest skips include PYPNM_TEST_POSTGRES-gated tests (local) and PNM_CM_IT hardware integration; CI job now sets PYPNM_TEST_POSTGRES.
+
+# FILE: install.sh
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -826,3 +834,171 @@ echo "👉 Next steps:"
 echo "   1) source '$VENV_DIR/bin/activate'"
 echo "   2) (optional) ./tools/pnm/pnm_file_retrieval_setup.py"
 echo "   3) mkdocs serve"
+
+# FILE: .github/workflows/daily-build.yml
+name: Build
+
+on:
+  push:
+    branches: [main]         # Run on every commit to main
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * *"      # Every day at 08:00 UTC
+  workflow_dispatch:          # Allow manual triggering from GitHub UI
+
+jobs:
+  daily-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run checks
+        run: |
+          pypnm-software-qa-checker
+
+  postgres-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pypnm
+          POSTGRES_PASSWORD: pypnm
+          POSTGRES_DB: pypnm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pypnm -d pypnm"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PYPNM_DB_BACKEND: postgres
+      PYPNM_DB_POSTGRES_DSN: postgresql://pypnm:pypnm@localhost:5432/pypnm
+      PYPNM_TEST_POSTGRES: "1"
+      PGPASSWORD: pypnm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install "psycopg[binary]"
+
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U pypnm -d pypnm; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready"
+          exit 1
+
+      - name: Postgres test diagnostics
+        run: |
+          echo "PYPNM_TEST_POSTGRES=${PYPNM_TEST_POSTGRES}"
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          dsn = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
+          parsed = urlparse(dsn)
+          host = parsed.hostname or ""
+          port = parsed.port or ""
+          db = parsed.path.lstrip("/")
+          user = parsed.username or ""
+          print(f\"PYPNM_DB_POSTGRES_DSN=postgresql://{user}:***@{host}:{port}/{db}\")
+          PY
+          python -c "import psycopg; print(psycopg.__version__)"
+
+      - name: Run checks
+        run: |
+          pypnm-software-qa-checker
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE_PROJECT_NAME: ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Seed demo config for container build
+        run: |
+          cp demo/settings/system.json deploy/docker/config/system.json
+          cp demo/settings/system.json deploy/docker/config/system.json.template
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker compose build --progress plain
+
+      - name: Start stack
+        run: |
+          docker compose up -d
+
+      - name: Wait for API health
+        run: |
+          container_id="$(docker compose ps -q pypnm-api)"
+          if [ -z "$container_id" ]; then
+            echo "API container was not created"
+            docker compose ps
+            exit 1
+          fi
+
+          for attempt in $(seq 1 30); do
+            status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            echo "Container not healthy yet (status: $status); waiting..."
+            sleep 5
+          done
+
+          echo "Container failed to become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down --volumes

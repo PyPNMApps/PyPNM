@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -129,17 +129,20 @@ class DatabaseSchemaManager:
             schema_version = self._fetch_schema_version(connection)
             unknown_sysdescr_present = self._has_unknown_sysdescr(connection)
             default_store_present = self._has_default_artifact_store(connection)
+            json_store_present = self._has_json_artifact_store(connection)
             ok = (
                 not missing_tables
                 and schema_version == SCHEMA_VERSION
                 and unknown_sysdescr_present
                 and default_store_present
+                and json_store_present
             )
             details = self._health_details(
                 schema_version,
                 missing_tables,
                 unknown_sysdescr_present,
                 default_store_present,
+                json_store_present,
             )
             return DatabaseHealthModel(
                 backend=self._backend,
@@ -147,6 +150,7 @@ class DatabaseSchemaManager:
                 missing_tables=missing_tables,
                 unknown_sysdescr_present=unknown_sysdescr_present,
                 default_artifact_store_present=default_store_present,
+                json_artifact_store_present=json_store_present,
                 ok=ok,
                 details=details,
             )
@@ -377,12 +381,32 @@ class DatabaseSchemaManager:
                     return cursor.fetchone() is not None
         return False
 
+    def _has_json_artifact_store(self, connection: DbConnection) -> bool:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT 1 FROM artifact_stores WHERE store_name = ?;",
+                    (JSON_ARTIFACT_STORE_NAME,),
+                )
+                return cursor.fetchone() is not None
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT 1 FROM artifact_stores WHERE store_name = %s;",
+                        (JSON_ARTIFACT_STORE_NAME,),
+                    )
+                    return cursor.fetchone() is not None
+        return False
+
     def _health_details(
         self,
         schema_version: int,
         missing_tables: list[str],
         unknown_sysdescr_present: bool,
         default_store_present: bool,
+        json_store_present: bool,
     ) -> str:
         if missing_tables:
             return f"Missing tables: {', '.join(missing_tables)}"
@@ -392,6 +416,8 @@ class DatabaseSchemaManager:
             return "Missing UNKNOWN sysDescr seed row"
         if not default_store_present:
             return "Missing default artifact store row"
+        if not json_store_present:
+            return "Missing JSON artifact store row"
         return "Schema healthy"
 
     def _resolve_sqlite_db_path(self) -> Path:
@@ -552,6 +578,12 @@ class DatabaseSchemaManager:
             if (parent / "pyproject.toml").is_file():
                 return parent
         return cwd
+
+    def resolve_app_root(self) -> Path:
+        """
+        Return the repository root path used for resolving relative DB assets.
+        """
+        return self._resolve_app_root()
 
 
 def initialize_database_schema() -> None:

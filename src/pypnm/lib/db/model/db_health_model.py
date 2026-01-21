@@ -26,5 +26,8 @@ class DatabaseHealthModel(BaseModel):
     default_artifact_store_present: bool = Field(
         ..., description="Whether the default artifact store row exists"
     )
+    json_artifact_store_present: bool = Field(
+        ..., description="Whether the JSON artifact store row exists"
+    )
     ok: bool = Field(..., description="True when schema is healthy and complete")
     details: str = Field("", description="Diagnostic summary")

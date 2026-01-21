@@ -6,6 +6,15 @@
             "write_community": "cmtspublic"
         }
     },
+    "Database": {
+        "backend": "sqlite",
+        "postgres": {
+            "dsn": ""
+        },
+        "sqlite": {
+            "path": ".data/db/pypnm.sqlite3"
+        }
+    },
     "FastApiRequestDefault": {
         "ip_address": "192.168.0.1",
         "mac_address": "aa:bb:cc:dd:ee:ff"
@@ -38,7 +47,7 @@
         "pnm_dir": ".data/pnm",
         "retries": 5,
         "retrieval_method": {
-            "method": "sftp",
+            "method": "local",
             "methods": {
                 "ftp": {
                     "host": "localhost",
@@ -83,15 +92,6 @@
         "session_group_db": ".data/db/session_group.json",
         "transaction_db": ".data/db/transactions.json",
         "xlsx_dir": ".data/xlsx"
-    },
-    "Database": {
-        "backend": "sqlite",
-        "sqlite": {
-            "path": ".data/db/pypnm.sqlite3"
-        },
-        "postgres": {
-            "dsn": ""
-        }
     },
     "SNMP": {
         "timeout": 2,

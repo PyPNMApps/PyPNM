@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -9,12 +9,13 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 
-from pypnm.config.pnm_config_manager import SystemConfigSettings
+from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.artifact_repository import ArtifactRepository
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.types import PathLike, TimestampSec, TransactionId
 
 JsonPayload = Mapping[str, object]
+_LEGACY_LEDGER_FILENAME: str = "transactions.json"
 
 
 class JsonTransactionDb:
@@ -80,6 +81,11 @@ class JsonTransactionDb:
         filename = str(fname)
         if extension:
             filename = f"{filename}.{extension.lstrip('.')}"
+        if Path(filename).name.lower() == _LEGACY_LEDGER_FILENAME:
+            raise RuntimeError(
+                "Legacy transactions.json writes are not supported; use the DB-backed "
+                "transaction repository and offline migrator."
+            )
 
         payload_path = self._json_dir / filename
         payload_processor = FileProcessor(payload_path)

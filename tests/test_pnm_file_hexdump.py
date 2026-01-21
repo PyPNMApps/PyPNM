@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025-2026 Maurice Garcia
+# Copyright (c) 2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -109,19 +109,6 @@ def _register_artifact(
     )
 
 
-def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
-    original_open = Path.open
-
-    def _guarded_open(
-        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
-    ) -> object:
-        if self.name == "transactions.json":
-            raise AssertionError(f"Unexpected JSON ledger access: {self}")
-        return original_open(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "open", _guarded_open)
-
-
 @pytest.mark.pnm
 def test_hexdump_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """
@@ -130,7 +117,6 @@ def test_hexdump_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     """
     transaction_id: TransactionId = TransactionId("8f17fcdd4c0138ef")
     db_path = _configure_db(tmp_path, monkeypatch)
-    _guard_json_ledgers(monkeypatch)
     _seed_transaction(db_path, transaction_id)
 
     file_path = tmp_path / DEFAULT_FILENAME
@@ -163,7 +149,6 @@ def test_hexdump_missing_transaction_raises(
     """
     transaction_id: TransactionId = TransactionId("deadbeefdeadbeef")
     _configure_db(tmp_path, monkeypatch)
-    _guard_json_ledgers(monkeypatch)
 
     service = PnmFileService()
 

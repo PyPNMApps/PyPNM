@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Make DB-only cutover guardrails enforceable (health check + test guard) and add minimal Postgres artifact coverage.
+- Changes: DB schema health check now validates JSON artifact store; added Postgres-gated artifact resolution test; centralized ledger read guard for PNM-marked tests.
+- Files: docs/design/db/database-backend.md; src/pypnm/lib/db/db_schema_manager.py; src/pypnm/lib/db/json_transaction.py; src/pypnm/lib/db/model/db_health_model.py; src/pypnm/tools/migrate_transactions.py; tests/ledger_guard.py; tests/test_migrate_transactions.py; tests/test_pnm_file_artifact_resolution.py; tests/test_pnm_file_hexdump.py; tests/test_artifact_repository.py; tests/test_db_schema_manager.py; tests/conftest.py
+- Tests: python3 -m compileall src; ruff check .; ruff format --check .; pytest -q
+- Notes: pytest skips include PYPNM_TEST_POSTGRES-gated tests and PNM_CM_IT hardware integration; planning/.pylintrc left untouched.
+
+# FILE: docs/design/db/database-backend.md
 # PyPNM Database Backend Design
 
 ## Table Of Contents
@@ -1175,3 +1183,993 @@ VALUES (
 
 COMMIT;
 ```
+
+# FILE: src/pypnm/lib/db/db_schema_manager.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+import sqlite3
+from importlib import resources
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeAlias
+
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.db.model.db_health_model import DatabaseHealthModel
+from pypnm.lib.types import DatabaseBackend, DatabaseDsn, DatabasePath
+
+if TYPE_CHECKING:
+    from psycopg import Connection as PsycopgConnection
+else:
+    PsycopgConnection = object
+
+DbConnection: TypeAlias = sqlite3.Connection | PsycopgConnection
+
+SCHEMA_VERSION: int = 1
+SCHEMA_META_ID: int = 1
+UNKNOWN_SYSDESCR_HASH: str = "UNKNOWN"
+DEFAULT_ARTIFACT_STORE_NAME: str = "default"
+JSON_ARTIFACT_STORE_NAME: str = "json"
+DEFAULT_ARTIFACT_STORE_ROOT: str = ".data/pnm"
+SQLITE_JOURNAL_MODE: str = "WAL"
+SQLITE_BUSY_TIMEOUT_MS: int = 5000
+
+BEGIN_STATEMENT: str = "BEGIN"
+COMMIT_STATEMENT: str = "COMMIT"
+
+_SQLITE_DDL_FILE: str = "schema_sqlite.sql"
+_POSTGRES_DDL_FILE: str = "schema_postgres.sql"
+_SCHEMA_SQL_PACKAGE: str = "pypnm.db.schema.sql"
+
+_REQUIRED_TABLES: tuple[str, ...] = (
+    "schema_meta",
+    "system_description_dim",
+    "device_details",
+    "transaction_records",
+    "capture_groups",
+    "capture_group_transactions",
+    "operation_captures",
+    "session_groups",
+    "session_group_transactions",
+    "artifact_stores",
+    "file_artifacts",
+    "transaction_artifacts",
+)
+
+
+class DatabaseSchemaManager:
+    """
+    Initialize and validate the DB schema for the selected backend.
+    """
+
+    def __init__(
+        self,
+        backend: DatabaseBackend,
+        sqlite_path: DatabasePath,
+        postgres_dsn: DatabaseDsn,
+    ) -> None:
+        self._backend = backend
+        self._sqlite_path = sqlite_path
+        self._postgres_dsn = postgres_dsn
+        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+
+    @classmethod
+    def from_system_config(cls) -> DatabaseSchemaManager:
+        """
+        Build a schema manager using SystemConfigSettings.
+        """
+        return cls(
+            SystemConfigSettings.database_backend(),
+            SystemConfigSettings.database_sqlite_path(),
+            SystemConfigSettings.database_postgres_dsn(),
+        )
+
+    @classmethod
+    def from_overrides(
+        cls,
+        backend: DatabaseBackend,
+        sqlite_path: DatabasePath,
+        postgres_dsn: DatabaseDsn,
+    ) -> DatabaseSchemaManager:
+        """
+        Build a schema manager using explicit backend overrides.
+        """
+        return cls(backend, sqlite_path, postgres_dsn)
+
+    def connect(self) -> DbConnection:
+        """
+        Open a DB connection for the configured backend.
+        """
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                return self._connect_sqlite()
+            case DatabaseBackend.POSTGRES:
+                return self._connect_postgres()
+        raise ValueError(f"Unsupported Database backend: {self._backend}")
+
+    def initialize_schema(self) -> None:
+        """
+        Apply schema DDL and seed required rows idempotently.
+        """
+        connection = self.connect()
+        try:
+            self._apply_schema(connection)
+            self._seed_unknown_sysdescr(connection)
+            self._seed_default_artifact_store(connection)
+            self._seed_json_artifact_store(connection)
+            self._ensure_schema_version(connection)
+        finally:
+            connection.close()
+
+    def health_check(self) -> DatabaseHealthModel:
+        """
+        Run a schema health check and return a diagnostic model.
+        """
+        connection = self.connect()
+        try:
+            table_names = self._fetch_table_names(connection)
+            missing_tables = [
+                table for table in _REQUIRED_TABLES if table not in table_names
+            ]
+            schema_version = self._fetch_schema_version(connection)
+            unknown_sysdescr_present = self._has_unknown_sysdescr(connection)
+            default_store_present = self._has_default_artifact_store(connection)
+            json_store_present = self._has_json_artifact_store(connection)
+            ok = (
+                not missing_tables
+                and schema_version == SCHEMA_VERSION
+                and unknown_sysdescr_present
+                and default_store_present
+                and json_store_present
+            )
+            details = self._health_details(
+                schema_version,
+                missing_tables,
+                unknown_sysdescr_present,
+                default_store_present,
+                json_store_present,
+            )
+            return DatabaseHealthModel(
+                backend=self._backend,
+                schema_version=schema_version,
+                missing_tables=missing_tables,
+                unknown_sysdescr_present=unknown_sysdescr_present,
+                default_artifact_store_present=default_store_present,
+                json_artifact_store_present=json_store_present,
+                ok=ok,
+                details=details,
+            )
+        finally:
+            connection.close()
+
+    def _connect_sqlite(self) -> sqlite3.Connection:
+        db_path = self._resolve_sqlite_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(db_path)
+        connection.execute(f"PRAGMA journal_mode = {SQLITE_JOURNAL_MODE};")
+        connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS};")
+        connection.execute("PRAGMA foreign_keys = ON;")
+        return connection
+
+    def _connect_postgres(self) -> PsycopgConnection:
+        dsn = str(self._postgres_dsn).strip()
+        if not dsn:
+            raise ValueError("Database.postgres.dsn cannot be blank")
+        try:
+            import psycopg
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg is required for Postgres backend support"
+            ) from exc
+        return psycopg.connect(dsn)
+
+    def _apply_schema(self, connection: DbConnection) -> None:
+        ddl_sql = self._load_schema_sql()
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                sqlite_conn.executescript(ddl_sql)
+                sqlite_conn.commit()
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                statements = self._split_sql_statements(ddl_sql)
+                current_idx = 0
+                try:
+                    with pg_conn.cursor() as cursor:
+                        for idx, statement in enumerate(statements, start=1):
+                            current_idx = idx
+                            if self._should_skip_statement(statement):
+                                continue
+                            cursor.execute(statement)
+                    pg_conn.commit()
+                except Exception as exc:
+                    pg_conn.rollback()
+                    raise RuntimeError(
+                        f"Failed to apply Postgres schema at statement {current_idx}"
+                    ) from exc
+
+    def _seed_unknown_sysdescr(self, connection: DbConnection) -> None:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                sqlite_conn.execute(
+                    """
+                    INSERT OR IGNORE INTO system_description_dim (
+                        hw_rev, vendor, bootr, sw_rev, model,
+                        sysdescr_json, sysdescr_hash, is_unknown
+                    )
+                    VALUES (
+                        'UNKNOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN',
+                        '{}', ?, 1
+                    );
+                    """,
+                    (UNKNOWN_SYSDESCR_HASH,),
+                )
+                sqlite_conn.commit()
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO system_description_dim (
+                            hw_rev, vendor, bootr, sw_rev, model,
+                            sysdescr_json, sysdescr_hash, is_unknown
+                        )
+                        VALUES (
+                            'UNKNOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN', 'UNKNOWN',
+                            '{}'::jsonb, %s, TRUE
+                        )
+                        ON CONFLICT (sysdescr_hash) DO NOTHING;
+                        """,
+                        (UNKNOWN_SYSDESCR_HASH,),
+                    )
+                pg_conn.commit()
+
+    def _seed_default_artifact_store(self, connection: DbConnection) -> None:
+        root_path = self._normalize_root_path(SystemConfigSettings.pnm_dir())
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                sqlite_conn.execute(
+                    """
+                    INSERT OR IGNORE INTO artifact_stores (store_name, root_path)
+                    VALUES (?, ?);
+                    """,
+                    (DEFAULT_ARTIFACT_STORE_NAME, root_path),
+                )
+                sqlite_conn.commit()
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO artifact_stores (store_name, root_path)
+                        VALUES (%s, %s)
+                        ON CONFLICT (store_name) DO NOTHING;
+                        """,
+                        (DEFAULT_ARTIFACT_STORE_NAME, root_path),
+                    )
+                pg_conn.commit()
+
+    def _seed_json_artifact_store(self, connection: DbConnection) -> None:
+        root_path = self._normalize_root_path(SystemConfigSettings.json_dir())
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                sqlite_conn.execute(
+                    """
+                    INSERT OR IGNORE INTO artifact_stores (store_name, root_path)
+                    VALUES (?, ?);
+                    """,
+                    (JSON_ARTIFACT_STORE_NAME, root_path),
+                )
+                sqlite_conn.commit()
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO artifact_stores (store_name, root_path)
+                        VALUES (%s, %s)
+                        ON CONFLICT (store_name) DO NOTHING;
+                        """,
+                        (JSON_ARTIFACT_STORE_NAME, root_path),
+                    )
+                pg_conn.commit()
+
+    def _ensure_schema_version(self, connection: DbConnection) -> None:
+        schema_version = self._fetch_schema_version(connection)
+        if schema_version != SCHEMA_VERSION:
+            raise RuntimeError(
+                f"Unsupported schema_version={schema_version}; expected {SCHEMA_VERSION}"
+            )
+
+    def _fetch_table_names(self, connection: DbConnection) -> set[str]:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table';"
+                )
+                return {row[0] for row in cursor.fetchall()}
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT table_name
+                        FROM information_schema.tables
+                        WHERE table_schema = 'public';
+                        """
+                    )
+                    return {row[0] for row in cursor.fetchall()}
+        return set()
+
+    def _fetch_schema_version(self, connection: DbConnection) -> int:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT schema_version FROM schema_meta WHERE schema_meta_id = ?;",
+                    (SCHEMA_META_ID,),
+                )
+                row = cursor.fetchone()
+                if row:
+                    return int(row[0])
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT schema_version FROM schema_meta WHERE schema_meta_id = %s;",
+                        (SCHEMA_META_ID,),
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        return int(row[0])
+        return 0
+
+    def _has_unknown_sysdescr(self, connection: DbConnection) -> bool:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT 1 FROM system_description_dim WHERE sysdescr_hash = ?;",
+                    (UNKNOWN_SYSDESCR_HASH,),
+                )
+                return cursor.fetchone() is not None
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT 1 FROM system_description_dim WHERE sysdescr_hash = %s;",
+                        (UNKNOWN_SYSDESCR_HASH,),
+                    )
+                    return cursor.fetchone() is not None
+        return False
+
+    def _has_default_artifact_store(self, connection: DbConnection) -> bool:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT 1 FROM artifact_stores WHERE store_name = ?;",
+                    (DEFAULT_ARTIFACT_STORE_NAME,),
+                )
+                return cursor.fetchone() is not None
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT 1 FROM artifact_stores WHERE store_name = %s;",
+                        (DEFAULT_ARTIFACT_STORE_NAME,),
+                    )
+                    return cursor.fetchone() is not None
+        return False
+
+    def _has_json_artifact_store(self, connection: DbConnection) -> bool:
+        match self._backend:
+            case DatabaseBackend.SQLITE:
+                sqlite_conn = connection
+                cursor = sqlite_conn.execute(
+                    "SELECT 1 FROM artifact_stores WHERE store_name = ?;",
+                    (JSON_ARTIFACT_STORE_NAME,),
+                )
+                return cursor.fetchone() is not None
+            case DatabaseBackend.POSTGRES:
+                pg_conn = connection
+                with pg_conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT 1 FROM artifact_stores WHERE store_name = %s;",
+                        (JSON_ARTIFACT_STORE_NAME,),
+                    )
+                    return cursor.fetchone() is not None
+        return False
+
+    def _health_details(
+        self,
+        schema_version: int,
+        missing_tables: list[str],
+        unknown_sysdescr_present: bool,
+        default_store_present: bool,
+        json_store_present: bool,
+    ) -> str:
+        if missing_tables:
+            return f"Missing tables: {', '.join(missing_tables)}"
+        if schema_version != SCHEMA_VERSION:
+            return f"Schema version mismatch: {schema_version}"
+        if not unknown_sysdescr_present:
+            return "Missing UNKNOWN sysDescr seed row"
+        if not default_store_present:
+            return "Missing default artifact store row"
+        if not json_store_present:
+            return "Missing JSON artifact store row"
+        return "Schema healthy"
+
+    def _resolve_sqlite_db_path(self) -> Path:
+        path = Path(str(self._sqlite_path))
+        if path.is_absolute():
+            return path
+        return self._resolve_app_root() / path
+
+    def _normalize_root_path(self, root_path: str) -> str:
+        path = Path(root_path)
+        if not path.is_absolute():
+            return root_path
+        app_root = self._resolve_app_root()
+        if app_root in path.parents:
+            return str(path.relative_to(app_root))
+        self.logger.warning(
+            "Artifact store root_path is absolute; portable paths are recommended: %s",
+            root_path,
+        )
+        return root_path
+
+    def _load_schema_sql(self) -> str:
+        ddl_file = (
+            _SQLITE_DDL_FILE
+            if self._backend == DatabaseBackend.SQLITE
+            else _POSTGRES_DDL_FILE
+        )
+        ddl_path = resources.files(_SCHEMA_SQL_PACKAGE).joinpath(ddl_file)
+        return ddl_path.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _split_sql_statements(sql: str) -> list[str]:
+        statements: list[str] = []
+        buffer: list[str] = []
+        in_single = False
+        in_double = False
+        in_line_comment = False
+        in_block_comment = False
+        dollar_tag: str | None = None
+
+        idx = 0
+        length = len(sql)
+        while idx < length:
+            ch = sql[idx]
+            nxt = sql[idx + 1] if idx + 1 < length else ""
+
+            if in_line_comment:
+                buffer.append(ch)
+                if ch == "\n":
+                    in_line_comment = False
+                idx += 1
+                continue
+
+            if in_block_comment:
+                buffer.append(ch)
+                if ch == "*" and nxt == "/":
+                    buffer.append(nxt)
+                    idx += 2
+                    in_block_comment = False
+                    continue
+                idx += 1
+                continue
+
+            if dollar_tag is not None:
+                if ch == "$" and sql.startswith(dollar_tag, idx):
+                    buffer.append(dollar_tag)
+                    idx += len(dollar_tag)
+                    dollar_tag = None
+                    continue
+                buffer.append(ch)
+                idx += 1
+                continue
+
+            if not in_single and not in_double:
+                if ch == "-" and nxt == "-":
+                    buffer.append(ch)
+                    buffer.append(nxt)
+                    idx += 2
+                    in_line_comment = True
+                    continue
+                if ch == "/" and nxt == "*":
+                    buffer.append(ch)
+                    buffer.append(nxt)
+                    idx += 2
+                    in_block_comment = True
+                    continue
+
+            if not in_single and not in_double and ch == "$":
+                tag_end = sql.find("$", idx + 1)
+                if tag_end != -1:
+                    tag = sql[idx : tag_end + 1]
+                    if DatabaseSchemaManager._is_valid_dollar_tag(tag):
+                        closing_idx = sql.find(tag, tag_end + 1)
+                        if closing_idx == -1:
+                            buffer.append(ch)
+                            idx += 1
+                            continue
+                        dollar_tag = tag
+                        buffer.append(tag)
+                        idx = tag_end + 1
+                        continue
+
+            if ch == "'" and not in_double:
+                if in_single and nxt == "'":
+                    buffer.append(ch)
+                    buffer.append(nxt)
+                    idx += 2
+                    continue
+                in_single = not in_single
+                buffer.append(ch)
+                idx += 1
+                continue
+
+            if ch == '"' and not in_single:
+                in_double = not in_double
+                buffer.append(ch)
+                idx += 1
+                continue
+
+            if ch == ";" and not in_single and not in_double and dollar_tag is None:
+                statement = "".join(buffer).strip()
+                if statement:
+                    statements.append(statement)
+                buffer = []
+                idx += 1
+                continue
+
+            buffer.append(ch)
+            idx += 1
+
+        tail = "".join(buffer).strip()
+        if tail:
+            statements.append(tail)
+        return statements
+
+    @staticmethod
+    def _should_skip_statement(statement: str) -> bool:
+        normalized = " ".join(statement.strip().strip(";").split()).upper()
+        return normalized in (
+            BEGIN_STATEMENT,
+            "BEGIN TRANSACTION",
+            COMMIT_STATEMENT,
+            "COMMIT WORK",
+            "ROLLBACK",
+            "ROLLBACK WORK",
+        )
+
+    @staticmethod
+    def _is_valid_dollar_tag(tag: str) -> bool:
+        if len(tag) < 2 or not tag.startswith("$") or not tag.endswith("$"):
+            return False
+        body = tag[1:-1]
+        return all(ch_token.isalnum() or ch_token == "_" for ch_token in body)
+
+    def _resolve_app_root(self) -> Path:
+        cwd = Path.cwd().resolve()
+        for parent in [cwd] + list(cwd.parents):
+            if (parent / "pyproject.toml").is_file():
+                return parent
+        return cwd
+
+    def resolve_app_root(self) -> Path:
+        """
+        Return the repository root path used for resolving relative DB assets.
+        """
+        return self._resolve_app_root()
+
+
+def initialize_database_schema() -> None:
+    """
+    Initialize and validate the database schema using system configuration.
+    """
+    manager = DatabaseSchemaManager.from_system_config()
+    manager.initialize_schema()
+    health = manager.health_check()
+    if not health.ok:
+        raise RuntimeError(f"Database schema health check failed: {health.details}")
+
+# FILE: src/pypnm/lib/db/json_transaction.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from collections.abc import Mapping
+from pathlib import Path
+
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.db.artifact_repository import ArtifactRepository
+from pypnm.lib.file_processor import FileProcessor
+from pypnm.lib.types import PathLike, TimestampSec, TransactionId
+
+JsonPayload = Mapping[str, object]
+_LEGACY_LEDGER_FILENAME: str = "transactions.json"
+
+
+class JsonTransactionDb:
+    """
+    JSON export writer with DB-backed artifact tracking.
+
+    The legacy JSON ledger file is no longer used. This helper writes JSON
+    payloads under the configured json_dir and registers the artifact in the
+    DB-backed artifact tables. When a transaction_id is supplied, the JSON
+    artifact is linked via transaction_artifacts using the JSON export role.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the JSON export writer.
+
+        Configuration comes from SystemConfigSettings.json_dir(), and artifacts
+        are registered via ArtifactRepository using the configured DB backend.
+        """
+        self._json_dir = Path(SystemConfigSettings.json_dir())
+        self._artifact_repo = ArtifactRepository.from_system_config()
+        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+
+    def write_json(
+        self,
+        data: JsonPayload,
+        fname: PathLike,
+        extension: str = "",
+        transaction_id: TransactionId | None = None,
+    ) -> Path:
+        """
+        Persist a JSON payload and register the artifact in the DB.
+
+        Parameters
+        ----------
+        data:
+            JSON-serializable mapping representing the payload.
+        fname:
+            Base filename (without extension) to use for the payload file.
+        extension:
+            File extension to use for the payload file (default: "").
+        transaction_id:
+            Optional transaction identifier to link the JSON artifact to an
+            existing transaction record.
+
+        Returns
+        -------
+        Path
+            Full path to the JSON payload file on disk.
+
+        Raises
+        ------
+        ValueError
+            If ``data`` cannot be serialized as JSON.
+        RuntimeError
+            If writing the payload file fails.
+        """
+        try:
+            json.dumps(data)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Provided data is not JSON-serializable: {exc}") from exc
+
+        filename = str(fname)
+        if extension:
+            filename = f"{filename}.{extension.lstrip('.')}"
+        if Path(filename).name.lower() == _LEGACY_LEDGER_FILENAME:
+            raise RuntimeError(
+                "Legacy transactions.json writes are not supported; use the DB-backed "
+                "transaction repository and offline migrator."
+            )
+
+        payload_path = self._json_dir / filename
+        payload_processor = FileProcessor(payload_path)
+        write_ok = payload_processor.write_file(dict(data), append=False)
+        if not write_ok:
+            raise RuntimeError(f"Failed to write transaction payload to {payload_path}")
+
+        created_epoch = TimestampSec(int(time.time()))
+        self._artifact_repo.register_json_export(
+            file_path=payload_path,
+            created_epoch=created_epoch,
+            transaction_id=transaction_id,
+        )
+
+        return payload_path
+
+# FILE: src/pypnm/lib/db/model/db_health_model.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from pypnm.lib.types import DatabaseBackend
+
+
+class DatabaseHealthModel(BaseModel):
+    """
+    Database health status for schema diagnostics.
+    """
+
+    backend: DatabaseBackend = Field(..., description="Database backend under test")
+    schema_version: int = Field(
+        ..., description="Detected schema version (0 when missing)"
+    )
+    missing_tables: list[str] = Field(
+        default_factory=list, description="Required tables that are missing"
+    )
+    unknown_sysdescr_present: bool = Field(
+        ..., description="Whether the canonical UNKNOWN sysDescr row exists"
+    )
+    default_artifact_store_present: bool = Field(
+        ..., description="Whether the default artifact store row exists"
+    )
+    json_artifact_store_present: bool = Field(
+        ..., description="Whether the JSON artifact store row exists"
+    )
+    ok: bool = Field(..., description="True when schema is healthy and complete")
+    details: str = Field("", description="Diagnostic summary")
+
+# FILE: src/pypnm/tools/migrate_transactions.py
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.db.db_schema_manager import DatabaseSchemaManager
+from pypnm.lib.db.transaction_repository import (
+    DeviceDetailsRepository,
+    SystemDescriptionRepository,
+    TransactionRepository,
+)
+from pypnm.lib.types import (
+    ExitCode,
+    FileName,
+    JsonValue,
+    MacAddressStr,
+    StringArray,
+    TimestampSec,
+    TransactionId,
+)
+
+_DEFAULT_LOG_FORMAT: str = "%(levelname)s %(name)s: %(message)s"
+_DEFAULT_LEDGER_PATH: str = ".data/db/transactions.json"
+_TIMESTAMP_KEYS: tuple[str, ...] = ("timestamp", "timestamp_epoch", "timestampEpoch")
+_TXN_ID_KEYS: tuple[str, ...] = ("transaction_id", "transactionId", "transactionIdHex")
+_MAC_KEYS: tuple[str, ...] = ("mac_address", "macAddress", "mac")
+_PNM_TEST_TYPE_KEYS: tuple[str, ...] = ("pnm_test_type", "pnmTestType")
+_FILENAME_KEYS: tuple[str, ...] = ("filename", "file_name", "fileName")
+_DEVICE_DETAILS_KEYS: tuple[str, ...] = ("device_details", "deviceDetails")
+
+
+@dataclass(frozen=True)
+class TransactionRecord:
+    transaction_id: TransactionId
+    timestamp_epoch: TimestampSec
+    mac_address: MacAddressStr
+    pnm_test_type: str
+    filename: FileName
+    device_details: dict[str, object]
+
+
+class TransactionMigrator:
+    """
+    Import legacy transactions.json into the DB-backed transaction_records tables.
+    """
+
+    EXIT_OK: ExitCode = ExitCode(0)
+    EXIT_USAGE: ExitCode = ExitCode(2)
+    EXIT_FAILURE: ExitCode = ExitCode(1)
+
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(f"{self.__class__.__name__}")
+
+    @staticmethod
+    def _load_json(path: Path) -> JsonValue:
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _resolve_default_path() -> Path:
+        app_root = DatabaseSchemaManager.from_system_config().resolve_app_root()
+        return app_root / _DEFAULT_LEDGER_PATH
+
+    @staticmethod
+    def _extract_string(entry: dict[str, object], keys: tuple[str, ...]) -> str:
+        for key in keys:
+            raw = entry.get(key)
+            if isinstance(raw, str):
+                return raw
+        return ""
+
+    @staticmethod
+    def _extract_timestamp(entry: dict[str, object]) -> TimestampSec | None:
+        for key in _TIMESTAMP_KEYS:
+            raw = entry.get(key)
+            if isinstance(raw, int):
+                return TimestampSec(int(raw))
+            if isinstance(raw, float):
+                return TimestampSec(int(raw))
+            if isinstance(raw, str) and raw.isdigit():
+                return TimestampSec(int(raw))
+        return None
+
+    @staticmethod
+    def _extract_device_details(entry: dict[str, object]) -> dict[str, object]:
+        for key in _DEVICE_DETAILS_KEYS:
+            raw = entry.get(key)
+            if isinstance(raw, dict):
+                return raw
+        return {}
+
+    def _parse_entry(
+        self, transaction_id: str, entry: object
+    ) -> TransactionRecord | None:
+        if not isinstance(entry, dict):
+            return None
+        tx_id = transaction_id.strip()
+        if not tx_id:
+            return None
+        timestamp = self._extract_timestamp(entry)
+        if timestamp is None:
+            return None
+        mac_address = self._extract_string(entry, _MAC_KEYS).strip()
+        if not mac_address:
+            return None
+        pnm_test_type = self._extract_string(entry, _PNM_TEST_TYPE_KEYS).strip()
+        if not pnm_test_type:
+            return None
+        filename = self._extract_string(entry, _FILENAME_KEYS).strip()
+        if not filename:
+            return None
+        device_details = self._extract_device_details(entry)
+        return TransactionRecord(
+            transaction_id=TransactionId(tx_id),
+            timestamp_epoch=timestamp,
+            mac_address=MacAddressStr(mac_address),
+            pnm_test_type=pnm_test_type,
+            filename=FileName(filename),
+            device_details=device_details,
+        )
+
+    def _parse_payload(self, payload: JsonValue) -> tuple[list[TransactionRecord], int]:
+        records: list[TransactionRecord] = []
+        skipped = 0
+        if isinstance(payload, dict):
+            for transaction_id, entry in payload.items():
+                if not isinstance(transaction_id, str):
+                    skipped += 1
+                    continue
+                record = self._parse_entry(transaction_id, entry)
+                if record is None:
+                    skipped += 1
+                    continue
+                records.append(record)
+            return records, skipped
+        if isinstance(payload, list):
+            for entry in payload:
+                if not isinstance(entry, dict):
+                    skipped += 1
+                    continue
+                tx_id = self._extract_string(entry, _TXN_ID_KEYS).strip()
+                record = self._parse_entry(tx_id, entry)
+                if record is None:
+                    skipped += 1
+                    continue
+                records.append(record)
+            return records, skipped
+        raise ValueError("transactions.json must be a JSON object or list")
+
+    def _migrate_records(self, records: list[TransactionRecord]) -> tuple[int, int, int]:
+        sys_repo = SystemDescriptionRepository.from_system_config()
+        device_repo = DeviceDetailsRepository.from_system_config()
+        txn_repo = TransactionRepository.from_system_config()
+        imported = 0
+        failed = 0
+        duplicates = 0
+        for record in records:
+            if txn_repo.get_transaction_record(record.transaction_id) is not None:
+                duplicates += 1
+                continue
+            try:
+                sysdescr_payload: dict[str, str] = {}
+                system_description = record.device_details.get("system_description")
+                if isinstance(system_description, dict):
+                    cleaned = {
+                        str(key): str(value) for key, value in system_description.items()
+                    }
+                    sysdescr_payload = SystemDescriptor.load_from_dict(cleaned).to_dict()
+                sysdescr_id = sys_repo.get_or_create_sysdescr_id(sysdescr_payload)
+                device_detail_id = device_repo.get_or_create_device_detail_id(
+                    record.device_details, sysdescr_id
+                )
+                txn_repo.insert_transaction(
+                    transaction_id=record.transaction_id,
+                    timestamp_epoch=record.timestamp_epoch,
+                    mac_address=record.mac_address,
+                    pnm_test_type=record.pnm_test_type,
+                    filename=record.filename,
+                    device_detail_id=device_detail_id,
+                )
+                imported += 1
+            except Exception as exc:
+                failed += 1
+                self.logger.error(
+                    "Failed to import transaction_id=%s: %s",
+                    record.transaction_id,
+                    exc,
+                )
+        return imported, duplicates, failed
+
+    def run(self, argv: StringArray) -> ExitCode:
+        parser = argparse.ArgumentParser(
+            description="Migrate legacy transactions.json into the DB backend."
+        )
+        parser.add_argument(
+            "--input",
+            type=Path,
+            help="Path to legacy transactions.json (defaults to .data/db/transactions.json).",
+        )
+
+        args = parser.parse_args(argv)
+        SystemConfigSettings.reload()
+
+        input_path = args.input
+        if input_path is None:
+            input_path = self._resolve_default_path()
+
+        if not input_path.exists():
+            self.logger.warning("Legacy transactions.json not found: %s", input_path)
+            return self.EXIT_OK
+
+        try:
+            payload = self._load_json(input_path)
+            records, skipped = self._parse_payload(payload)
+        except Exception as exc:
+            self.logger.error("Failed to read legacy transactions.json: %s", exc)
+            return self.EXIT_FAILURE
+
+        DatabaseSchemaManager.from_system_config().initialize_schema()
+
+        imported, duplicates, failed = self._migrate_records(records)
+        self.logger.info(
+            "Migrated %d transaction records from %s (duplicates=%d, skipped=%d, failed=%d)",
+            imported,
+            input_path,
+            duplicates,
+            skipped,
+            failed,
+        )
+        return self.EXIT_OK
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format=_DEFAULT_LOG_FORMAT)
+    migrator = TransactionMigrator()
+    raise SystemExit(migrator.run(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    main()

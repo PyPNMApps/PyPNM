@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 import pytest
+from tests.postgres_test_utils import require_postgres
 
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.db.artifact_repository import (
@@ -127,3 +129,67 @@ def test_artifact_repository_resolves_role_preference(
 
     resolved = repo.resolve_transaction_artifact_path(transaction_id)
     assert resolved == raw_path
+
+
+def test_postgres_transaction_artifact_resolution_optional(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    postgres_dsn, _ = require_postgres()
+    sqlite_path = DatabasePath(str(tmp_path / "unused.sqlite3"))
+
+    json_dir = tmp_path / "json"
+    json_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "pnm_dir",
+        classmethod(lambda cls: str(tmp_path)),
+    )
+    monkeypatch.setattr(
+        SystemConfigSettings,
+        "json_dir",
+        classmethod(lambda cls: str(json_dir)),
+    )
+
+    manager = DatabaseSchemaManager.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+    manager.initialize_schema()
+
+    transaction_id = TransactionId(uuid.uuid4().hex)
+    sys_repo = SystemDescriptionRepository.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+    device_repo = DeviceDetailsRepository.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+    txn_repo = TransactionRepository.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+    sysdescr_id = sys_repo.get_or_create_sysdescr_id(SYS_DESCR)
+    device_detail_id = device_repo.get_or_create_device_detail_id(
+        DEVICE_DETAILS, sysdescr_id
+    )
+    txn_repo.insert_transaction(
+        transaction_id=transaction_id,
+        timestamp_epoch=TimestampSec(DEFAULT_TIMESTAMP),
+        mac_address=DEFAULT_MAC,
+        pnm_test_type=PNM_TEST_TYPE,
+        filename=DEFAULT_FILENAME,
+        device_detail_id=device_detail_id,
+    )
+
+    file_path = tmp_path / DEFAULT_FILENAME
+    file_path.write_bytes(b"postgres")
+
+    repo = ArtifactRepository.from_overrides(
+        DatabaseBackend.POSTGRES, sqlite_path, postgres_dsn
+    )
+    repo.register_transaction_artifact(
+        transaction_id=transaction_id,
+        file_path=file_path,
+        role=ROLE_PNM_RAW,
+        created_epoch=TimestampSec(DEFAULT_TIMESTAMP),
+    )
+
+    resolved = repo.resolve_transaction_artifact_path(transaction_id)
+    assert resolved == file_path

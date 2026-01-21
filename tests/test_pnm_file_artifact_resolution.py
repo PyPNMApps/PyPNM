@@ -14,6 +14,7 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp imp
 )
 from pypnm.api.routes.docs.pnm.files.schemas import (
     FileAnalysisRequest,
+    FileQueryRequest,
     FileSearchRequest,
 )
 from pypnm.api.routes.docs.pnm.files.service import PnmFileService
@@ -118,26 +119,12 @@ def _register_artifact(
     )
 
 
-def _guard_json_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
-    original_open = Path.open
-
-    def _guarded_open(
-        self: Path, *args: tuple[object, ...], **kwargs: dict[str, object]
-    ) -> object:
-        if self.name == "transactions.json":
-            raise AssertionError(f"Unexpected JSON ledger access: {self}")
-        return original_open(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "open", _guarded_open)
-
-
 @pytest.mark.pnm
 def test_get_file_by_transaction_id_uses_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     transaction_id = TransactionId("txn-1")
     db_path = _configure_db(tmp_path, monkeypatch)
-    _guard_json_ledgers(monkeypatch)
     _seed_transaction(db_path, transaction_id)
 
     file_path = tmp_path / DEFAULT_FILENAME
@@ -159,7 +146,6 @@ def test_get_analysis_resolves_via_artifacts(
 ) -> None:
     transaction_id = TransactionId("txn-2")
     db_path = _configure_db(tmp_path, monkeypatch)
-    _guard_json_ledgers(monkeypatch)
     _seed_transaction(db_path, transaction_id)
 
     file_path = tmp_path / DEFAULT_FILENAME
@@ -205,3 +191,33 @@ def test_get_analysis_resolves_via_artifacts(
     analysis_model, file_type = PnmFileService().get_analysis(request)
     assert file_type == PnmFileType.RECEIVE_MODULATION_ERROR_RATIO
     assert analysis_model is not None
+
+
+@pytest.mark.pnm
+@pytest.mark.pnm
+def test_search_files_uses_db_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transaction_id = TransactionId("txn-search")
+    db_path = _configure_db(tmp_path, monkeypatch)
+    _seed_transaction(db_path, transaction_id)
+
+    request = FileQueryRequest(mac_address=str(DEFAULT_MAC))
+    response = PnmFileService().search_files(request)
+
+    entries = response.files.get(str(DEFAULT_MAC), [])
+    assert len(entries) == 1
+    assert entries[0].transaction_id == transaction_id
+
+
+@pytest.mark.pnm
+def test_get_mac_addresses_uses_db_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transaction_id = TransactionId("txn-mac")
+    db_path = _configure_db(tmp_path, monkeypatch)
+    _seed_transaction(db_path, transaction_id)
+
+    response = PnmFileService().get_mac_addresses()
+    assert response.mac_addresses
+    assert response.mac_addresses[0].mac_address == str(DEFAULT_MAC)

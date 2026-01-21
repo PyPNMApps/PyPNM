@@ -165,6 +165,34 @@ ruff format --check .
 
 The `pypnm` credentials are intended for local and CI use only.
 
+### 5.2 Real-life Postgres validation (local)
+
+Preconditions:
+- Docker is installed and the daemon is running.
+- python3 is available in your environment.
+
+Run the local validation script:
+
+```bash
+tools/db/validate_postgres_local.sh
+```
+
+What the script does:
+- Starts a Postgres 16 container with local-only defaults (`pypnm` / `pypnm`).
+- Installs `.[dev,postgres]` to ensure `psycopg` is available.
+- Prints a masked Postgres DSN and the `psycopg` version.
+- Executes a small Postgres-gated proof set (`-ra`) followed by `pytest -q`.
+
+Expected pass criteria:
+- The proof tests report `2 passed` and do not show skip reasons.
+- `pytest -q` completes without Postgres-gated tests being skipped.
+- Schema init and health checks succeed, and artifact resolution reads from Postgres tables.
+
+If you see skips when running tests manually, check for:
+- `PYPNM_TEST_POSTGRES` not set.
+- `PYPNM_DB_POSTGRES_DSN` not set.
+- `psycopg` not installed (install with `pypnm-docsis[postgres]`).
+
 ## 6. Troubleshooting
 
 ### 6.1 `pypnm-software-qa-checker: command not found`

@@ -57,6 +57,7 @@ jobs:
     env:
       PYPNM_DB_BACKEND: postgres
       PYPNM_DB_POSTGRES_DSN: postgresql://pypnm:pypnm@localhost:5432/pypnm
+      PYPNM_TEST_POSTGRES: "1"
       PGPASSWORD: pypnm
 
     steps:
@@ -71,8 +72,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          pip install "psycopg[binary]"
+          pip install -e ".[dev,postgres]"
 
       - name: Install Postgres client
         run: |
@@ -89,6 +89,35 @@ jobs:
           done
           echo "Postgres did not become ready"
           exit 1
+
+      - name: Postgres test diagnostics
+        run: |
+          echo "PYPNM_TEST_POSTGRES=${PYPNM_TEST_POSTGRES}"
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          dsn = os.environ.get("PYPNM_DB_POSTGRES_DSN", "")
+          parsed = urlparse(dsn)
+          host = parsed.hostname or ""
+          port = parsed.port or ""
+          db = parsed.path.lstrip("/")
+          user = parsed.username or ""
+          print(f\"PYPNM_DB_POSTGRES_DSN=postgresql://{user}:***@{host}:{port}/{db}\")
+          PY
+          python -c "import psycopg; print(psycopg.__version__)"
+
+      - name: Postgres-gated test proof
+        run: |
+          set -euo pipefail
+          proof_output="$(python -m pytest -q -ra \
+            tests/test_db_schema_manager.py::test_postgres_schema_init_optional \
+            tests/test_artifact_repository.py::test_postgres_transaction_artifact_resolution_optional)"
+          printf '%s\n' "$proof_output"
+          if printf '%s\n' "$proof_output" | grep -qi "skipped"; then
+            echo "Postgres-gated proof tests were skipped; check env vars and psycopg install." >&2
+            exit 1
+          fi
 
       - name: Run checks
         run: |

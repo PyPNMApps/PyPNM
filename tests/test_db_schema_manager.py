@@ -15,6 +15,7 @@ from pypnm.lib.db.db_schema_manager import (
     BEGIN_STATEMENT,
     COMMIT_STATEMENT,
     DEFAULT_ARTIFACT_STORE_NAME,
+    JSON_ARTIFACT_STORE_NAME,
     SCHEMA_VERSION,
     SQLITE_BUSY_TIMEOUT_MS,
     SQLITE_JOURNAL_MODE,
@@ -66,6 +67,7 @@ def test_sqlite_schema_init_and_health(tmp_path: Path) -> None:
     assert health.missing_tables == []
     assert health.unknown_sysdescr_present is True
     assert health.default_artifact_store_present is True
+    assert health.json_artifact_store_present is True
 
     connection = sqlite3.connect(db_path)
     try:
@@ -88,6 +90,14 @@ def test_sqlite_schema_init_and_health(tmp_path: Path) -> None:
         cursor = connection.execute(
             "SELECT root_path FROM artifact_stores WHERE store_name = ?;",
             (DEFAULT_ARTIFACT_STORE_NAME,),
+        )
+        row = cursor.fetchone()
+        assert row is not None
+        assert str(row[0]).strip() != ""
+
+        cursor = connection.execute(
+            "SELECT root_path FROM artifact_stores WHERE store_name = ?;",
+            (JSON_ARTIFACT_STORE_NAME,),
         )
         row = cursor.fetchone()
         assert row is not None
