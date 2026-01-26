@@ -40,7 +40,7 @@ jobs:
       - name: Install Project
         run: |
           python -m pip install -e .
-          python -m pip install -e ".[test]" || true
+          python -m pip install -e ".[test]"
 
       - name: Run Tests
         env:
