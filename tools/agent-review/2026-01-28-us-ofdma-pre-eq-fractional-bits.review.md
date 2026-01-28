@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Use correct fractional bits for upstream OFDMA pre-equalization parsing.
+- Changes: Keep PNN6 pre-eq at s2.13 and last-update at s1.14; align docstring/debug text.
+- Files: src/pypnm/pnm/parser/CmUsOfdmaPreEq.py
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails: repo drift); pytest -q
+- Notes: Ruff format would reformat many existing files; no formatting applied. Pytest skipped 3 hardware integration tests (PNM_CM_IT not set).
+
+# FILE: src/pypnm/pnm/parser/CmUsOfdmaPreEq.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
