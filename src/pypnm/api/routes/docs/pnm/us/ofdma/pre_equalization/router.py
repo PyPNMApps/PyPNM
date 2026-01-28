@@ -104,7 +104,6 @@ class UsOfdmaPreEqualizationRouter:
                 payload: dict[str, Any] = cast(dict[str, Any], analysis.get_results())
 
                 # Clean up payload by removing unneeded or redundant sections
-                DictGenerate.pop_keys_recursive(payload, ["pnm_header"])
                 primative:dict[Any,Any] = msg_rsp.payload_to_dict('primative')
                 DictGenerate.pop_keys_recursive(primative, ["device_details"])
                 payload.update(primative)
