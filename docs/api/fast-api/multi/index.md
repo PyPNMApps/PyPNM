@@ -31,3 +31,4 @@ Use these guides when you need periodic or scheduled captures (for example, hour
 | [OFDM echo detection](analysis/ofdm-echo-detection.md) | Detect reflections and echo artifacts. |
 | [Phase slope LTE detection](analysis/phase-slope-lte-detection.md) | Spot LTE-related interference patterns. |
 | [Signal statistics](analysis/signal-statistics.md) | Extract RMS/min/max variance from captures. |
+- [Multi-Capture US OFDMA Pre-Equalization](multi-capture-us-ofdma-pre-eq.md)
