@@ -13,9 +13,9 @@ from typing import cast
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from pypnm.api.routes.advance.analysis.signal_analysis.multi_chan_est_singnal_analysis import (
-    MultiChanEstAnalysisType,
-    MultiChanEstimationSignalAnalysis,
+from pypnm.api.routes.advance.analysis.signal_analysis.multi_ofdma_pre_eq_signal_analysis import (
+    MultiOfdmaPreEqAnalysisType,
+    MultiOfdmaPreEqSignalAnalysis,
 )
 from pypnm.api.routes.advance.common.abstract.service import AbstractService
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
@@ -222,7 +222,7 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
 
             # Parse analysis type
             try:
-                atype = MultiChanEstAnalysisType(request.analysis.type)
+                atype = MultiOfdmaPreEqAnalysisType(request.analysis.type)
 
             except ValueError:
                 msg = f"Invalid analysis type: {request.analysis.type}"
@@ -234,10 +234,10 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
                     data        =   AnalysisDataModel(analysis_type="UNKNOWN", results=[]))
 
             # Dispatch map for type → analysis engine
-            analysis_map: dict[MultiChanEstAnalysisType, Callable[[CaptureDataAggregator], MultiChanEstimationSignalAnalysis]] = {
-                MultiChanEstAnalysisType.MIN_AVG_MAX:           lambda agg: MultiChanEstimationSignalAnalysis(agg, MultiChanEstAnalysisType.MIN_AVG_MAX),
-                MultiChanEstAnalysisType.GROUP_DELAY:           lambda agg: MultiChanEstimationSignalAnalysis(agg, MultiChanEstAnalysisType.GROUP_DELAY),
-                MultiChanEstAnalysisType.ECHO_DETECTION_IFFT:   lambda agg: MultiChanEstimationSignalAnalysis(agg, MultiChanEstAnalysisType.ECHO_DETECTION_IFFT),
+            analysis_map: dict[MultiOfdmaPreEqAnalysisType, Callable[[CaptureDataAggregator], MultiOfdmaPreEqSignalAnalysis]] = {
+                MultiOfdmaPreEqAnalysisType.MIN_AVG_MAX:         lambda agg: MultiOfdmaPreEqSignalAnalysis(agg, MultiOfdmaPreEqAnalysisType.MIN_AVG_MAX),
+                MultiOfdmaPreEqAnalysisType.GROUP_DELAY:         lambda agg: MultiOfdmaPreEqSignalAnalysis(agg, MultiOfdmaPreEqAnalysisType.GROUP_DELAY),
+                MultiOfdmaPreEqAnalysisType.ECHO_DETECTION_IFFT: lambda agg: MultiOfdmaPreEqSignalAnalysis(agg, MultiOfdmaPreEqAnalysisType.ECHO_DETECTION_IFFT),
             }
 
             if atype not in analysis_map:

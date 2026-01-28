@@ -101,7 +101,10 @@ Before introducing new types, validators, formats, or storage conventions:
   - Emojis allowed only in `install.sh` and `pypnm-cmts` CLI output; do not use emojis elsewhere.
 - Testing expectations:
   - Run at least: `python3 -m compileall src`, `ruff check src`, `ruff format --check .`, `pytest -q`.
+  - After any code change, run `ruff check src` and `pytest -q`. If only Markdown changes are made, run `mkdocs build -s` instead.
   - If an integration test is optional/gated (for example Postgres DSN), note skips explicitly in the summary.
+- Troubleshooting:
+  - When debugging endpoint behavior, include `tail -n 25 /home/dev01/Projects/PyPNM/logs/pypnm.log` in the troubleshooting steps.
 
 ## Pytest Guidance (PyPNM Pattern)
 

@@ -8,8 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pypnm.api.routes.advance.analysis.signal_analysis.multi_chan_est_singnal_analysis import (
-    MultiChanEstAnalysisType,
+from pypnm.api.routes.advance.analysis.signal_analysis.multi_ofdma_pre_eq_signal_analysis import (
+    MultiOfdmaPreEqAnalysisType,
 )
 from pypnm.api.routes.advance.common.schema.common_capture_schema import (
     MultiCaptureParametersResponse,
@@ -36,8 +36,8 @@ class AnalysisDataModel(BaseModel):
     results: list[dict[str, Any]]   = Field(..., description="List of per-channel analysis results (min/avg/max, group delay, anomalies, etc.).")
 
 class MultiUsOfdmaPreEqAnalysisContainerModel(BaseModel):
-    """Model for Multi-ChannelEstimation analysis types."""
-    type: MultiChanEstAnalysisType      = Field(default=MultiChanEstAnalysisType.MIN_AVG_MAX, description="Analysis type to perform, implementation-specific integer value")
+    """Model for Multi-US-OFDMA Pre-Equalization analysis types."""
+    type: MultiOfdmaPreEqAnalysisType   = Field(default=MultiOfdmaPreEqAnalysisType.MIN_AVG_MAX, description="Analysis type to perform, implementation-specific integer value")
     output: CommonOutput                = Field(default=CommonOutput(), description="Output type control: json or archive")
     plot: CommonMatPlotConfigRequest    = Field(default=CommonMatPlotConfigRequest(), description="Plot configuration for multi-ChannelEstimation analysis")
 

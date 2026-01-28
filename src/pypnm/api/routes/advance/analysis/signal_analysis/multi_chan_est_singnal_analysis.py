@@ -16,6 +16,7 @@ from pypnm.api.routes.common.classes.analysis.model.schema import (
 from pypnm.lib.types import ChannelId, StringEnum
 from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
 
+
 # ──────────────────────────────────────────────────────────────
 # Enum
 # ──────────────────────────────────────────────────────────────
