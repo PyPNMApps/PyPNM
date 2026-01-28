@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Update US OFDMA pre-eq docs and add tests for OFDMA analysis types.
+- Changes: Removed unsupported OFDMA analysis type from docs; added analysis type validation tests.
+- Files: docs/api/fast-api/multi/multi-capture-us-ofdma-pre-eq.md; tests/test_multi_us_ofdma_pre_eq_analysis_types.py.
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails: repo drift); pytest -q; mkdocs build -s.
+- Notes: pytest skips due to PNM_CM_IT not set; ruff format check failed because of pre-existing formatting drift; mkdocs build reports pages not in nav.
+
+# FILE: docs/api/fast-api/multi/multi-capture-us-ofdma-pre-eq.md
 # Multi-Capture US OFDMA Pre-Equalization
 
 This API runs periodic upstream OFDMA pre-equalization captures and stores each capture as PNM files. After the
@@ -117,3 +125,31 @@ Supported analysis types:
   }
 }
 ```
+
+
+# FILE: tests/test_multi_us_ofdma_pre_eq_analysis_types.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from pypnm.api.routes.advance.analysis.signal_analysis.multi_ofdma_pre_eq_signal_analysis import (
+    MultiOfdmaPreEqAnalysisType,
+)
+from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.schemas import (
+    MultiUsOfdmaPreEqAnalysisContainerModel,
+)
+
+
+def test_ofdma_pre_eq_analysis_type_values() -> None:
+    values = {item.value for item in MultiOfdmaPreEqAnalysisType}
+    assert values == {"min-avg-max", "group-delay", "echo-detection-ifft"}
+    assert "lte-detection-phase-slope" not in values
+
+
+def test_ofdma_pre_eq_analysis_schema_rejects_lte() -> None:
+    with pytest.raises(ValidationError):
+        MultiUsOfdmaPreEqAnalysisContainerModel(type="lte-detection-phase-slope")
