@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # tests/test_complex_array_ops.py
 from __future__ import annotations
@@ -54,12 +54,19 @@ def test_magnitude_power_and_db() -> None:
     mag = ops.magnitude()
     pwr = ops.power()
     pwr_db = ops.power_db()
+    pwr_db_eps = ops.power_db(eps=1e-12)
+    pwr_db_epsilon = ops.power_db(epsilon=1e-12)
+    pwr_db_mean = ops.power_db_normalized(normalize="mean")
+    pwr_db_unit = ops.power_db_normalized(normalize="unit")
 
     assert np.allclose(mag, [5.0, 0.0])
     assert np.allclose(pwr, [25.0, 0.0])
 
     assert np.isfinite(pwr_db[1])
     assert pwr_db[0] > pwr_db[1]
+    assert np.allclose(pwr_db_eps, pwr_db_epsilon)
+    assert np.isclose(float(np.mean(pwr_db_mean)), 0.0, atol=1e-12)
+    assert np.isfinite(pwr_db_unit).all()
 
 
 def test_phase_and_unwrap() -> None:
@@ -71,6 +78,18 @@ def test_phase_and_unwrap() -> None:
 
     assert np.allclose(ph, [0.0, np.pi, 0.0])
     assert np.allclose(ph_u, [0.0, np.pi, 0.0])
+
+
+def test_power_db_normalized_unit_mean_matches_expected() -> None:
+    x = pairs(1, 0, 2, 0)
+    ops = ComplexArrayOps(x)
+
+    pwr_db_unit = ops.power_db_normalized(normalize="unit", epsilon=1e-12)
+    pwr_linear = 10.0 ** (pwr_db_unit / 10.0)
+    assert np.isclose(float(np.mean(pwr_linear)), 1.0, atol=1e-12)
+
+    with pytest.raises(ValueError):
+        ops.power_db_normalized(normalize="bad-mode")
 
 
 def test_rms_and_mean_power_with_mask() -> None:
