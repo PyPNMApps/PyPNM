@@ -65,7 +65,7 @@ class MultiDsChanEstRouter(AbstractService):
 
     def __init__(self) -> None:
         super().__init__()
-        self.router = APIRouter(prefix="/advance/multiChannelEstimation",
+        self.router = APIRouter(prefix="/advance/multi/channelEstimation",
                                 tags=["PNM Operations - Multi-DS-Channel-Estimation"])
         self.logger = logging.getLogger(self.__class__.__name__)
         self._add_routes()

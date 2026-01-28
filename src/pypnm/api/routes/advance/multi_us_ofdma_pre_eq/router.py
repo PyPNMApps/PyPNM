@@ -65,7 +65,7 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
 
     def __init__(self) -> None:
         super().__init__()
-        self.router = APIRouter(prefix="/advance/multiUsOfdmaPreEqualization",
+        self.router = APIRouter(prefix="/advance/multi/usOfdmaPreEqualization",
                                 tags=["PNM Operations - Multi-US-OFDMA-Pre-Equalization"])
         self.logger = logging.getLogger(self.__class__.__name__)
         self._add_routes()

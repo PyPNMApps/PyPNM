@@ -7,15 +7,15 @@ capture window completes, you can download a ZIP of the PNM files or run post-ca
 
 | # | Method | Path | Description |
 | - | ------ | ---- | ----------- |
-| 1 | POST | `/advance/multiUsOfdmaPreEqualization/start` | Begin a multi-sample US OFDMA pre-equalization capture |
-| 2 | GET | `/advance/multiUsOfdmaPreEqualization/status/{operation_id}` | Poll capture progress |
-| 3 | GET | `/advance/multiUsOfdmaPreEqualization/results/{operation_id}` | Download a ZIP of captured PNM files |
-| 4 | DELETE | `/advance/multiUsOfdmaPreEqualization/stop/{operation_id}` | Stop the capture after the current iteration |
-| 5 | POST | `/advance/multiUsOfdmaPreEqualization/analysis` | Run post-capture signal analysis |
+| 1 | POST | `/advance/multi/usOfdmaPreEqualization/start` | Begin a multi-sample US OFDMA pre-equalization capture |
+| 2 | GET | `/advance/multi/usOfdmaPreEqualization/status/{operation_id}` | Poll capture progress |
+| 3 | GET | `/advance/multi/usOfdmaPreEqualization/results/{operation_id}` | Download a ZIP of captured PNM files |
+| 4 | DELETE | `/advance/multi/usOfdmaPreEqualization/stop/{operation_id}` | Stop the capture after the current iteration |
+| 5 | POST | `/advance/multi/usOfdmaPreEqualization/analysis` | Run post-capture signal analysis |
 
 ## Start capture
 
-**Request** `POST /advance/multiUsOfdmaPreEqualization/start`
+**Request** `POST /advance/multi/usOfdmaPreEqualization/start`
 
 ```json
 {
@@ -48,7 +48,7 @@ capture window completes, you can download a ZIP of the PNM files or run post-ca
 
 ## Status
 
-**Request** `GET /advance/multiUsOfdmaPreEqualization/status/{operation_id}`
+**Request** `GET /advance/multi/usOfdmaPreEqualization/status/{operation_id}`
 
 **Response**
 
@@ -68,7 +68,7 @@ capture window completes, you can download a ZIP of the PNM files or run post-ca
 
 ## Results
 
-**Request** `GET /advance/multiUsOfdmaPreEqualization/results/{operation_id}`
+**Request** `GET /advance/multi/usOfdmaPreEqualization/results/{operation_id}`
 
 Returns a ZIP file containing the captured PNM files for each iteration.
 
@@ -76,13 +76,13 @@ Returns a ZIP file containing the captured PNM files for each iteration.
 
 ## Stop
 
-**Request** `DELETE /advance/multiUsOfdmaPreEqualization/stop/{operation_id}`
+**Request** `DELETE /advance/multi/usOfdmaPreEqualization/stop/{operation_id}`
 
 Stops the capture after the current iteration finishes. The `status` endpoint will reflect final state once complete.
 
 ## Analysis
 
-**Request** `POST /advance/multiUsOfdmaPreEqualization/analysis`
+**Request** `POST /advance/multi/usOfdmaPreEqualization/analysis`
 
 ```json
 {
