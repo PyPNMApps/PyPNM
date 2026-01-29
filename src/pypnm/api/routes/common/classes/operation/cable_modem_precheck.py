@@ -17,7 +17,7 @@ from pypnm.docsis.data_type.ClabsDocsisVersion import ClabsDocsisVersion
 from pypnm.docsis.data_type.InterfaceStats import DocsisIfType
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import ChannelId, InetAddressStr, MacAddressStr
 
 PreCheckStatus = tuple[ServiceStatusCode, str]
 
@@ -51,6 +51,8 @@ class CableModemServicePreCheck:
         validate_ofdma_exist: bool      = False,
         validate_scqam_exist: bool      = False,
         validate_atdma_exist: bool      = False,
+        validate_ds_channel_ids_exist: list[ChannelId] | None = None,
+        validate_us_channel_ids_exist: list[ChannelId] | None = None,
         validate_pnm_ready_status: bool = True,
         ignore_mac_address_check: bool  = False,
     ) -> None:
@@ -64,6 +66,8 @@ class CableModemServicePreCheck:
             check_docsis_version: Optional list of acceptable DOCSIS versions to validate.
             validate_ofdm_exist: If True, verifies that one or more downstream OFDM channels exist.
             validate_ofdma_exist: If True, verifies that one or more upstream OFDMA channels exist.
+            validate_ds_channel_ids_exist: Optional list of downstream OFDM channel IDs to validate.
+            validate_us_channel_ids_exist: Optional list of upstream OFDMA channel IDs to validate.
 
         Raises:
             ValueError: If neither a `CableModem` object nor both `mac_address` and `ip_address` are provided.
@@ -102,6 +106,8 @@ class CableModemServicePreCheck:
         self._validate_ofdm_exist       = validate_ofdm_exist
         self._validate_scqam_exist      = validate_scqam_exist
         self._validate_atdma_exist      = validate_atdma_exist
+        self._validate_ds_channel_ids  = validate_ds_channel_ids_exist
+        self._validate_us_channel_ids  = validate_us_channel_ids_exist
         self._validate_pnm_ready_stat   = validate_pnm_ready_status
         self._ignore_mac_address_check  = ignore_mac_address_check
 
@@ -166,6 +172,16 @@ class CableModemServicePreCheck:
 
         if self._validate_atdma_exist:
             status, msg = await self.validate_atdma_channel_exist()
+            if status != ServiceStatusCode.SUCCESS:
+                return status, msg
+
+        if self._validate_ds_channel_ids is not None:
+            status, msg = await self.validate_ds_channel_ids_exist(self._validate_ds_channel_ids)
+            if status != ServiceStatusCode.SUCCESS:
+                return status, msg
+
+        if self._validate_us_channel_ids is not None:
+            status, msg = await self.validate_us_channel_ids_exist(self._validate_us_channel_ids)
             if status != ServiceStatusCode.SUCCESS:
                 return status, msg
 
@@ -343,6 +359,40 @@ class CableModemServicePreCheck:
             return ServiceStatusCode.NO_ATDMA_CHAN_ID_INDEX_FOUND, msg
 
         return ServiceStatusCode.SUCCESS, "ATDMA upstream channels detected."
+
+    async def validate_ds_channel_ids_exist(self, channel_ids: list[ChannelId]) -> PreCheckStatus:
+        """
+        Validate that provided downstream OFDM channel IDs exist on the cable modem.
+        """
+        if len(channel_ids) == 0:
+            return ServiceStatusCode.SUCCESS, "No DS channel IDs provided for validation."
+
+        idx_chan_stack = await self.cm.getDocsIf31CmDsOfdmChannelIdIndexStack()
+        available_ids = {int(chan_id) for _, chan_id in idx_chan_stack}
+        missing = [int(channel_id) for channel_id in channel_ids if int(channel_id) not in available_ids]
+
+        if missing:
+            msg = f"Invalid DS channel ID(s): {missing}"
+            return ServiceStatusCode.INVALID_CHANNEL_ID, msg
+
+        return ServiceStatusCode.SUCCESS, "DS channel IDs validated."
+
+    async def validate_us_channel_ids_exist(self, channel_ids: list[ChannelId]) -> PreCheckStatus:
+        """
+        Validate that provided upstream OFDMA channel IDs exist on the cable modem.
+        """
+        if len(channel_ids) == 0:
+            return ServiceStatusCode.SUCCESS, "No US channel IDs provided for validation."
+
+        idx_chan_stack = await self.cm.getDocsIf31CmUsOfdmaChannelIdIndexStack()
+        available_ids = {int(chan_id) for _, chan_id in idx_chan_stack}
+        missing = [int(channel_id) for channel_id in channel_ids if int(channel_id) not in available_ids]
+
+        if missing:
+            msg = f"Invalid US channel ID(s): {missing}"
+            return ServiceStatusCode.INVALID_CHANNEL_ID, msg
+
+        return ServiceStatusCode.SUCCESS, "US channel IDs validated."
 
     async def validate_pnm_ready_status(self) -> PreCheckStatus:
 

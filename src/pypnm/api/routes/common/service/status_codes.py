@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -63,6 +63,7 @@ class ServiceStatusCode(IntEnum):
     INVALID_DOCSIS_VERSION                  = 120
     NO_OFDMA_CHANNELS_EXIST                 = 121
     NO_OFDM_CHANNELS_EXIST                  = 122
+    INVALID_CHANNEL_ID                      = 123
 
     TRANSACTION_RECORD_GET_FAILED           = 200
     UNSUPPORTED_TEST_TYPE                   = 201

@@ -94,7 +94,11 @@ class MultiDsChanEstRouter(AbstractService):
             cm = CableModem(mac_address=MacAddress(mac_address), inet=Inet(ip_address), write_community=community)
 
              # Pre-checks
-            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm,
+                validate_ofdm_exist=True,
+                validate_ds_channel_ids_exist=channel_ids,
+            ).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(f"[start] Precheck failed for MAC={mac_address}: {msg}")
                 return SnmpResponse(mac_address=mac_address, status=status, message=msg)

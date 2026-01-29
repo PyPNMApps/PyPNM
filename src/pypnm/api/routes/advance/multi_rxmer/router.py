@@ -143,6 +143,7 @@ class MultiRxMerRouter(AbstractService):
 
             status, msg = await CableModemServicePreCheck(cable_modem=cable_modem,
                                                           validate_ofdm_exist=True,
+                                                          validate_ds_channel_ids_exist=channel_ids,
                                                           validate_pnm_ready_status=True).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)

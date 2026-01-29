@@ -84,15 +84,18 @@ class ChannelEstimationCoefficientRouter:
                             inet=Inet(ip),
                             write_community=community)
 
+            channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+                cable_modem=cm,
+                validate_ofdm_exist=True,
+                validate_ds_channel_ids_exist=channel_ids,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
             service: CmDsOfdmChanEstCoefService = CmDsOfdmChanEstCoefService(cm, tftp_servers=tftp_servers)
-            channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
             interface_parameters = None
             if channel_ids:
                 interface_parameters = DownstreamOfdmParameters(channel_id=list(channel_ids))

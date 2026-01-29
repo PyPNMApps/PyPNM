@@ -75,8 +75,12 @@ class UsOfdmaPreEqualizationRouter:
 
             cm = CableModem(MacAddress(mac), Inet(ip), write_community=community)
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm,
-                                                          validate_ofdma_exist=True).run_precheck()
+            channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm,
+                validate_ofdma_exist=True,
+                validate_us_channel_ids_exist=channel_ids,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
