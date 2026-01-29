@@ -160,9 +160,31 @@ if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
   kubectl create namespace "${NAMESPACE}"
 fi
 
+load_image_into_kind() {
+  local image_name="$1"
+  local cluster_name="$2"
+  local retries="${KIND_LOAD_RETRIES:-3}"
+  local delay="${KIND_LOAD_DELAY:-2}"
+  local attempt=1
+
+  while (( attempt <= retries )); do
+    if kind load docker-image "${image_name}" --name "${cluster_name}"; then
+      return 0
+    fi
+    echo "kind load docker-image failed (attempt ${attempt}/${retries}); retrying in ${delay}s..." >&2
+    sleep "${delay}"
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 if [[ "${IMAGE_SOURCE}" == "local" ]]; then
   docker build -t pypnm:local --build-arg PYTHON_VERSION="${PYTHON_VERSION}" .
-  kind load docker-image pypnm:local --name "${CLUSTER_NAME}"
+  if ! load_image_into_kind "pypnm:local" "${CLUSTER_NAME}"; then
+    echo "Failed to load image into kind cluster ${CLUSTER_NAME}." >&2
+    exit 1
+  fi
   KUSTOMIZE_PATH="deploy/kubernetes"
 else
   KUSTOMIZE_PATH="deploy/kubernetes/overlays/ghcr"
