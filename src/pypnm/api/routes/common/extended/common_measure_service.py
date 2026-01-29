@@ -89,6 +89,7 @@ MeasurementEntry: TypeAlias =   DocsPnmCmOfdmChanEstCoefEntry   | \
                                 DocsIf3CmSpectrumAnalysisEntry
 
 class CommonMeasureService(CommonMessagingService):
+    SPECTRUM_ANALYZER_AVERAGES_CAP: int = 1
     """
     Base service class for executing common Proactive Network Maintenance (PNM) measurement tests.
 
@@ -141,7 +142,7 @@ class CommonMeasureService(CommonMessagingService):
         self._capture_parameter.spectrum_retrieval_type = SpectrumRetrievalType.UNKNOWN
 
         if self.extra_options:
-            self.logger.info(f"{self.log_prefix} - OPTIONS: {self.extra_options}")
+            self.logger.debug(f"{self.log_prefix} - OPTIONS: {self.extra_options}")
             self._preload_interface_parameters()
 
         self._precheck()
@@ -1240,6 +1241,15 @@ class CommonMeasureService(CommonMessagingService):
                 num_averages                = self.extra_options.get("num_averages", 1),
                 spectrum_retrieval_type     = self.extra_options.get("spectrum_retrieval_type",SpectrumRetrievalType.FILE),
             )
+
+        if capture_parameter.num_averages != self.SPECTRUM_ANALYZER_AVERAGES_CAP:
+            self.logger.warning(
+                "%s - Capping spectrum analyzer averages from %s to %s",
+                self.log_prefix,
+                capture_parameter.num_averages,
+                self.SPECTRUM_ANALYZER_AVERAGES_CAP,
+            )
+            capture_parameter.num_averages = self.SPECTRUM_ANALYZER_AVERAGES_CAP
 
         if capture_parameter.spectrum_retrieval_type == SpectrumRetrievalType.SNMP:
             self.logger.info(f"{self.log_prefix} - SPECTRUM-ANALYZER - SNMP-AMPLITUDE-DATA-RETURN")

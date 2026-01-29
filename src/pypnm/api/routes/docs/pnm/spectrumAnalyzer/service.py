@@ -322,6 +322,7 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
                  tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                  number_of_averages: int = 2,
                  resolution_bandwidth_hz: ResolutionBw | None = None,
+                 channel_ids: list[ChannelId] | None = None,
                  spectrum_retrieval_type:SpectrumRetrievalType = SpectrumRetrievalType.FILE,) -> None:
         super().__init__(cable_modem)
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -335,6 +336,8 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         self._pnm_test_type = DocsPnmCmCtlTest.SPECTRUM_ANALYZER
         self.log_prefix = f"DsOfdmChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
         self._tftp_servers = tftp_servers
+
+        self._channel_ids = channel_ids if channel_ids else None
 
     async def start(self, capture_per_channel: bool = False) -> list[tuple[ChannelId, MessageResponse]]:
         """
@@ -387,9 +390,12 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         spectrum_retrieval_type = self._spectrum_retrieval_type
         inactivity_timeout      = 30
         noise_bw                = 150
+        channel_filter = set(self._channel_ids) if self._channel_ids else None
         segment_freq_span       = rbw_settings[2]
 
         for chan_id, (start_hz, plc_hz, end_hz) in bw_by_channel.items():
+            if channel_filter and chan_id not in channel_filter:
+                continue
             self.logger.debug(
                 f"OFDM - Mac: {self._cm.get_mac_address} - "
                 f"Channel Settings: {chan_id}, {start_hz}, {plc_hz}, {end_hz}"
@@ -578,13 +584,17 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
                  tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                  number_of_averages: int = 1,
                  resolution_bandwidth_hz: ResolutionBw | None = None,
-                 spectrum_retrieval_type:SpectrumRetrievalType = SpectrumRetrievalType.FILE,) -> None:
+                 channel_ids: list[ChannelId] | None = None,
+                 spectrum_retrieval_type: SpectrumRetrievalType = SpectrumRetrievalType.FILE,
+                 test_mode: bool = False,) -> None:
         super().__init__(cable_modem)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._number_of_averages = number_of_averages
         self._resolution_bandwidth = resolution_bandwidth_hz if resolution_bandwidth_hz is not None else ResolutionBw(25_000)
         self._spectrum_retrieval_type = spectrum_retrieval_type
         self._tftp_servers = tftp_servers
+
+        self._channel_ids = channel_ids if channel_ids else None
 
         self.log_prefix = f"DsScQamChannelSpectrumAnalyzer - CM {self._cm.get_mac_address}"
         self._test_mode = False
@@ -629,9 +639,13 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         spectrum_retrieval_type = self._spectrum_retrieval_type
         inactivity_timeout = 60
         noise_bw = 150
+        channel_filter = set(self._channel_ids) if self._channel_ids else None
         segment_freq_span = rbw_settings[2]
 
         for count, (chan_id, (start_hz, _center_hz, end_hz)) in enumerate(bw_by_channel.items()):
+
+            if channel_filter and chan_id not in channel_filter:
+                continue
 
             if self._test_mode and count > 1:
                 self.logger.warning("Test mode active: processing only first 2 channels.")
