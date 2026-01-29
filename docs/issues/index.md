@@ -22,7 +22,11 @@ A: Ensure the transaction record includes an `extension` mapping and that the up
 Q: Why does US PreEq SNMP retrieval log validation errors about missing fields?  
 A: Some modems return sparse or empty entries for certain indices. Ensure the device supports the table and that the entry is populated; missing required fields will cause the entry to be skipped.
 
+Q: Why do multi US OFDMA Pre-Equalization plots show a Channel Estimation title?  
+A: Update to a build that includes the plot title fix; the title now reflects the PNM file type as US PreEqualization (PNN6) or US Last PreEqualization (PNN7).
+
 ## TODO
 
 - Add or update a FAQ entry whenever an error is fixed so the resolution is documented.
 - Add FAQ entries when SNMP validation errors are addressed to capture the resolution.
+- Track FAQ updates for the US OFDMA Pre-Equalization plot title fix.

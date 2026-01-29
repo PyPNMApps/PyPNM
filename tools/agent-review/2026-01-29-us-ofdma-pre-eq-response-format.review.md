@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Align US OFDMA Pre-Equalization multi-capture response examples with the common response format.
+- Changes: Updated start/status/analysis response examples to include mac_address, correct status values, and realistic IDs.
+- Files: docs/api/fast-api/multi/multi-capture-us-ofdma-pre-eq.md
+- Tests: mkdocs build -s
+- Notes: mkdocs reports many pages not included in nav (pre-existing).
+
+# FILE: /home/dev01/Projects/PyPNM/docs/api/fast-api/multi/multi-capture-us-ofdma-pre-eq.md
 # Multi-Capture US OFDMA Pre-Equalization
 
 This API runs periodic upstream OFDMA pre-equalization captures and stores each capture as PNM files. After the

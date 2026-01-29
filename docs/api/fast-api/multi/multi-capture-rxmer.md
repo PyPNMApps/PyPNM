@@ -28,11 +28,11 @@ early termination, and post‑capture analysis.
 
 | Step | HTTP   | Path                                         | Purpose                                  |
 | ---: | :----- | :------------------------------------------- | :--------------------------------------- |
-|    1 | POST   | `/advance/multi/rxMer/start`                  | Begin a background capture               |
-|    2 | GET    | `/advance/multi/rxMer/status/{operation_id}`  | Poll capture progress                    |
-|    3 | GET    | `/advance/multi/rxMer/results/{operation_id}` | Download a ZIP of captured PNM files     |
-|    4 | DELETE | `/advance/multi/rxMer/stop/{operation_id}`    | Stop the capture after current iteration |
-|    5 | POST   | `/advance/multi/rxMer/analysis`               | Run post‑capture analytics               |
+|    1 | POST   | `/advance/multi/ds/rxMer/start`                  | Begin a background capture               |
+|    2 | GET    | `/advance/multi/ds/rxMer/status/{operation_id}`  | Poll capture progress                    |
+|    3 | GET    | `/advance/multi/ds/rxMer/results/{operation_id}` | Download a ZIP of captured PNM files     |
+|    4 | DELETE | `/advance/multi/ds/rxMer/stop/{operation_id}`    | Stop the capture after current iteration |
+|    5 | POST   | `/advance/multi/ds/rxMer/analysis`               | Run post-capture analytics               |
 
 ### Identifiers
 
@@ -53,7 +53,7 @@ early termination, and post‑capture analysis.
 
 Starts a background RxMER capture with a fixed duration and sample interval.
 
-**Request** `POST /advance/multi/rxMer/start`  
+**Request** `POST /advance/multi/ds/rxMer/start`  
 **Body** (`MultiRxMerRequest`):
 
 ```json
@@ -115,7 +115,7 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 
 ### 2) Status Check
 
-**Request** `GET /advance/multi/rxMer/status/{operation_id}`
+**Request** `GET /advance/multi/ds/rxMer/status/{operation_id}`
 
 #### Response (MultiRxMerStatusResponse)
 
@@ -136,7 +136,7 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 
 ### 3) Download Results
 
-**Request** `GET /advance/multi/rxMer/results/{operation_id}`
+**Request** `GET /advance/multi/ds/rxMer/results/{operation_id}`
 
 #### Response
 
@@ -158,7 +158,7 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 
 ### 4) Stop Capture Early
 
-**Request** `DELETE /advance/multi/rxMer/stop/{operation_id}`
+**Request** `DELETE /advance/multi/ds/rxMer/stop/{operation_id}`
 
 #### Stop Response (MultiRxMerStatusResponse)
 
@@ -179,7 +179,7 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 
 ### 5) Analysis
 
-**Request** `POST /advance/multi/rxMer/analysis`  
+**Request** `POST /advance/multi/ds/rxMer/analysis`  
 **Body** (`MultiRxMerAnalysisRequest` - preferred string enums):
 
 ```json

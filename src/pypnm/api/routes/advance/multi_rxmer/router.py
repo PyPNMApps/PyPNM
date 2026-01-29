@@ -93,7 +93,7 @@ class MultiRxMerRouter(AbstractService):
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.router = APIRouter(
-            prefix="/advance/multi/rxMer",
+            prefix="/advance/multi/ds/rxMer",
             tags=["PNM Operations - Multi-Downstream OFDM RxMER"],)
         self._add_routes()
 

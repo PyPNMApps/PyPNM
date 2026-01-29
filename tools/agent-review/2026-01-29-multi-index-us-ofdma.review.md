@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Align the multi-capture index with the new US OFDMA Pre-Equalization endpoint grouping.
+- Changes: Added the US OFDMA Pre-Equalization workflow to the table and removed the stray bullet.
+- Files: docs/api/fast-api/multi/index.md
+- Tests: mkdocs build -s
+- Notes: mkdocs reports many pages not included in nav (pre-existing).
+
+# FILE: /home/dev01/Projects/PyPNM/docs/api/fast-api/multi/index.md
 # Multi-capture API index
 
 Use these guides when you need periodic or scheduled captures (for example, hourly RxMER snapshots) along with downstream analysis.

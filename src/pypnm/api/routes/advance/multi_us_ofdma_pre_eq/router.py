@@ -65,7 +65,7 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
 
     def __init__(self) -> None:
         super().__init__()
-        self.router = APIRouter(prefix="/advance/multi/usOfdmaPreEqualization",
+        self.router = APIRouter(prefix="/advance/multi/us/ofdmaPreEqualization",
                                 tags=["PNM Operations - Multi-US-OFDMA-Pre-Equalization"])
         self.logger = logging.getLogger(self.__class__.__name__)
         self._add_routes()
@@ -140,7 +140,7 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
                     message         =   None))
 
         @self.router.get("/results/{operation_id}",
-            summary="Download a ZIP archive of all UsOfdmaPreEqualization capture files",
+            summary="Download a ZIP archive of all OFDMA PreEqualization capture files",
             responses={200: {"content": {"application/zip": {}},
                              "description": "ZIP archive of capture files"}})
         def download_results_zip(operation_id: OperationId) -> StreamingResponse:
@@ -164,7 +164,7 @@ class MultiUsOfdmaPreEqRouter(AbstractService):
                         self.logger.warning(f"[zip] Skip {path}: {e}")
 
             buf.seek(0)
-            headers = {"Content-Disposition": f"attachment; filename=multiUsOfdmaPreEqualization_{mac}_{operation_id}.zip"}
+            headers = {"Content-Disposition": f"attachment; filename=multiOfdmaPreEqualization_{mac}_{operation_id}.zip"}
             return StreamingResponse(buf, media_type="application/zip", headers=headers)
 
 

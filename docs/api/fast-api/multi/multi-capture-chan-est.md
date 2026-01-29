@@ -27,11 +27,11 @@ A concise, implementation-ready reference for orchestrating downstream OFDM chan
 
 | Step | HTTP   | Path                                                       | Purpose                                        |
 | ---: | :----- | :--------------------------------------------------------- | :--------------------------------------------- |
-|    1 | POST   | `/advance/multi/channelEstimation/start`                    | Begin a multi-sample ChannelEstimation capture |
-|    2 | GET    | `/advance/multi/channelEstimation/status/{operation_id}`    | Poll capture progress                          |
-|    3 | GET    | `/advance/multi/channelEstimation/results/{operation_id}`   | Download a ZIP of captured PNM files           |
-|    4 | DELETE | `/advance/multi/channelEstimation/stop/{operation_id}`      | Stop the capture after current iteration       |
-|    5 | POST   | `/advance/multi/channelEstimation/analysis`                 | Run post-capture signal analysis               |
+|    1 | POST   | `/advance/multi/ds/channelEstimation/start`                    | Begin a multi-sample ChannelEstimation capture |
+|    2 | GET    | `/advance/multi/ds/channelEstimation/status/{operation_id}`    | Poll capture progress                          |
+|    3 | GET    | `/advance/multi/ds/channelEstimation/results/{operation_id}`   | Download a ZIP of captured PNM files           |
+|    4 | DELETE | `/advance/multi/ds/channelEstimation/stop/{operation_id}`      | Stop the capture after current iteration       |
+|    5 | POST   | `/advance/multi/ds/channelEstimation/analysis`                 | Run post-capture signal analysis               |
 
 ### Identifiers
 
@@ -52,7 +52,7 @@ A concise, implementation-ready reference for orchestrating downstream OFDM chan
 
 Starts a background multi-sample ChannelEstimation capture with a fixed duration and sample interval.
 
-**Request** `POST /advance/multi/channelEstimation/start`  
+**Request** `POST /advance/multi/ds/channelEstimation/start`  
 **Body** (`MultiChanEstRequest`):
 
 ```json
@@ -98,7 +98,7 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 
 ### 2) Status Check
 
-**Request** `GET /advance/multi/channelEstimation/status/{operation_id}`
+**Request** `GET /advance/multi/ds/channelEstimation/status/{operation_id}`
 
 #### Response (MultiChanEstStatusResponse)
 
@@ -119,7 +119,7 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 
 ### 3) Download Results
 
-**Request** `GET /advance/multi/channelEstimation/results/{operation_id}`
+**Request** `GET /advance/multi/ds/channelEstimation/results/{operation_id}`
 
 #### Response
 
@@ -135,7 +135,7 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 
 ### 4) Stop Capture Early
 
-**Request** `DELETE /advance/multi/channelEstimation/stop/{operation_id}`
+**Request** `DELETE /advance/multi/ds/channelEstimation/stop/{operation_id}`
 
 #### Response (MultiChanEstStatusResponse)
 
@@ -156,7 +156,7 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 
 ### 5) Analysis
 
-**Request** `POST /advance/multi/channelEstimation/analysis`  
+**Request** `POST /advance/multi/ds/channelEstimation/analysis`  
 **Body** (`MultiChanEstAnalysisRequest` - preferred string enums):
 
 ```json
