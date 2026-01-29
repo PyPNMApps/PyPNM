@@ -98,12 +98,30 @@ load_image_into_kind() {
   local retries="${KIND_LOAD_RETRIES:-3}"
   local delay="${KIND_LOAD_DELAY:-2}"
   local attempt=1
+  local image_repo=""
+  local image_tag=""
+  local node_name=""
+
+  image_repo="${image_name%:*}"
+  image_tag="${image_name##*:}"
+  if [[ "${image_repo}" == "${image_tag}" ]]; then
+    image_tag="latest"
+  fi
+  if [[ "${image_repo}" != */* ]]; then
+    image_repo="docker.io/library/${image_repo}"
+  fi
+  node_name="${cluster_name}-control-plane"
 
   while (( attempt <= retries )); do
     if kind load docker-image "${image_name}" --name "${cluster_name}"; then
-      return 0
+      if docker exec "${node_name}" crictl images 2>/dev/null | \
+        grep -Eq "^${image_repo}[[:space:]]+${image_tag}[[:space:]]"; then
+        return 0
+      fi
+      echo "kind load docker-image reported success but image not visible yet (attempt ${attempt}/${retries})." >&2
+    else
+      echo "kind load docker-image failed (attempt ${attempt}/${retries}); retrying in ${delay}s..." >&2
     fi
-    echo "kind load docker-image failed (attempt ${attempt}/${retries}); retrying in ${delay}s..." >&2
     sleep "${delay}"
     attempt=$((attempt + 1))
   done
