@@ -5,9 +5,10 @@ Downstream Spectrum Capture And Per-Channel Analysis For DOCSIS 3.x/4.0 Cable Mo
 ## Overview
 
 [`SpectrumAnalyzerRouter`](http://github.com/PyPNMApps/PyPNM/blob/main/src/pypnm/api/routes/docs/pnm/spectrumAnalyzer/router.py)
-exposes three related endpoints that drive downstream spectrum capture and analysis:
+exposes four related endpoints that drive downstream spectrum capture and analysis:
 
 * A single spectrum capture endpoint (`/getCapture`) for free-form frequency sweeps.
+* A single spectrum capture endpoint with friendly RBW inputs (`/getCapture/friendly`).
 * An OFDM-focused endpoint (`/getCapture/ofdm`) that walks all downstream OFDM channels.
 * An SC-QAM-focused endpoint (`/getCapture/scqam`) that walks all downstream SC-QAM channels.
 
@@ -34,6 +35,7 @@ All endpoints share the same base prefix: `/docs/pnm/ds`.
 | Purpose                        | Method | Path                                             |
 | ------------------------------ | ------ | ------------------------------------------------ |
 | Single spectrum capture        | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture`       |
+| Single spectrum capture (RBW)  | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/friendly` |
 | All OFDM downstream channels   | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/ofdm`  |
 | All SC-QAM downstream channels | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/scqam` |
 
@@ -139,6 +141,69 @@ most flexible entry point and allows arbitrary sweep settings (within diplexer l
 #### Note
 
 > `spectrum_retrieval_type` Use 1 (PNM_FILE) is preferred for most use cases. Use `2` (SNMP) when PNM file transfer is not available.
+
+## Single Capture (Friendly) - `/spectrumAnalyzer/getCapture/friendly`
+
+This variant accepts a resolution bandwidth and a requested window, then derives
+the segment span and bin count using the spectrum-analysis-capture-set rules. The
+first and last segment center frequencies are adjusted inward by half a segment
+span to satisfy the analyzer's scaled window constraints.
+
+### Friendly Capture Example Request
+
+```json
+{
+  "cable_modem": {
+    "mac_address": "aa:bb:cc:dd:ee:ff",
+    "ip_address": "192.168.0.100",
+    "pnm_parameters": {
+      "tftp": {
+        "ipv4": "192.168.0.10",
+        "ipv6": "2001:db8::10"
+      }
+    },
+    "snmp": {
+      "snmpV2C": {
+        "community": "private"
+      }
+    }
+  },
+  "analysis": {
+    "type": "basic",
+    "output": { "type": "json" },
+    "plot": { "ui": { "theme": "dark" } },
+    "spectrum_analysis": {
+      "moving_average": { "points": 10 }
+    }
+  },
+  "capture_parameters": {
+    "inactivity_timeout": 60,
+    "first_segment_center_freq": 300000000,
+    "last_segment_center_freq": 900000000,
+    "resolution_bw": 30000,
+    "noise_bw": 150,
+    "window_function": 1,
+    "num_averages": 1,
+    "spectrum_retrieval_type": 1
+  }
+}
+```
+
+### Friendly Capture Parameters
+
+| JSON path                                      | Type | Description                                                                  |
+| ---------------------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| `capture_parameters.inactivity_timeout`        | int  | Timeout (seconds) before aborting idle spectrum acquisition.                 |
+| `capture_parameters.first_segment_center_freq` | int  | Requested first segment center frequency (Hz) for the capture window.        |
+| `capture_parameters.last_segment_center_freq`  | int  | Requested last segment center frequency (Hz) for the capture window.         |
+| `capture_parameters.resolution_bw`             | int  | Resolution bandwidth (Hz) used to derive segment span and bin count.         |
+| `capture_parameters.noise_bw`                  | int  | Equivalent noise bandwidth in kHz.                                           |
+| `capture_parameters.window_function`           | int  | Window function enum value.                                                  |
+| `capture_parameters.num_averages`              | int  | Number of averages per segment.                                              |
+| `capture_parameters.spectrum_retrieval_type`   | int  | Retrieval mode enum value (FILE = 1, SNMP = 2).                              |
+
+Note: The computed `segment_freq_span`, `num_bins_per_segment`, and adjusted segment
+center frequencies are returned in the analysis payload.
 
 ### Abbreviated JSON Response (Output Type `"json"`)
 

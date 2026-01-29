@@ -21,7 +21,7 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
     PnmSingleCaptureRequest,
 )
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import FrequencyHz, InetAddressStr, MacAddressStr
+from pypnm.lib.types import FrequencyHz, InetAddressStr, MacAddressStr, ResolutionBw
 from pypnm.pnm.data_type.DocsIf3CmSpectrumAnalysisCtrlCmd import (
     SpectrumRetrievalType,
     WindowFunction,
@@ -37,6 +37,19 @@ class SpecAnCapturePara(BaseModel):
     last_segment_center_freq : FrequencyHz              = Field(default=FrequencyHz(900_000_000), description="Last segment center frequency in Hz.")
     segment_freq_span        : FrequencyHz              = Field(default=FrequencyHz(1_000_000), description="Frequency span of each segment in Hz.")
     num_bins_per_segment     : int                      = Field(default=256, description="Number of FFT bins per segment.")
+    noise_bw                 : int                      = Field(default=150, description="Equivalent noise bandwidth in kHz.")
+    window_function          : WindowFunction           = Field(default=WindowFunction.HANN, description="FFT window function to apply. See WindowFunction enum for options.")
+    num_averages             : int                      = Field(default=1, description="Number of averages per segment.")
+    spectrum_retrieval_type  : SpectrumRetrievalType    = Field(default=SpectrumRetrievalType.FILE,
+                                                                description=f"Method of spectrum data retrieval: "
+                                                                            f"PNM ({SpectrumRetrievalType.FILE}) | "
+                                                                            f"SNMP({SpectrumRetrievalType.SNMP}).")
+
+class SpecAnCaptureParaFriendly(BaseModel):
+    inactivity_timeout       : int                      = Field(default=60, description="Timeout in seconds for inactivity during spectrum analysis.")
+    first_segment_center_freq: FrequencyHz              = Field(default=FrequencyHz(300_000_000), description="Requested first segment center frequency in Hz.")
+    last_segment_center_freq : FrequencyHz              = Field(default=FrequencyHz(900_000_000), description="Requested last segment center frequency in Hz.")
+    resolution_bw            : ResolutionBw             = Field(default=ResolutionBw(30_000), description="Resolution bandwidth in Hz used to derive segment span and bins.")
     noise_bw                 : int                      = Field(default=150, description="Equivalent noise bandwidth in kHz.")
     window_function          : WindowFunction           = Field(default=WindowFunction.HANN, description="FFT window function to apply. See WindowFunction enum for options.")
     num_averages             : int                      = Field(default=1, description="Number of averages per segment.")
@@ -81,6 +94,11 @@ class SingleCaptureSpectrumAnalyzerRequest(BaseModel):
     cable_modem: SpectrumAnalyzerCableModemConfig       = Field(description="Cable modem configuration")
     analysis: ExtendCommonSingleCaptureAnalysisType     = Field(description="Analysis type to perform")
     capture_parameters: SpecAnCapturePara               = Field(description="Spectrum capture Parameters.")
+
+class SingleCaptureSpectrumAnalyzerFriendlyRequest(BaseModel):
+    cable_modem: SpectrumAnalyzerCableModemConfig       = Field(description="Cable modem configuration")
+    analysis: ExtendCommonSingleCaptureAnalysisType     = Field(description="Analysis type to perform")
+    capture_parameters: SpecAnCaptureParaFriendly       = Field(description="Spectrum capture Parameters.")
 
 class SingleCaptureSpectrumAnalyzer(ExtendSingleCaptureSpecAnaRequest):
     capture_parameters: SpecAnCapturePara       = Field(..., description="Spectrum capture Parameters.")

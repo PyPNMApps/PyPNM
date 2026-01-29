@@ -45,12 +45,14 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import (
     OfdmSpecAnaAnalysisResponse,
     ScQamSpecAnaAnalysisRequest,
     ScQamSpecAnaAnalysisResponse,
+    SingleCaptureSpectrumAnalyzerFriendlyRequest,
     SingleCaptureSpectrumAnalyzerRequest,
 )
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.service import (
     CmSpectrumAnalysisService,
     DsOfdmChannelSpectrumAnalyzer,
     DsScQamChannelSpectrumAnalyzer,
+    SpectrumAnalyzerFriendlyCaptureBuilder,
 )
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.pnm.DocsIf3CmSpectrumAnalysisEntry import (
@@ -121,6 +123,115 @@ class SpectrumAnalyzerRouter:
                 cable_modem=cm,
                 tftp_servers=tftp_servers,
                 capture_parameters=request.capture_parameters,)
+
+            msg_rsp: MessageResponse = await service.set_and_go()
+
+            if msg_rsp.status != ServiceStatusCode.SUCCESS:
+                err = "Unable to complete Spectrum Analyzer capture."
+                self.logger.error("%s Status: %s", err, msg_rsp.status.name)
+                return SnmpResponse(mac_address=mac, status=msg_rsp.status, message=err)
+
+            channel_ids = None
+            measurement_stats: list[DocsIf3CmSpectrumAnalysisEntry] = cast(
+                list[DocsIf3CmSpectrumAnalysisEntry],
+                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),)
+
+            cps = CommonProcessService(msg_rsp)
+            msg_rsp = cps.process()
+
+            analysis = Analysis(AnalysisType.BASIC, msg_rsp, skip_automatic_process=True)
+            analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
+
+            if request.analysis.output.type == OutputType.JSON:
+                payload: dict[str, Any] = cast(dict[str, Any], analysis.get_results())
+                DictGenerate.pop_keys_recursive(payload, ["pnm_header", "mac_address", "channel_id"])
+
+                primative = msg_rsp.payload_to_dict("primative")
+                DictGenerate.pop_keys_recursive(
+                    primative,
+                    ["device_details", "channel_id", "amplitude_bin_segments_float"],
+                )
+                payload.update(cast(dict[str, Any], primative))
+                payload.update(
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
+
+                return PnmAnalysisResponse(
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=payload,
+                )
+
+            if request.analysis.output.type == OutputType.ARCHIVE:
+                theme = request.analysis.plot.ui.theme
+                plot_config = AnalysisRptMatplotConfig(theme=theme)
+                analysis_rpt = SpectrumAnalyzerReport(analysis, plot_config)
+                rpt: Path = cast(Path, analysis_rpt.build_report())
+                return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
+
+            return PnmAnalysisResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                data={},
+            )
+
+        @self.router.post(
+            f"{self.base_endpoint}/getCapture/friendly",
+            summary="Get Spectrum Analyzer Capture (Friendly)",
+            response_model=None,
+            responses=FAST_API_RESPONSE,
+        )
+        async def get_capture_friendly(
+            request: SingleCaptureSpectrumAnalyzerFriendlyRequest,
+        ) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
+            """
+            Perform Spectrum Analyzer Capture Using Friendly RBW Inputs.
+
+            This endpoint accepts a resolution bandwidth (RBW) and a requested window,
+            then derives a segment span and bin count using the spectrum-analysis-capture-set
+            rules. The segment center frequencies are adjusted inward by half a segment
+            span on each edge to satisfy the analyzer's scaled window constraints.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/single/spectrum-analyzer/spectrum-analyzer.md)
+            """
+            mac: MacAddressStr = request.cable_modem.mac_address
+            ip: InetAddressStr = request.cable_modem.ip_address
+            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+
+            self.logger.info("Starting Spectrum Analyzer friendly capture for MAC: %s, IP: %s, Output Type: %s",
+                mac, ip, request.analysis.output.type,)
+
+            cm = CableModem(mac_address=MacAddress(mac),
+                            inet=Inet(ip),
+                            write_community=community,)
+
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
+
+            try:
+                capture_parameters = SpectrumAnalyzerFriendlyCaptureBuilder.build(
+                    request.capture_parameters,
+                )
+            except ValueError as e:
+                err = f"Invalid capture parameters: {e}"
+                self.logger.error(err)
+                return SnmpResponse(mac_address=mac, status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS, message=err)
+
+            service = CmSpectrumAnalysisService(
+                cable_modem=cm,
+                tftp_servers=tftp_servers,
+                capture_parameters=capture_parameters,)
 
             msg_rsp: MessageResponse = await service.set_and_go()
 

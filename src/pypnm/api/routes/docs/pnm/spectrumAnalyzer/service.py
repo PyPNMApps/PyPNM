@@ -24,6 +24,7 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.abstract.com_spec_chan_ana impor
 )
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import (
     SpecAnCapturePara,  # type: ignore[import-untyped]
+    SpecAnCaptureParaFriendly,  # type: ignore[import-untyped]
 )
 from pypnm.config.pnm_config_manager import (
     PnmConfigManager,  # type: ignore[import-untyped]
@@ -107,6 +108,150 @@ class CmSpectrumAnalysisService(CommonMeasureService):
             cable_modem.getWriteCommunity(),)
 
         self.setSpectrumCaptureParameters(capture_parameters)
+
+class SpectrumAnalyzerFriendlyCaptureBuilder:
+    """
+    Build Spectrum Analyzer capture parameters from the friendly request shape.
+
+    Uses the spectrum-analysis-capture-set algorithm to derive segment span,
+    bins per segment, and adjusted first/last segment center frequencies
+    based on the requested window and resolution bandwidth.
+    """
+
+    MIN_SEGMENT_SPAN_HZ: int = 1_000_000
+    MAX_BINS: int = 2048
+    MAX_TRIES: int = 64
+
+    @staticmethod
+    def _floor_to_multiple(value: int, base: int) -> int:
+        if base <= 0:
+            return value
+        return (value // base) * base
+
+    @staticmethod
+    def _pick_seg_span_and_bins(freq_span: int, rbw_hz: int) -> tuple[int, int]:
+        if rbw_hz <= 0:
+            raise ValueError("resolution_bw must be > 0")
+        if freq_span < (2 * SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ):
+            raise ValueError("Frequency span too small to support scaled window rules with minimum segment span")
+
+        best_seg_span = 0
+        best_bins = 0
+        best_err = float("inf")
+
+        max_seg_span = freq_span // 2
+        if max_seg_span < SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ:
+            max_seg_span = SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+
+        seg_span = SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+        while seg_span <= max_seg_span:
+            k = freq_span // seg_span
+            if k < 2:
+                seg_span += SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+                continue
+
+            bins = int(round(float(seg_span) / float(rbw_hz)))
+            if bins < 1:
+                bins = 1
+            if bins > SpectrumAnalyzerFriendlyCaptureBuilder.MAX_BINS:
+                seg_span += SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+                continue
+
+            rbw_actual = float(seg_span) / float(bins)
+            err = abs(rbw_actual - float(rbw_hz)) / float(rbw_hz)
+
+            if (err < best_err) or ((err == best_err) and (seg_span < best_seg_span)):
+                best_err = err
+                best_seg_span = seg_span
+                best_bins = bins
+
+            seg_span += SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+
+        if best_seg_span <= 0 or best_bins <= 0:
+            raise ValueError("No valid segment span/bins combination found for the requested resolution bandwidth")
+
+        return best_seg_span, best_bins
+
+    @staticmethod
+    def build(capture_parameters: SpecAnCaptureParaFriendly) -> SpecAnCapturePara:
+        """
+        Convert friendly capture settings into a concrete spectrum analyzer command.
+
+        The returned parameters are aligned such that the raw window is divisible
+        by the derived segment span and the configured segment centers are
+        offset inward by half a segment span on each side.
+        """
+        req_first = int(capture_parameters.first_segment_center_freq)
+        req_last = int(capture_parameters.last_segment_center_freq)
+        rbw_hz = int(capture_parameters.resolution_bw)
+
+        if req_first <= 0 or req_last <= 0:
+            raise ValueError("Requested frequencies must be > 0")
+        if req_last <= req_first:
+            raise ValueError("Invalid range: last_segment_center_freq must be greater than first_segment_center_freq")
+
+        first = req_first
+        last = req_last
+        tries = 0
+        first_scaled = 0
+        last_scaled = 0
+        seg_span = SpectrumAnalyzerFriendlyCaptureBuilder.MIN_SEGMENT_SPAN_HZ
+        bins = 0
+
+        while tries < SpectrumAnalyzerFriendlyCaptureBuilder.MAX_TRIES:
+            tries += 1
+
+            freq_span = int(last - first)
+            seg_span, bins = SpectrumAnalyzerFriendlyCaptureBuilder._pick_seg_span_and_bins(
+                freq_span=freq_span,
+                rbw_hz=rbw_hz,
+            )
+
+            if (freq_span % seg_span) != 0:
+                usable = SpectrumAnalyzerFriendlyCaptureBuilder._floor_to_multiple(freq_span, seg_span)
+                if usable <= 0:
+                    usable = seg_span
+
+                candidate_last = first + usable
+                if candidate_last > last:
+                    candidate_last = last
+                if candidate_last > req_last:
+                    candidate_last = req_last
+
+                if candidate_last <= first:
+                    candidate_first = last - usable
+                    if candidate_first < req_first:
+                        candidate_first = req_first
+                    first = candidate_first
+                    continue
+
+                last = candidate_last
+                continue
+
+            half = seg_span // 2
+            first_scaled = first + half
+            last_scaled = last - half
+
+            if last_scaled <= first_scaled:
+                last = max(first + seg_span, first + 1)
+                continue
+
+            break
+
+        if tries >= SpectrumAnalyzerFriendlyCaptureBuilder.MAX_TRIES:
+            raise ValueError("Unable to find settings within bounds that satisfy rules")
+
+        return SpecAnCapturePara(
+            inactivity_timeout          = capture_parameters.inactivity_timeout,
+            first_segment_center_freq   = FrequencyHz(first_scaled),
+            last_segment_center_freq    = FrequencyHz(last_scaled),
+            segment_freq_span           = FrequencyHz(seg_span),
+            num_bins_per_segment        = bins,
+            noise_bw                    = capture_parameters.noise_bw,
+            window_function             = capture_parameters.window_function,
+            num_averages                = capture_parameters.num_averages,
+            spectrum_retrieval_type     = capture_parameters.spectrum_retrieval_type,
+        )
 
 class OfdmChanSpecAnalyzerService(CommonMeasureService):
     """
