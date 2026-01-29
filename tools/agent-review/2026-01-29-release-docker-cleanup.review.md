@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Remove local docker image after release docker preflight to save disk space.
+- Changes: Add docker image cleanup after successful local docker smoke test.
+- Files: tools/release/release.py
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails: repo drift); pytest -q (3 skipped: PNM_CM_IT)
+- Notes: Docker cleanup targets pypnm:latest from local docker-compose preflight.
+
+# FILE: tools/release/release.py
 #!/usr/bin/env python3
 from __future__ import annotations
 
