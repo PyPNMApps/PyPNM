@@ -18,7 +18,7 @@ PyPNM ships with Docker assets so you can run the API quickly on a workstation, 
 ## Fast path: PyPNM Docker container install
 
 ```bash
-TAG="v1.1.5.0-rc1"
+TAG="v1.1.6.0-rc1"
 PORT=8080
 
 curl -fsSLo install-pypnm-docker-container.sh \
@@ -50,7 +50,7 @@ curl -X GET http://127.0.0.1:${PORT}/pypnm/system/webService/reload -H 'accept: 
 ## Deploy bundle flow (tarball)
 
 ```bash
-TAG="v1.1.5.0-rc1"
+TAG="v1.1.6.0-rc1"
 WORKING_DIR="PyPNM-${TAG}"
 
 mkdir -p "${WORKING_DIR}"
