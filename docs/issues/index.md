@@ -25,8 +25,12 @@ A: Some modems return sparse or empty entries for certain indices. Ensure the de
 Q: Why do multi US OFDMA Pre-Equalization plots show a Channel Estimation title?  
 A: Update to a build that includes the plot title fix; the title now reflects the PNM file type as US PreEqualization (PNN6) or US Last PreEqualization (PNN7).
 
+Q: Why do US OFDMA Pre-Equalization analysis examples reject uppercase analysis types?  
+A: The multi-capture analysis endpoints accept the string enum values (`min-avg-max`, `group-delay`, `echo-detection-ifft`) along with the standard analysis output structure.
+
 ## TODO
 
 - Add or update a FAQ entry whenever an error is fixed so the resolution is documented.
 - Add FAQ entries when SNMP validation errors are addressed to capture the resolution.
 - Track FAQ updates for the US OFDMA Pre-Equalization plot title fix.
+- Track FAQ updates for the US OFDMA Pre-Equalization analysis request format.
