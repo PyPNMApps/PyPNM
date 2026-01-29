@@ -41,7 +41,6 @@ from pypnm.lib.types import (  # type: ignore[import-untyped]
     ChannelId,
     FrequencyHz,
     ResolutionBw,
-    ResolutionBwSettings,
     SubcarrierIdx,
 )
 from pypnm.pnm.data_type.pnm_test_types import (
@@ -381,17 +380,11 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         # Compute the bandwidth mapping for all OFDM channels
         bw_by_channel: OfdmSpectrumBwLut = await self.calculate_channel_spectrum_bandwidth()
 
-        rbw_settings: ResolutionBwSettings = RBWConversion.getSpectrumRbwSetttings(
-            self._resolution_bandwidth,
-        )
-
-        num_bins_per_segment    = rbw_settings[1]
         number_of_averages      = self._number_of_averages
         spectrum_retrieval_type = self._spectrum_retrieval_type
         inactivity_timeout      = 30
         noise_bw                = 150
         channel_filter = set(self._channel_ids) if self._channel_ids else None
-        segment_freq_span       = rbw_settings[2]
 
         for chan_id, (start_hz, plc_hz, end_hz) in bw_by_channel.items():
             if channel_filter and chan_id not in channel_filter:
@@ -401,16 +394,18 @@ class DsOfdmChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
                 f"Channel Settings: {chan_id}, {start_hz}, {plc_hz}, {end_hz}"
             )
 
-            capture_parameter = SpecAnCapturePara(
+            friendly_capture_parameter = SpecAnCaptureParaFriendly(
                 inactivity_timeout          = inactivity_timeout,
                 first_segment_center_freq   = FrequencyHz(start_hz),
                 last_segment_center_freq    = FrequencyHz(end_hz),
-                segment_freq_span           = FrequencyHz(segment_freq_span),
-                num_bins_per_segment        = num_bins_per_segment,
+                resolution_bandwidth_hz     = ResolutionBw(self._resolution_bandwidth),
                 noise_bw                    = noise_bw,
                 window_function             = WindowFunction.HANN,
                 num_averages                = number_of_averages,
                 spectrum_retrieval_type     = spectrum_retrieval_type,
+            )
+            capture_parameter = SpectrumAnalyzerFriendlyCaptureBuilder.build(
+                friendly_capture_parameter,
             )
 
             self.logger.debug(
@@ -632,15 +627,11 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
         out: list[tuple[ChannelId, MessageResponse]] = []
 
         bw_by_channel: ScQamSpectrumBwLut = await self.calculate_channel_spectrum_bandwidth()
-        rbw_settings:ResolutionBwSettings = RBWConversion.getSpectrumRbwSetttings(self._resolution_bandwidth)
-
-        num_bins_per_segment = rbw_settings[1]
         number_of_averages = self._number_of_averages
         spectrum_retrieval_type = self._spectrum_retrieval_type
         inactivity_timeout = 60
         noise_bw = 150
         channel_filter = set(self._channel_ids) if self._channel_ids else None
-        segment_freq_span = rbw_settings[2]
 
         for count, (chan_id, (start_hz, _center_hz, end_hz)) in enumerate(bw_by_channel.items()):
 
@@ -651,16 +642,18 @@ class DsScQamChannelSpectrumAnalyzer(CommonSpectrumChannelAnalyzer):
                 self.logger.warning("Test mode active: processing only first 2 channels.")
                 break
 
-            capture_parameter = SpecAnCapturePara(
+            friendly_capture_parameter = SpecAnCaptureParaFriendly(
                 inactivity_timeout        = inactivity_timeout,
                 first_segment_center_freq = FrequencyHz(start_hz),
                 last_segment_center_freq  = FrequencyHz(end_hz),
-                segment_freq_span         = FrequencyHz(segment_freq_span),
-                num_bins_per_segment      = num_bins_per_segment,
+                resolution_bandwidth_hz   = ResolutionBw(self._resolution_bandwidth),
                 noise_bw                  = noise_bw,
                 window_function           = WindowFunction.HANN,
                 num_averages              = number_of_averages,
                 spectrum_retrieval_type   = spectrum_retrieval_type,
+            )
+            capture_parameter = SpectrumAnalyzerFriendlyCaptureBuilder.build(
+                friendly_capture_parameter,
             )
 
             channel_spec_capture.append((chan_id, capture_parameter))
