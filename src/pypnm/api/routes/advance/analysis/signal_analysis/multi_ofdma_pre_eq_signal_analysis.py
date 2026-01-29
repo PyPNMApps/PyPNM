@@ -19,6 +19,7 @@ from pypnm.api.routes.common.classes.analysis.analysis import Analysis
 from pypnm.api.routes.common.classes.analysis.model.schema import (
     UsOfdmaUsPreEqAnalysisModel,
 )
+from pypnm.lib.matplot.manager import MatplotManager
 from pypnm.lib.types import (
     ChannelId,
     ComplexArray,
@@ -53,6 +54,8 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
         """
         super().__init__(capt_data_agg, analysis_type)
         self._file_type_by_channel: dict[ChannelId, PnmFileType] = {}
+        self._available_file_types: set[PnmFileType] = set()
+        self._filter_file_type: PnmFileType | None = None
 
     def _parse_capture(
         self,
@@ -67,6 +70,10 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
             except KeyError as exc:
                 self.logger.warning(f"OFDMA pre-eq unknown file type for {tcm.filename}: {exc}")
                 file_type = PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS
+
+            self._available_file_types.add(file_type)
+            if self._filter_file_type is not None and file_type != self._filter_file_type:
+                return None
 
         except Exception as e:
             self.logger.error(f"OFDMA pre-eq analysis parse failed: {e}")
@@ -86,6 +93,7 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
         freqs: ChannelFrequencyMap = {}
         obw: ChannelOccupiedBwMap = {}
         self._file_type_by_channel = {}
+        self._available_file_types = set()
         models = self._trans_collect.getTransactionCollectionModel()
         self.logger.info(f"OFDMA Pre-EQ captures: count={len(models)}")
 
@@ -117,6 +125,24 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
 
         return channel_data, freqs, obw
 
+    def _ordered_file_types(self) -> list[PnmFileType]:
+        return [
+            PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS,
+            PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE,
+        ]
+
+    def _collect_available_file_types(self) -> list[PnmFileType]:
+        if not self._available_file_types:
+            self._extract_channel_data()
+        return [ft for ft in self._ordered_file_types() if ft in self._available_file_types]
+
+    def _set_file_type_filter(self, file_type: PnmFileType | None) -> None:
+        self._filter_file_type = file_type
+        self._results = None
+        self._channel_data = None
+        self._file_type_by_channel = {}
+        self._available_file_types = set()
+
     def _plot_title_prefix(self, channel_id: ChannelId) -> str:
         """
         Return the plot title prefix based on the PNM file type for the channel.
@@ -134,3 +160,31 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
         if file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE:
             return ["us-last-pre-eq"]
         return ["us-pre-eq"]
+
+    def create_matplot(self, **kwargs: object) -> list[MatplotManager]:
+        """
+        Generate Matplotlib plots for both Pre-EQ and Last Pre-EQ captures when present.
+        """
+        file_types = self._collect_available_file_types()
+        if not file_types:
+            return super().create_matplot(**kwargs)
+
+        plots: list[MatplotManager] = []
+        original_filter = self._filter_file_type
+        original_results = self._results
+        original_channel_data = self._channel_data
+        original_file_type_map = dict(self._file_type_by_channel)
+        original_available = set(self._available_file_types)
+
+        try:
+            for file_type in file_types:
+                self._set_file_type_filter(file_type)
+                plots.extend(super().create_matplot(**kwargs))
+        finally:
+            self._filter_file_type = original_filter
+            self._results = original_results
+            self._channel_data = original_channel_data
+            self._file_type_by_channel = original_file_type_map
+            self._available_file_types = original_available
+
+        return plots

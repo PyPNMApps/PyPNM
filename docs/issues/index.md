@@ -28,9 +28,13 @@ A: Update to a build that includes the plot title fix; the title now reflects th
 Q: Why do US OFDMA Pre-Equalization analysis examples reject uppercase analysis types?  
 A: The multi-capture analysis endpoints accept the string enum values (`min-avg-max`, `group-delay`, `echo-detection-ifft`) along with the standard analysis output structure.
 
+Q: Why do multi US OFDMA Pre-Equalization plots only show Pre-Equalization data?  
+A: Ensure both Pre-Equalization (PNN6) and Last Pre-Equalization (PNN7) files are present; the multi-capture plots now emit both sets when available.
+
 ## TODO
 
 - Add or update a FAQ entry whenever an error is fixed so the resolution is documented.
 - Add FAQ entries when SNMP validation errors are addressed to capture the resolution.
 - Track FAQ updates for the US OFDMA Pre-Equalization plot title fix.
 - Track FAQ updates for the US OFDMA Pre-Equalization analysis request format.
+- Track FAQ updates for the US OFDMA Pre-Equalization dual plot output.
