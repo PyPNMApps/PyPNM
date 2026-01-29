@@ -263,5 +263,5 @@ Postman is a great tool for testing the FastAPI endpoints:
 
 Maurice Garcia
 
-- [Email](mailto:mgarcia01752@outlook.com)  
+- [Email](mailto:pypnm.docsis@gmail.com)  
 - [LinkedIn](https://www.linkedin.com/in/mauricemgarcia/)

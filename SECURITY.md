@@ -17,7 +17,7 @@ If you believe you have found a security vulnerability in PyPNM, any of its depe
 
 ### Preferred Contact
 
-- Email: `mgarcia01752@outlook.com`
+- Email: `pypnm.docsis@gmail.com`
 
 When reporting, include as much detail as possible so the issue can be reproduced and evaluated:
 
