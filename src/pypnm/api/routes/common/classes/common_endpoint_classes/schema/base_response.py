@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from pydantic import BaseModel, Field, field_validator
 
 from pypnm.api.routes.advance.common.operation_state import OperationState
@@ -27,7 +27,7 @@ class BaseDeviceResponse(BaseModel):
     message: str | None                                  = Field(default=None, description="Additional informational or error message")
 
     @field_validator("mac_address", mode="before")
-    def _normalize_mac(cls, v: str) -> str:
+    def _normalize_mac(cls, v: object) -> str:
         """
         Normalize and validate a raw MAC address string before assignment.
 
@@ -40,7 +40,9 @@ class BaseDeviceResponse(BaseModel):
         Raises:
             ValueError: If the provided MAC is invalid.
         """
+        if v is None:
+            return MacAddress.null()
         try:
-            return MacAddress(v).to_mac_format(MacAddressFormat.COLON)
-        except Exception as e:
-            raise ValueError(f"Invalid MAC address {v!r}: {e}") from e
+            return MacAddress(str(v)).to_mac_format(MacAddressFormat.COLON)
+        except Exception:
+            return str(v)

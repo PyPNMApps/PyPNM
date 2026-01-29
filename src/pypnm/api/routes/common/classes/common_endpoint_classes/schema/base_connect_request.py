@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from ipaddress import ip_address
 
 from pydantic import BaseModel, Field, field_validator
@@ -24,18 +24,22 @@ class CableModemOnlyConfig(BaseModel):
     snmp: SNMPConfig = Field(...,description="SNMP configuration block")
 
     @field_validator("mac_address", mode="before")
-    def _normalize_mac(cls, v: str) -> str:
+    def _normalize_mac(cls, v: object) -> str:
+        if v is None:
+            return str(SCSC.default_mac_address())
         try:
-            return str(MacAddress(v))
-        except Exception as e:
-            raise ValueError(f"Invalid MAC address {v!r}: {e}") from e
+            return str(MacAddress(str(v)))
+        except Exception:
+            return str(v)
 
-    @field_validator("ip_address")
-    def _validate_ip(cls, v: str) -> str:
+    @field_validator("ip_address", mode="before")
+    def _validate_ip(cls, v: object) -> str:
+        if v is None:
+            return str(SCSC.default_ip_address())
         try:
-            return str(ip_address(v))
+            return str(ip_address(str(v)))
         except ValueError:
-            raise ValueError(f"Invalid IP address {v!r}") from None
+            return str(v)
 
 class BaseDeviceConnectRequest(BaseModel):
     """

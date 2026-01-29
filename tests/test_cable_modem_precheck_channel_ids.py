@@ -20,6 +20,19 @@ class _FakeCableModem:
     ) -> None:
         self._ds_stack = ds_stack
         self._us_stack = us_stack
+        self._mac_address = "aa:bb:cc:dd:ee:ff"
+        self._inet_address = "192.168.0.1"
+
+    @property
+    def get_mac_address(self):  # match CableModem attribute shape
+        class _Mac:
+            def __init__(self, value: str) -> None:
+                self.mac_address = value.replace(":", "")
+        return _Mac(self._mac_address)
+
+    @property
+    def get_inet_address(self) -> str:
+        return self._inet_address
 
     async def getDocsIf31CmDsOfdmChannelIdIndexStack(self) -> list[tuple[InterfaceIndex, ChannelId]]:
         return list(self._ds_stack)
@@ -56,3 +69,29 @@ async def test_validate_us_channel_ids_valid() -> None:
     status, _ = await precheck.validate_us_channel_ids_exist([ChannelId(20)])
 
     assert status == ServiceStatusCode.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_precheck_invalid_mac_format() -> None:
+    precheck = CableModemServicePreCheck(
+        mac_address="not-a-mac",
+        ip_address="192.168.0.1",
+        validate_pnm_ready_status=False,
+    )
+
+    status, _ = await precheck.run_precheck()
+
+    assert status == ServiceStatusCode.INVALID_MAC_ADDRESS_FORMAT
+
+
+@pytest.mark.asyncio
+async def test_precheck_invalid_inet_format() -> None:
+    precheck = CableModemServicePreCheck(
+        mac_address="aa:bb:cc:dd:ee:ff",
+        ip_address="999.999.999.999",
+        validate_pnm_ready_status=False,
+    )
+
+    status, _ = await precheck.run_precheck()
+
+    assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT

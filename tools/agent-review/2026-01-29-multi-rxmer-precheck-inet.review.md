@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Prevent invalid INET input from raising before precheck in multi RxMER start.
+- Changes: Run precheck with raw MAC/INET first and build CableModem after validation.
+- Files: src/pypnm/api/routes/advance/multi_rxmer/router.py
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails: repo drift); pytest -q
+- Notes: ruff format --check . reports many files would be reformatted; pytest skips hardware integration tests (PNM_CM_IT).
+
+# FILE: src/pypnm/api/routes/advance/multi_rxmer/router.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
