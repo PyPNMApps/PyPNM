@@ -83,6 +83,7 @@ class RxMerRouter:
             channel_ids = request.cable_modem.pnm_parameters.capture.channel_ids
             status, msg = await CableModemServicePreCheck(
                 cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
                 validate_ofdm_exist=True,
                 validate_ds_channel_ids_exist=channel_ids,
             ).run_precheck()

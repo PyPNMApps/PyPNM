@@ -17,6 +17,7 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp im
     SNMPConfig,
     SNMPv2c,
 )
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
     PnmSingleCaptureRequest,
 )
@@ -64,6 +65,30 @@ def test_resolver_ignores_request_when_not_tftp(monkeypatch: pytest.MonkeyPatch)
     tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(tftp)
 
     assert tftp_servers == (Inet("192.168.0.10"), Inet("2001:db8::10"))
+
+
+def test_resolver_checked_rejects_invalid_ipv4(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "tftp"))
+    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10"))
+    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10"))
+
+    tftp = TftpConfig(ipv4="192.168.0.10a", ipv6="2001:db8::20")
+    status, _, servers = RequestDefaultsResolver.resolve_tftp_servers_checked(tftp)
+
+    assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT
+    assert servers is None
+
+
+def test_resolver_checked_rejects_invalid_ipv6(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(SystemConfigSettings, "bulk_transfer_method", staticmethod(lambda: "tftp"))
+    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v4", staticmethod(lambda: "192.168.0.10"))
+    monkeypatch.setattr(SystemConfigSettings, "bulk_tftp_ip_v6", staticmethod(lambda: "2001:db8::10"))
+
+    tftp = TftpConfig(ipv4="192.168.0.20", ipv6="2001:db8::10g")
+    status, _, servers = RequestDefaultsResolver.resolve_tftp_servers_checked(tftp)
+
+    assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT
+    assert servers is None
 
 
 def test_rxmer_request_rejects_blank_tftp_ipv4() -> None:

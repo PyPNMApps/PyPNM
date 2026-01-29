@@ -6,6 +6,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
+from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
+    TftpConfig,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.request_defaults import (
+    RequestDefaultsResolver,
+)
 from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
     SNMPConfig,
     SNMPv2c,
@@ -46,6 +52,7 @@ class CableModemServicePreCheck:
         mac_address: MacAddressStr | None = None,
         ip_address: InetAddressStr | None = None,
         snmp_config: SNMPConfig | None = None,
+        tftp_config: TftpConfig | None = None,
         check_docsis_version: list[ClabsDocsisVersion] = None,
         validate_ofdm_exist: bool       = False,
         validate_ofdma_exist: bool      = False,
@@ -63,6 +70,7 @@ class CableModemServicePreCheck:
             cable_modem: An existing CableModem instance to use for queries (optional).
             mac_address: MAC address of the target cable modem (optional).
             ip_address: IP address of the target cable modem (optional).
+            tftp_config: TFTP server configuration overrides to validate (optional).
             check_docsis_version: Optional list of acceptable DOCSIS versions to validate.
             validate_ofdm_exist: If True, verifies that one or more downstream OFDM channels exist.
             validate_ofdma_exist: If True, verifies that one or more upstream OFDMA channels exist.
@@ -124,6 +132,7 @@ class CableModemServicePreCheck:
         self._validate_us_channel_ids  = validate_us_channel_ids_exist
         self._validate_pnm_ready_stat   = validate_pnm_ready_status
         self._ignore_mac_address_check  = ignore_mac_address_check
+        self._tftp_config               = tftp_config
 
     async def run_precheck(self) -> tuple[ServiceStatusCode, str]:
         """
@@ -147,6 +156,12 @@ class CableModemServicePreCheck:
         if status != ServiceStatusCode.SUCCESS:
             self.logger.error(msg)
             return status, msg
+
+        if self._tftp_config is not None:
+            status, msg = self.validate_tftp_servers(self._tftp_config)
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return status, msg
 
         status = self.ping_reachable()
         if status != ServiceStatusCode.SUCCESS:
@@ -448,6 +463,14 @@ class CableModemServicePreCheck:
             msg = f"Invalid INET address format: {raw}"
             return ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT, msg
         return ServiceStatusCode.SUCCESS, "INET address format valid."
+
+    @staticmethod
+    def validate_tftp_servers(tftp_config: TftpConfig) -> PreCheckStatus:
+        """
+        Validate TFTP IPv4/IPv6 addresses using request overrides and defaults.
+        """
+        status, msg, _ = RequestDefaultsResolver.resolve_tftp_servers_checked(tftp_config)
+        return status, msg
 
     def _set_format_errors(self, mac_address: MacAddressStr, ip_address: InetAddressStr) -> None:
         try:

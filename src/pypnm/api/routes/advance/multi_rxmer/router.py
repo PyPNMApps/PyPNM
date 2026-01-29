@@ -146,6 +146,7 @@ class MultiRxMerRouter(AbstractService):
                 mac_address=mac_address,
                 ip_address=ip_address,
                 snmp_config=snmp_config,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
                 validate_ofdm_exist=True,
                 validate_ds_channel_ids_exist=channel_ids,
                 validate_pnm_ready_status=True,

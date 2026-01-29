@@ -8,6 +8,9 @@ import pytest
 from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
     CableModemServicePreCheck,
 )
+from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
+    TftpConfig,
+)
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.lib.types import ChannelId, InterfaceIndex
 
@@ -93,5 +96,19 @@ async def test_precheck_invalid_inet_format() -> None:
     )
 
     status, _ = await precheck.run_precheck()
+
+    assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT
+
+
+def test_validate_tftp_servers_rejects_invalid_ipv4() -> None:
+    tftp = TftpConfig(ipv4="192.168.0.10a", ipv6="2001:db8::10")
+    status, _ = CableModemServicePreCheck.validate_tftp_servers(tftp)
+
+    assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT
+
+
+def test_validate_tftp_servers_rejects_invalid_ipv6() -> None:
+    tftp = TftpConfig(ipv4="192.168.0.10", ipv6="2001:db8::10g")
+    status, _ = CableModemServicePreCheck.validate_tftp_servers(tftp)
 
     assert status == ServiceStatusCode.INVALID_INET_ADDRESS_FORMAT

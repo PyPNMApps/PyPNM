@@ -91,7 +91,10 @@ class DsHistogramRouter:
                             inet=Inet(ip),
                             write_community=community)
 
-            status, msg = await CableModemServicePreCheck(cable_modem=cm).run_precheck()
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+            ).run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)

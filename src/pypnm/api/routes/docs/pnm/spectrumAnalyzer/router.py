@@ -108,7 +108,10 @@ class SpectrumAnalyzerRouter:
                             write_community=community,)
 
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_pnm_ready_status=True,).run_precheck()
+                cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
@@ -208,7 +211,11 @@ class SpectrumAnalyzerRouter:
             self.logger.info("DOCSIS 3.1 OFDM Downstream Spectrum Capture for MAC %s, IP %s", mac, ip,)
 
             status, msg = await CableModemServicePreCheck(
-                cable_modem=cm, validate_ofdm_exist=True, validate_pnm_ready_status=True,).run_precheck()
+                cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+                validate_ofdm_exist=True,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
@@ -302,7 +309,10 @@ class SpectrumAnalyzerRouter:
 
             status, msg = await CableModemServicePreCheck(
                 cable_modem=cm,
-                validate_scqam_exist=True, validate_pnm_ready_status=True,).run_precheck()
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+                validate_scqam_exist=True,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
