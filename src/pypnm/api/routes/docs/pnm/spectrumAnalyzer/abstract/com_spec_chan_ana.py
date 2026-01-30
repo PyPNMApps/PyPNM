@@ -1,15 +1,18 @@
 
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 import logging
-
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
 from abc import ABC, abstractmethod
 
 from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
 from pypnm.api.routes.common.extended.common_process_service import DocsPnmCmCtlTest
 from pypnm.docsis.cable_modem import CableModem
+from pypnm.docsis.data_type.DocsIf31CmDsOfdmChanEntry import (
+    DocsIf31CmDsOfdmChanChannelEntry,
+)
+from pypnm.docsis.data_type.DocsIfDownstreamChannel import DocsIfDownstreamChannelEntry
 from pypnm.docsis.data_type.pnm.DocsIf3CmSpectrumAnalysisEntry import (
     DocsIf3CmSpectrumAnalysisEntry,
 )
@@ -161,4 +164,8 @@ class CommonSpectrumChannelAnalyzer(ABC):
         CommonSpectumBwLut
             Mapping of ChannelId -> (start_hz, center_or_plc_hz, end_hz).
         """
+        pass
+
+    @abstractmethod
+    async def getChannelEntry(self) -> list[DocsIf31CmDsOfdmChanChannelEntry | DocsIfDownstreamChannelEntry]:
         pass

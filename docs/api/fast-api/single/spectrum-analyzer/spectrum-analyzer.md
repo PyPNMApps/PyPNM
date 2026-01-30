@@ -359,7 +359,16 @@ Each per-channel capture is processed like the single capture. Results are retur
 
 * `data.analyses[]` - list of per-channel analysis views (one entry per capture).
 * `data.primative` - dictionary of raw capture payloads indexed by channel position.
-* `data.measurement_stats[]` - flattened SNMP spectrum-analysis entries.
+* `data.measurement_stats[]` - flattened SNMP spectrum-analysis entries with channel context.
+
+Each `measurement_stats[]` entry includes:
+
+* `channel_id` - the downstream channel ID associated with the capture.
+* `channel_stats` - the channel entry used to resolve the capture (OFDM or SC-QAM table data).
+
+Per-channel analysis JSON artifacts written under `.data/json/` also include a
+`measurement_stats` array, but the `channel_id` field is omitted because the
+channel is already encoded in the filename and top-level `channel_id` field.
 
 DOCSIS constraints:
 
@@ -487,6 +496,14 @@ To scope captures to specific OFDM channels, set `pnm_parameters.capture.channel
     },
     "measurement_stats": [
       {
+        "channel_id": 193,
+        "channel_stats": {
+          "index": 10,
+          "channel_id": 193,
+          "entry": {
+            "docsIf31CmDsOfdmChanChannelId": 193
+          }
+        },
         "index": 0,
         "entry": {
           "docsIf3CmSpectrumAnalysisCtrlCmdEnable": true,
@@ -504,6 +521,14 @@ To scope captures to specific OFDM channels, set `pnm_parameters.capture.channel
         }
       },
       {
+        "channel_id": 194,
+        "channel_stats": {
+          "index": 11,
+          "channel_id": 194,
+          "entry": {
+            "docsIf31CmDsOfdmChanChannelId": 194
+          }
+        },
         "index": 0,
         "entry": {
           "docsIf3CmSpectrumAnalysisCtrlCmdEnable": true,
@@ -543,7 +568,8 @@ To scope captures to specific OFDM channels, set `pnm_parameters.capture.channel
 
 **Payload: `data.measurement_stats[]` (OFDM)**
 
-Reuses the single-capture `measurement_stats` field definitions, repeated per OFDM channel.
+Reuses the single-capture `measurement_stats` field definitions, with `channel_id`
+and `channel_stats` included per OFDM channel.
 
 ## SC-QAM Downstream Capture - `/spectrumAnalyzer/getCapture/scqam`
 
@@ -559,7 +585,7 @@ The response shape for SC-QAM captures mirrors the OFDM multi-channel layout:
 
 * `data.analyses[]` - list of per-channel analysis views.
 * `data.primative` - dictionary of raw capture payloads indexed by channel position.
-* `data.measurement_stats[]` - flattened SNMP statistics per captured channel.
+* `data.measurement_stats[]` - flattened SNMP statistics per captured channel with channel context.
 
 ### Example Request
 
@@ -626,7 +652,8 @@ Same as OFDM: each list element represents a per-channel analysis view with
 
 **Payload: `data.measurement_stats[]` (SC-QAM)**
 
-Reuses the single-capture `measurement_stats` field definitions, per SC-QAM channel.
+Reuses the single-capture `measurement_stats` field definitions, with `channel_id`
+and `channel_stats` included per SC-QAM channel.
 
 ## Archive Output
 

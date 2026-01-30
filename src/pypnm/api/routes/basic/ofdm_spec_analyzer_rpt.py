@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any, cast
 from pydantic import BaseModel
 
 from pypnm.api.routes.basic.abstract.analysis_report import AnalysisReport
+from pypnm.api.routes.basic.abstract.base_models.common_analysis import CommonAnalysis
 from pypnm.api.routes.basic.spec_analyzer_analysis_rpt import (
     SpecAnaWindowAvgRptModel,
     SpectrumAnalyzerAnalysisRptModel,
@@ -24,8 +25,17 @@ from pypnm.config.pnm_config_manager import SystemConfigSettings
 from pypnm.docsis.cable_modem import MacAddress
 from pypnm.lib.archive.manager import ArchiveManager
 from pypnm.lib.csv.manager import CSVManager
+from pypnm.lib.db.json_transaction import JsonTransactionDb
+from pypnm.lib.dict_utils import DictGenerate
 from pypnm.lib.matplot.manager import MatplotManager, PlotConfig
-from pypnm.lib.types import ArrayLike, FloatSeries, FrequencySeriesHz, Path, PathLike
+from pypnm.lib.types import (
+    ArrayLike,
+    ChannelId,
+    FloatSeries,
+    FrequencySeriesHz,
+    Path,
+    PathLike,
+)
 from pypnm.lib.utils import Generate
 
 
@@ -56,7 +66,11 @@ class OfdmSpecAnalyzerAnalysisReport:
     >>> rpt_dict = rpt.to_dict()
     """
 
-    def __init__(self, multi_analysis:MultiAnalysis) -> None:
+    def __init__(
+        self,
+        multi_analysis: MultiAnalysis,
+        measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] | None = None,
+    ) -> None:
         """Initialize the report coordinator.
 
         Parameters
@@ -68,6 +82,7 @@ class OfdmSpecAnalyzerAnalysisReport:
         self._archive_path:PathLike = SystemConfigSettings.archive_dir()
         self._analysis_files:list[PathLike] = []
         self._archive_file:PathLike
+        self._measurement_stats_by_channel = measurement_stats_by_channel
 
     def build_report(self) -> PathLike:
         """
@@ -94,7 +109,7 @@ class OfdmSpecAnalyzerAnalysisReport:
             remain accessible through their respective report instances.
         """
         for _ in self._get_analyses():
-            rpt = SingleOfdmSpecAnalyzerReport(_)
+            rpt = SingleOfdmSpecAnalyzerReport(_, measurement_stats_by_channel=self._measurement_stats_by_channel)
             rpt.build_report()
             rpt.get_all_generated_files()
             self._analysis_files.extend(rpt.get_all_generated_files())
@@ -196,7 +211,11 @@ class SingleOfdmSpecAnalyzerReport(AnalysisReport):
     """
     FNAME_TAG: str = "ofdm_spec_ana_rpt"
 
-    def __init__(self, analysis: Analysis) -> None:
+    def __init__(
+        self,
+        analysis: Analysis,
+        measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] | None = None,
+    ) -> None:
         """Create a report instance bound to a single :class:`Analysis`.
 
         Parameters
@@ -207,6 +226,22 @@ class SingleOfdmSpecAnalyzerReport(AnalysisReport):
         super().__init__(analysis)
         self.logger = logging.getLogger("SingleOfdmSpecAnalyzerReport")
         self._results: dict[int, SpectrumAnalyzerAnalysisRptModel] = {}
+        self._measurement_stats_by_channel = measurement_stats_by_channel
+
+    def _build_common_analysis_json(self, channel_id: ChannelId, common_analysis: CommonAnalysis) -> None:
+        payload = common_analysis.model_dump()
+        if self._measurement_stats_by_channel is not None:
+            stats = self._measurement_stats_by_channel.get(channel_id, [])
+            if stats:
+                DictGenerate.pop_keys_recursive(stats, ["channel_id"])
+                payload["measurement_stats"] = stats
+
+        full_path_fname = self.create_json_fname(tags=[str(channel_id), "analysis", str(Generate.time_stamp())])
+        self.json_files.append(full_path_fname)
+        JsonTransactionDb().write_json(
+            data=payload,
+            fname=Path(full_path_fname).parts[-1],
+        )
 
     def create_csv(self, **kwargs: dict[str, object]) -> list[CSVManager]:
         """Emit a CSV per channel with ``Frequency``, ``Magnitude(dBmV)``, and ``MovingAverage``.
