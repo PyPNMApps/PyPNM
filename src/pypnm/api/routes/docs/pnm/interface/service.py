@@ -1,12 +1,12 @@
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 
 
 class InterfaceStatsService:
@@ -14,7 +14,7 @@ class InterfaceStatsService:
     Service class for retrieving DOCSIS interface statistics from a cable modem.
     """
 
-    def __init__(self, mac_address: MacAddressStr, ip_address: InetAddressStr, write_community: str) -> None:
+    def __init__(self, mac_address: MacAddressStr, ip_address: InetAddressStr, write_community: SnmpCommunity) -> None:
         """
         Initialize the service with a target cable modem's MAC and IP address.
 

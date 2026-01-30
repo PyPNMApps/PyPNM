@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 import argparse
 import json
@@ -21,6 +21,7 @@ from pypnm.examples.common.common_cli import (
     _join_url,
     build_cable_modem_payload,
 )
+from pypnm.lib.types import SnmpCommunity
 
 
 def main() -> int:
@@ -72,10 +73,11 @@ def main() -> int:
     args = parser.parse_args()
 
     # Strongly-typed base payload (TypedDict)
+    community = SnmpCommunity(args.community_write)
     cm_payload: CableModemRequestPayload = build_cable_modem_payload(
         mac=args.mac,
         ip=args.inet,
-        community=args.community_write,
+        community=community,
     )
 
     # Top-level JSON payload for FastAPI - use a plain dict so we can

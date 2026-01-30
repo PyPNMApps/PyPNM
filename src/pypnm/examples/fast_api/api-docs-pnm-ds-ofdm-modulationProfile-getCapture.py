@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 import argparse
 import json
@@ -18,6 +18,7 @@ from pypnm.examples.common.common_cli import (
     EXIT_REQUEST_ERROR,
     EXIT_SUCCESS,
 )
+from pypnm.lib.types import SnmpCommunity
 
 ENDPOINT_PATH: str = "/docs/pnm/ds/ofdm/modulationProfile/getCapture"
 DEFAULT_TFTP_IPV6: str = "::1"
@@ -78,7 +79,7 @@ def parse_args() -> argparse.Namespace:
 def build_payload(
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     tftp_ipv4: str,
     tftp_ipv6: str,
 ) -> dict[str, Any]:
@@ -123,10 +124,11 @@ def main() -> int:
     args = parse_args()
 
     url: str = _join_url(args.base_url, ENDPOINT_PATH)
+    community = SnmpCommunity(args.community)
     payload: dict[str, Any] = build_payload(
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
         tftp_ipv4=args.tftp_ipv4,
         tftp_ipv6=args.tftp_ipv6,
     )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from pypnm.examples.common.common_cli import (
     EXIT_SUCCESS,
     send_cable_modem_request,
 )
+from pypnm.lib.types import SnmpCommunity
 
 ENDPOINT_PATH: str = "/docs/if31/docsis/baseCapability"
 
@@ -56,12 +57,13 @@ def main() -> int:
     """
     args = parse_args()
 
+    community = SnmpCommunity(args.community)
     return send_cable_modem_request(
         endpoint_path=ENDPOINT_PATH,
         base_url=args.base_url,
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
     )
 
 

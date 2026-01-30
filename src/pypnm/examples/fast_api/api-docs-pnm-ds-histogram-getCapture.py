@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 import argparse
 import json
@@ -17,6 +17,7 @@ from pypnm.examples.common.common_cli import (
     DEFAULT_HTTP_TIMEOUT_SEC,
     DEFAULT_SNMP_COMMUNITY,
 )
+from pypnm.lib.types import SnmpCommunity
 
 EXIT_SUCCESS: int = 0
 EXIT_REQUEST_ERROR: int = 3
@@ -25,7 +26,7 @@ EXIT_REQUEST_ERROR: int = 3
 def build_ds_histogram_payload(
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     tftp_ipv4: str,
     tftp_ipv6: str,
     sample_duration: int,
@@ -124,10 +125,11 @@ def main() -> int:
     base_url: str = args.base_url.rstrip("/")
     url: str = f"{base_url}{endpoint_path}"
 
+    community = SnmpCommunity(args.community)
     payload: Dict[str, Any] = build_ds_histogram_payload(
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
         tftp_ipv4=args.tftp_ipv4,
         tftp_ipv6=args.tftp_ipv6,
         sample_duration=args.sample_duration,

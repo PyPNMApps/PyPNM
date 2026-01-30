@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmDsOfdmRxMerEntry
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 from pypnm.lib.utils import Generate, TimeUnit
 
 LOG_FORMAT: str   = "%(asctime)s - %(levelname)s - %(message)s"
@@ -73,7 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
 async def _build_cable_modem(
     mac_address: MacAddressStr,
     ip_address: InetAddressStr,
-    write_community: str,
+    write_community: SnmpCommunity,
 ) -> CableModem:
     """
     Build A CableModem Instance For PNM Operations.
@@ -119,7 +119,7 @@ async def _run_rxmer_set_and_go(
     ip: InetAddressStr,
     tftp_ipv4: InetAddressStr,
     tftp_ipv6: InetAddressStr | None,
-    write_community: str,
+    write_community: SnmpCommunity,
 ) -> None:
     """
     Run The Downstream OFDM RxMER Set-And-Go Workflow And Emit Merged JSON.
@@ -209,7 +209,7 @@ async def main() -> None:
     tftp_ipv6: InetAddressStr | None = (
         InetAddressStr(args.tftp_ipv6) if args.tftp_ipv6 is not None else None
     )
-    write_community: str      = str(args.community_write)
+    write_community: SnmpCommunity      = SnmpCommunity(args.community_write)
 
     try:
         await _run_rxmer_set_and_go(

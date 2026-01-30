@@ -1,3 +1,96 @@
+## Agent Review Bundle Summary
+- Goal: Update community type hints to SnmpCommunity and fix default handling
+- Changes: Swap community annotations, add SnmpCommunity casts, and refresh SPDX years
+- Files: src/pypnm/api/routes/common/classes/common_endpoint_classes/schema/base_snmp.py, src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/api/routes/docs/pnm/ds/ofdm/mer_margin/router.py, src/pypnm/api/routes/docs/pnm/interface/router.py, src/pypnm/api/routes/docs/pnm/interface/service.py, src/pypnm/docsis/cable_modem.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/examples/common/cm_pnm_helpers.py, src/pypnm/examples/common/common_cli.py, src/pypnm/examples/fast_api/api-docs-dev-eventlog.py, src/pypnm/examples/fast_api/api-docs-if30-ds-scqam-chan-codewordErrorRate.py, src/pypnm/examples/fast_api/api-docs-if30-ds-scqam-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if30-us-atdma-chan-preEqualization.py, src/pypnm/examples/fast_api/api-docs-if30-us-atdma-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if31-docsis-baseCapability.py, src/pypnm/examples/fast_api/api-docs-if31-ds-ofdm-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if31-ds-ofdm-profile-stats.py, src/pypnm/examples/fast_api/api-docs-if31-system-diplexer.py, src/pypnm/examples/fast_api/api-docs-if31-us-ofdma-channel-stats.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-histogram-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-channelEstCoeff-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-constellationDisplay-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-fecSummary-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-modulationProfile-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-rxMer-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-interface-stats.py, src/pypnm/examples/fast_api/api-system-sysDescr.py, src/pypnm/examples/fast_api/api-system-upTime.py, src/pypnm/examples/python/py-pnm-ds-ofdm-chan-estimate.py, src/pypnm/examples/python/py-pnm-ds-ofdm-rxmer.py, src/pypnm/snmp/snmp_v2c.py
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails pre-existing formatting); pytest -q
+- Notes: Ruff format check fails due to pre-existing repo formatting drift
+
+# FILE: src/pypnm/api/routes/common/classes/common_endpoint_classes/schema/base_snmp.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+"""
+Module: common_endpoint_classes.schema.base_snmp
+Defines SNMP configuration models for v2c and v3 settings.
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic.alias_generators import to_camel
+
+from pypnm.config.system_config_settings import SystemConfigSettings as SCSC
+from pypnm.lib.types import SnmpCommunity
+
+
+class SNMPv2c(BaseModel):
+    """
+    SNMP v2c settings model.
+
+    Attributes:
+        community (str): Write community string. Must not be blank.
+    """
+    community: SnmpCommunity | None = Field(
+        ...,
+        description=f"Write community string (null uses {SCSC.snmp_write_community()})",
+    )
+
+    @field_validator("community")
+    def community_not_blank(cls, v: SnmpCommunity | None) -> SnmpCommunity | None:
+        """
+        Validate that the community string is not blank.
+        """
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("SNMPv2c.community must not be blank")
+        return v
+
+class SNMPv3(BaseModel):
+    """
+    SNMP v3 settings model.
+
+    Attributes:
+        username (Optional[str]): Username; if omitted, system default is used.
+        securityLevel (Literal["noAuthNoPriv","authNoPriv","authPriv"]): Required SNMPv3 security level.
+        authProtocol (Optional[Literal["MD5","SHA"]]): Authentication protocol.
+        authPassword (Optional[str]): Authentication password.
+        privProtocol (Optional[Literal["DES","AES"]]): Privacy protocol.
+        privPassword (Optional[str]): Privacy password.
+    """
+    username: str | None = Field(default=None, description="Username; if omitted, system default is used")
+    securityLevel: Literal["noAuthNoPriv","authNoPriv","authPriv"] = Field(default="noAuthNoPriv", description="SNMPv3 security level")
+    authProtocol: Literal["MD5", "SHA"] | None = Field(default="SHA", description="Authentication protocol")
+    authPassword: str | None = Field(default="password", description="Authentication password")
+    privProtocol: Literal["DES", "AES"] | None = Field(default="AES", description="Privacy protocol")
+    privPassword: str | None = Field(default="password", description="Privacy password")
+
+    @model_validator(mode="after")
+    def check_v3_fields(self) -> SNMPv3:
+        """
+        Ensure that authentication and privacy fields are present based on securityLevel.
+        """
+        lvl = self.securityLevel
+        if lvl in ("authNoPriv", "authPriv") and (not self.authProtocol or not self.authPassword):
+            raise ValueError("authProtocol & authPassword are required for auth levels")
+        if lvl == "authPriv" and (not self.privProtocol or not self.privPassword):
+            raise ValueError("privProtocol & privPassword are required for privacy level")
+        return self
+
+
+
+class SNMPConfig(BaseModel):
+    """
+    SNMP configuration model supporting both v2c and optional v3 settings.
+    """
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    snmp_v2c: SNMPv2c   = Field(..., description="SNMP v2c settings")
+
+    if SCSC.snmp_v3_enable():
+        snmp_v3: SNMPv3     = Field(default_factory=SNMPv3, description="SNMP v3 settings")
+# FILE: src/pypnm/api/routes/common/extended/common_measure_service.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
@@ -1329,3 +1422,446 @@ class CommonMeasureService(CommonMessagingService):
 
         self.logger.debug(f"{self.log_prefix} - Ping failed for host: {host}")
         return ServiceStatusCode.PING_FAILED
+# FILE: src/pypnm/api/routes/docs/pnm/ds/ofdm/mer_margin/router.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter
+
+from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
+    PnmAnalysisResponse,
+    PnmRequest,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import (
+    SnmpResponse,
+)
+from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
+    CableModemServicePreCheck,
+)
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.api.routes.docs.pnm.ds.ofdm.mer_margin.schemas import PnmMerMarginRequest
+from pypnm.api.routes.docs.pnm.ds.ofdm.mer_margin.service import (
+    CmDsOfdmMerMarginService,
+)
+from pypnm.docsis.cable_modem import CableModem
+from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
+from pypnm.lib.inet import Inet
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
+
+
+class RxMerMarginRouter:
+    """
+    FastAPI Router for DOCSIS 3.1 Downstream OFDM MER Margin operations.
+
+    This router handles the following operations for MER Margin:
+    - Triggering measurement (`getMeasurement`)
+    - Fetching measurement results (`getAnalysis`)
+    - Fetching measurement configuration/status (`getMeasurementStatistics`)
+    """
+
+    def __init__(self) -> None:
+        prefix = "/docs/pnm/ds/ofdm"
+        tags = ["PNM Operations - Downstream OFDM MER Margin"]
+        self.base_endpoint = "merMargin"
+        self.router = APIRouter(prefix=prefix, tags=tags)
+        self.logger = logging.getLogger(f"RxMerMarginRouter.{self.base_endpoint}")
+
+        self._add_routes()
+
+    def _add_routes(self) -> None:
+
+        @self.router.post(f"/{self.base_endpoint}/getMeasurementTemplate",
+                          response_model=SnmpResponse,
+                          responses=FAST_API_RESPONSE,)
+        async def get_measurement_template(request: PnmRequest) -> SnmpResponse:
+            """
+            📘 [API Guide - MER Margin Measurement Template](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/single/ds/ofdm/mer-margin.md#get-measurement-template)
+            """
+            mac: MacAddressStr = request.cable_modem.mac_address
+            ip: InetAddressStr = request.cable_modem.ip_address
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
+
+            self.logger.info(f"Retrieving MER Margin measurement template for MAC: {mac}, IP: {ip}")
+
+            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+
+            status, msg = await CableModemServicePreCheck(cable_modem=cm,validate_ofdm_exist=True).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status, message=msg)
+
+            service = CmDsOfdmMerMarginService(cm)
+            template:dict[str, list[dict]] = await service.getMeasurementTemplate()
+
+            return SnmpResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="MER Margin test triggered successfully",
+                results=template)
+
+        @self.router.post(f"/{self.base_endpoint}/getMeasurement",
+                          response_model=SnmpResponse,
+                          responses=FAST_API_RESPONSE,)
+        async def get_measurement(request: PnmMerMarginRequest) -> SnmpResponse:
+            """
+            Initiates a MER Margin test on a specified OFDM channel/profile.
+
+            Triggers the modem to calculate MER margin statistics against a given modulation profile.
+            This test measures subcarrier MER against required profile thresholds and computes available MER margin.
+
+            [API Guide - MER Margin Measurement](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/single/ds/ofdm/mer-margin.md#get-measurement)
+            """
+            mac = request.cable_modem.mac_address
+            ip = request.cable_modem.ip_address
+            self.logger.info(f"Initiating MER Margin measurement for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}")
+
+            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip))
+
+            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status, message=msg)
+
+            service = CmDsOfdmMerMarginService(cm)
+            await service.set(request.mer_margin)
+
+            return SnmpResponse(
+                mac_address=request.cable_modem.mac_address,
+                status=ServiceStatusCode.SUCCESS,
+                message="MER Margin test triggered successfully")
+
+        @self.router.post(f"/{self.base_endpoint}/getAnalysis",
+                          response_model=None,
+                          responses=FAST_API_RESPONSE,)
+        async def get_analysis(request: PnmMerMarginRequest) -> SnmpResponse | PnmAnalysisResponse:
+            """
+            Retrieves the MER Margin analysis results from the cable modem.
+
+            This endpoint provides values for:
+            - Measured Average MER
+            - Required Average MER
+            - Number of subcarriers below threshold
+            - MER Margin (dB)
+
+            [API Guide - MER Margin Analysis](https://github.com/PyPNMApps/PyPNM/blob/main/documentation/api/fast-api/single/ds/ofdm/mer-margin.md#get-analysis)
+            """
+            mac = request.cable_modem.mac_address
+            ip = request.cable_modem.ip_address
+            self.logger.info(f"Retrieving MER Margin analysis for MAC: {mac}, IP: {ip}, Profile ID: {request.mer_margin.profile_id}")
+
+            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip))
+
+            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(mac_address=mac,status=status, message=msg)
+
+            service = CmDsOfdmMerMarginService(cm)
+            return await service.get_analysis()
+
+        @self.router.post(f"/{self.base_endpoint}/getMeasurementStatistics",
+                          response_model=SnmpResponse)
+        async def get_measurement_statistics(request: PnmRequest) -> SnmpResponse:
+            """
+            Returns current MER Margin measurement configuration and status.
+
+            This includes:
+            - Trigger status
+            - Profile ID and threshold configuration
+            - Measurement enable flag
+            - Symbol averaging parameters
+
+            [API Guide - MER Margin Measurement Configuration and Status](https://github.com/PyPNMApps/PyPNM/blob/main/documentation/api/fast-api/single/ds/ofdm/mer-margin.md#get-measurement-statistics)
+            """
+            mac = request.cable_modem.mac_address
+            ip = request.cable_modem.ip_address
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
+            self.logger.info(f"Fetching MER Margin measurement statistics for MAC: {mac}, IP: {ip}")
+
+            cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)
+
+            status, msg = await CableModemServicePreCheck(cable_modem=cm, validate_ofdm_exist=True).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status, message=msg)
+
+            service = CmDsOfdmMerMarginService(cm)
+            results = await service.getMeasurementStatus()
+
+            return SnmpResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.SUCCESS,
+                message="Measurement Statistics for MER Margin",
+                results=results)
+
+# Required for dynamic auto-registration
+router = RxMerMarginRouter().router
+# FILE: src/pypnm/api/routes/docs/pnm/interface/router.py
+
+from __future__ import annotations
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+import logging
+
+from fastapi import APIRouter
+
+from pypnm.api.routes.common.classes.common_endpoint_classes.snmp.schemas import (
+    SnmpRequest,
+    SnmpResponse,
+)
+from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
+    CableModemServicePreCheck,
+)
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.api.routes.docs.pnm.interface.service import InterfaceStatsService
+from pypnm.api.routes.docs.pnm.spectrumAnalyzer.router import FAST_API_RESPONSE
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
+
+
+class InterfaceStatsRouter:
+    """
+    FastAPI router for retrieving DOCSIS interface statistics.
+    """
+
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.router = APIRouter(
+            prefix="/docs/pnm/interface",
+            tags=["Interface Statistics"])
+        self._add_routes()
+
+    def _add_routes(self) -> None:
+        @self.router.post("/stats",
+                          response_model=SnmpResponse,
+                          responses=FAST_API_RESPONSE,)
+        async def get_interface_stats(request: SnmpRequest) -> SnmpResponse:
+            """
+            Retrieve DOCSIS interface statistics grouped by interface type.
+
+            [API Guide - Retrieve DOCSIS Interface Statistics](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/single/pnm/interface/stats.md)
+            """
+            mac: MacAddressStr = request.cable_modem.mac_address
+            ip: InetAddressStr = request.cable_modem.ip_address
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
+            self.logger.info(f"Retrieving interface statistics for MAC: {mac}, IP: {ip}")
+
+            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
+                                                          ip_address    =   ip,
+                                                          snmp_config   =   request.cable_modem.snmp).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse( mac_address=mac, status=status, message=msg)
+
+            service = InterfaceStatsService(mac_address=mac, ip_address=ip, write_community=community)
+            data: dict[str, list[dict]] = await service.get_interface_stat_entries()
+
+            return SnmpResponse(mac_address=mac,
+                                status=ServiceStatusCode.SUCCESS,
+                                message="Interface statistics retrieved successfully",
+                                results=data)
+
+# Required for dynamic auto-registration
+router = InterfaceStatsRouter().router
+# FILE: src/pypnm/api/routes/docs/pnm/interface/service.py
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+from __future__ import annotations
+
+from pypnm.docsis.cable_modem import CableModem
+from pypnm.lib.inet import Inet
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
+
+
+class InterfaceStatsService:
+    """
+    Service class for retrieving DOCSIS interface statistics from a cable modem.
+    """
+
+    def __init__(self, mac_address: MacAddressStr, ip_address: InetAddressStr, write_community: SnmpCommunity) -> None:
+        """
+        Initialize the service with a target cable modem's MAC and IP address.
+
+        Args:
+            mac_address (str): MAC address of the cable modem.
+            ip_address (str): IP address of the cable modem.
+        """
+        self.cm = CableModem(mac_address=MacAddress(mac_address),
+                             inet=Inet(ip_address),
+                             write_community=write_community)
+
+    async def get_interface_stat_entries(self) -> dict[str, list[dict]]:
+        """
+        Fetches interface statistics from the cable modem, grouped by interface type.
+
+        Returns:
+            Dict[str, List[Dict]]: A dictionary where each key is the DOCSIS interface type
+            name (e.g., 'docsCableDownstream') and the value is a list of corresponding
+            interface statistics dictionaries.
+        """
+        interface_stat: dict[str, list[dict]] = await self.cm.getInterfaceStatistics()
+        return interface_stat
+# FILE: src/pypnm/docsis/cable_modem.py
+
+from __future__ import annotations
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+import logging
+
+from pypnm.config.pnm_config_manager import PnmConfigManager
+from pypnm.docsis.cm_snmp_operation import CmSnmpOperation
+from pypnm.lib.inet import Inet, InetAddressStr
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.ping import Ping
+from pypnm.lib.types import SnmpCommunity
+
+
+class CableModem(CmSnmpOperation):
+    """
+    Represents a Cable Modem device that extends SNMP operations.
+
+    Provides access to the modem's MAC and IP addresses, and utility
+    functions such as ping-based reachability and SNMP responsiveness checks.
+    """
+
+    inet: Inet
+
+    def __init__(self, mac_address: MacAddress,
+                 inet: Inet,
+                 write_community: SnmpCommunity | None = None) -> None:
+        """
+        Initialize the CableModem instance.
+
+        Args:
+            mac_address (MacAddress): The MAC address of the cable modem.
+            inet (Inet): The IP address of the cable modem.
+            write_community (SnmpCommunity | None, optional): SNMP write community string.
+                Defaults to the configured value when not provided.
+        """
+        resolved_community = write_community
+        if resolved_community is None:
+            resolved_community = PnmConfigManager.get_write_community()
+        super().__init__(inet=inet, write_community=resolved_community)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._mac_address: MacAddress = mac_address
+
+    @property
+    def get_mac_address(self) -> MacAddress:
+        """
+        Returns the MAC address of the cable modem.
+
+        Returns:
+            MacAddress: The cable modem's MAC address.
+        """
+        return self._mac_address
+
+    @property
+    def get_inet_address(self) -> InetAddressStr:
+        """
+        Returns the IP address of the cable modem as a string.
+
+        Returns:
+            str: The cable modem's IP address.
+        """
+        return InetAddressStr(self._inet.__str__())
+
+    def is_ping_reachable(self) -> bool:
+        """
+        Checks whether the cable modem is reachable via ICMP ping.
+
+        Returns:
+            bool: True if the modem responds to ping, False otherwise.
+        """
+        return Ping.is_reachable(self.get_inet_address)
+
+    async def is_snmp_reachable(self) -> bool:
+        """
+        Checks whether the cable modem is reachable via SNMP by requesting sysDescr.
+
+        Returns:
+            bool: True if SNMP communication is successful, False otherwise.
+        """
+        system_description = await self.getSysDescr(timeout=1, retries=1)
+
+        self.logger.debug(f"SNMP.is_snmp_reachable: System Description for {system_description}, is_empty: {system_description.is_empty()}")
+
+        if system_description.is_empty():
+            self.logger.debug(f"{self.__repr__()}- SNMP access failed")
+            return False
+
+        return True
+
+    async def isCableModemMacCorrect(self) -> bool:
+        "Checks to see if mac address is cable modem mac-address (docsCableMaclayer)"
+        mac = await self.getIfPhysAddress()
+        self.logger.debug(f"CableModem MAC Address: {self.get_mac_address}, SNMP Retrieved MAC Address: {mac}")
+        return self.get_mac_address.is_equal(mac)
+
+    def same_inet_version(self, other: Inet) -> bool:
+        """
+        Determines whether this modem's IP address and another Inet address are the same IP version.
+
+        Args:
+            other (Inet): Another Inet instance to compare.
+
+        Returns:
+            bool: True if both are either IPv4 or IPv6, False otherwise.
+
+        Raises:
+            TypeError: If 'other' is not an instance of Inet.
+        """
+        if not isinstance(other, Inet):
+            raise TypeError(f"Expected 'Inet' instance, got {type(other).__name__}")
+        return self._inet.same_inet_version(other)
+
+    def __str__(self) -> str:
+        """
+        String representation of the cable modem.
+
+        Returns:
+            str: MAC and IP address representation.
+        """
+        return f"{self.get_mac_address}"
+
+    def __repr__(self) -> str:
+        """
+        String representation of the cable modem.
+
+        Returns:
+            str: MAC and IP address representation.
+        """
+        return f"Mac: {self.__str__()} - Inet: {self.get_inet_address}"
+
+    def __hash__(self) -> int:
+        """
+        Hash based on the normalized raw MAC address string (12 lowercase hex chars).
+
+        This ensures that any MacAddress instance with the same underlying
+        normalized MAC value will be treated as equal in sets and dicts.
+        """
+        return hash(self._mac_address.mac_address)
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Equality check based on normalized MAC string.
+        """
+        return isinstance(other, MacAddress) and self._mac_address == other._mac

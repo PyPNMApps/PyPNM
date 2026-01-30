@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Update community type hints to SnmpCommunity and fix default handling
+- Changes: Swap community annotations, add SnmpCommunity casts, and refresh SPDX years
+- Files: src/pypnm/api/routes/common/classes/common_endpoint_classes/schema/base_snmp.py, src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/api/routes/docs/pnm/ds/ofdm/mer_margin/router.py, src/pypnm/api/routes/docs/pnm/interface/router.py, src/pypnm/api/routes/docs/pnm/interface/service.py, src/pypnm/docsis/cable_modem.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/examples/common/cm_pnm_helpers.py, src/pypnm/examples/common/common_cli.py, src/pypnm/examples/fast_api/api-docs-dev-eventlog.py, src/pypnm/examples/fast_api/api-docs-if30-ds-scqam-chan-codewordErrorRate.py, src/pypnm/examples/fast_api/api-docs-if30-ds-scqam-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if30-us-atdma-chan-preEqualization.py, src/pypnm/examples/fast_api/api-docs-if30-us-atdma-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if31-docsis-baseCapability.py, src/pypnm/examples/fast_api/api-docs-if31-ds-ofdm-chan-stats.py, src/pypnm/examples/fast_api/api-docs-if31-ds-ofdm-profile-stats.py, src/pypnm/examples/fast_api/api-docs-if31-system-diplexer.py, src/pypnm/examples/fast_api/api-docs-if31-us-ofdma-channel-stats.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-histogram-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-channelEstCoeff-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-constellationDisplay-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-fecSummary-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-modulationProfile-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-ds-ofdm-rxMer-getCapture.py, src/pypnm/examples/fast_api/api-docs-pnm-interface-stats.py, src/pypnm/examples/fast_api/api-system-sysDescr.py, src/pypnm/examples/fast_api/api-system-upTime.py, src/pypnm/examples/python/py-pnm-ds-ofdm-chan-estimate.py, src/pypnm/examples/python/py-pnm-ds-ofdm-rxmer.py, src/pypnm/snmp/snmp_v2c.py
+- Tests: python3 -m compileall src; ruff check src; ruff format --check . (fails pre-existing formatting); pytest -q
+- Notes: Ruff format check fails due to pre-existing repo formatting drift
+
+# FILE: src/pypnm/docsis/cm_snmp_operation.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
@@ -2455,3 +2463,480 @@ class CmSnmpOperation:
                 "Ensure Pre-Equalization is enabled on the upstream interface(s).")
 
         return ded
+# FILE: src/pypnm/examples/common/cm_pnm_helpers.py
+#!/usr/bin/env python3
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Sequence
+
+from pypnm.docsis.cable_modem import CableModem
+from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlStatus
+from pypnm.lib.inet import Inet
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
+
+DEFAULT_PNM_POLL_INTERVAL_SECONDS: float = 1.0
+
+logger = logging.getLogger(__name__)
+
+
+async def build_cable_modem(
+    mac_address: MacAddressStr,
+    ip_address: InetAddressStr,
+    write_community: SnmpCommunity,
+) -> CableModem:
+    """
+    Build And Verify A CableModem Instance For PNM Operations.
+
+    Construct a ``CableModem`` using the supplied MAC address, IP address,
+    and SNMP write community. Basic reachability is verified using ICMP ping,
+    and the device ``sysDescr`` is logged for visibility.
+
+    A ``RuntimeError`` is raised if the modem is not reachable so callers
+    can treat this as an all-or-nothing setup step for subsequent PNM calls.
+    """
+    cm = CableModem(
+        mac_address     = MacAddress(mac_address),
+        inet            = Inet(ip_address),
+        write_community = write_community,
+    )
+
+    if not cm.is_ping_reachable():
+        logger.error("%s not reachable", cm.get_inet_address)
+        raise RuntimeError(f"{cm.get_inet_address} not reachable")
+
+    logger.info("Connected to: %s", await cm.getSysDescr())
+    return cm
+
+
+async def discover_ofdm_indices(cm: CableModem) -> Sequence[int]:
+    """
+    Discover Downstream OFDM Channel Indices For The Cable Modem.
+
+    Wrap the DOCSIS SNMP query that returns downstream OFDM channel
+    indices. The discovered list is logged. A ``RuntimeError`` is raised
+    if no indices are found, which typically indicates that the modem is
+    not configured for OFDM or not provisioned as expected.
+    """
+    ofdm_idx_list: Sequence[int] = await cm.getDocsIf31CmDsOfdmChannelIdIndex()
+
+    if not ofdm_idx_list:
+        logger.error("No downstream OFDM channel indices discovered")
+        raise RuntimeError("No downstream OFDM channel indices discovered")
+
+    logger.info("Discovered OFDM channel indices: %s", list(ofdm_idx_list))
+    return ofdm_idx_list
+
+
+async def configure_pnm_bulk_tftp(
+    cm: CableModem,
+    tftp_ipv4: InetAddressStr,
+    tftp_dest_dir: str,
+) -> None:
+    """
+    Configure PNM Bulk Transfer TFTP Server And Destination Directory.
+
+    Program the DOCSIS PNM bulk data transfer settings on the cable modem
+    for the provided IPv4 TFTP server and destination directory. A
+    ``RuntimeError`` is raised if configuration fails so callers can stop
+    the workflow early.
+    """
+    if await cm.setDocsPnmBulk(
+        tftp_server = str(tftp_ipv4),
+        tftp_path   = tftp_dest_dir,
+    ):
+        logger.info("PNM bulk TFTP configured: server=%s path=%s", tftp_ipv4, tftp_dest_dir)
+        return
+
+    logger.error("Unable to set TFTP server %s and/or TFTP path %s", tftp_ipv4, tftp_dest_dir)
+    raise RuntimeError(f"Unable to configure PNM bulk TFTP: server={tftp_ipv4} path={tftp_dest_dir}")
+
+
+async def poll_pnm_test_until_complete(
+    cm: CableModem,
+    poll_interval_seconds: float = DEFAULT_PNM_POLL_INTERVAL_SECONDS,
+) -> DocsPnmCmCtlStatus:
+    """
+    Poll The PNM Control Status Until The Test Completes.
+
+    Repeatedly read ``DocsPnmCmCtlStatus`` and block until the status
+    transitions away from ``TEST_IN_PROGRESS``. The final status value is
+    returned so callers can validate success or failure.
+
+    A configurable poll interval balances test responsiveness with
+    network and CPU usage.
+    """
+    while True:
+        status: DocsPnmCmCtlStatus = await cm.getDocsPnmCmCtlStatus()
+
+        if status == DocsPnmCmCtlStatus.TEST_IN_PROGRESS:
+            logger.warning("PNM test in progress...")
+            await asyncio.sleep(poll_interval_seconds)
+        else:
+            logger.info("PNM test completed with status: %s", status.name)
+            return status
+# FILE: src/pypnm/examples/common/common_cli.py
+#!/usr/bin/env python3
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import Any, Dict, TypedDict
+
+from pypnm.lib.types import SnmpCommunity
+
+try:
+    import requests
+except ImportError:
+    print("The 'requests' library is not installed. Please install it before running these examples.")
+    sys.exit(2)
+
+
+EXIT_SUCCESS: int                      = 0
+EXIT_IMPORT_ERROR: int                 = 2
+EXIT_REQUEST_ERROR: int                = 3
+
+DEFAULT_SNMP_COMMUNITY: SnmpCommunity  = SnmpCommunity("private")
+DEFAULT_BASE_URL: str                  = "http://127.0.0.1:8000"
+DEFAULT_SAMPLE_TIME_ELAPSED_SEC: int   = 5
+DEFAULT_HTTP_TIMEOUT_SEC: float        = 120.0
+
+DEFAULT_TFTP_IPV4: str                 = "192.168.0.10"
+DEFAULT_TFTP_IPV6: str                 = "::1"
+
+
+class SnmpV2CPayload(TypedDict):
+    community: SnmpCommunity
+
+
+class SnmpPayload(TypedDict):
+    snmpV2C: SnmpV2CPayload
+
+
+class PnmTftpPayload(TypedDict):
+    ipv4: str
+    ipv6: str
+
+
+class PnmParametersPayload(TypedDict, total=False):
+    tftp: PnmTftpPayload
+
+
+class CableModemPayload(TypedDict, total=False):
+    mac_address: str
+    ip_address: str
+    snmp: SnmpPayload
+    pnm_parameters: PnmParametersPayload
+
+
+class CableModemRequestPayload(TypedDict):
+    cable_modem: CableModemPayload
+
+
+class CaptureParametersPayload(TypedDict, total=False):
+    sample_time_elapsed: int
+    inactivity_timeout: int
+    first_segment_center_freq: int
+    last_segment_center_freq: int
+    segment_freq_span: int
+    num_bins_per_segment: int
+    noise_bw: int
+    window_function: int
+    num_averages: int
+    spectrum_retrieval_type: int
+    number_of_averages: int
+
+
+class CableModemCaptureRequestPayload(TypedDict):
+    cable_modem: CableModemPayload
+    capture_parameters: CaptureParametersPayload
+
+
+def build_cable_modem_payload(mac: str, ip: str, community: SnmpCommunity) -> CableModemRequestPayload:
+    """
+    Build The Common cable_modem Request Payload.
+
+    This helper constructs the JSON structure shared by multiple example
+    scripts. The returned payload contains the cable_modem object with the
+    MAC address, IP address, and SNMP v2c community configuration.
+    """
+    return {
+        "cable_modem": {
+            "mac_address": mac,
+            "ip_address": ip,
+            "snmp": {
+                "snmpV2C": {
+                    "community": community,
+                },
+            },
+        },
+    }
+
+
+def build_cable_modem_capture_payload(
+    mac: str,
+    ip: str,
+    community: SnmpCommunity,
+    sample_time_elapsed: int,
+) -> CableModemCaptureRequestPayload:
+    """
+    Build A cable_modem Request Payload With Capture Parameters.
+
+    This helper extends the common cable_modem payload with a capture_parameters
+    section used by measurement endpoints such as downstream SC-QAM codeword
+    error rate. The sample_time_elapsed value defines the capture duration in
+    seconds.
+    """
+    base_payload: CableModemRequestPayload = build_cable_modem_payload(mac, ip, community)
+    return {
+        "cable_modem": base_payload["cable_modem"],
+        "capture_parameters": {
+            "sample_time_elapsed": sample_time_elapsed,
+        },
+    }
+
+
+def send_cable_modem_request(endpoint_path: str, base_url: str, mac: str, ip: str, community: SnmpCommunity) -> int:
+    """
+    Send A POST Request To A PyPNM Endpoint Using The cable_modem Payload.
+
+    The endpoint_path argument supplies the REST path, such as
+    "/docs/dev/eventLog". The base_url argument defines the server root, for
+    example "http://127.0.0.1:8000". A POST request is issued with the
+    cable_modem payload, and the JSON response is printed when available. The
+    return value is an exit status where zero indicates success and a non-zero
+    value indicates a transport or HTTP error.
+    """
+    url: str = _join_url(base_url, endpoint_path)
+    payload: CableModemRequestPayload = build_cable_modem_payload(mac, ip, community)
+
+    print()
+    print(f"Sending POST to {url} with payload:")
+    print(json.dumps(payload, indent=2))
+
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT_SEC)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print()
+        print("Request failed:")
+        print(str(exc))
+        return EXIT_REQUEST_ERROR
+
+    print()
+    print("Response:")
+    try:
+        print(json.dumps(response.json(), indent=2))
+    except ValueError:
+        print(response.text)
+
+    return EXIT_SUCCESS
+
+
+def send_cable_modem_capture_request(
+    endpoint_path: str,
+    base_url: str,
+    mac: str,
+    ip: str,
+    community: SnmpCommunity,
+    sample_time_elapsed: int,
+) -> int:
+    """
+    Send A POST Request With cable_modem And capture_parameters Payload.
+
+    This helper is intended for measurement endpoints that require both the
+    cable_modem configuration and capture_parameters, such as downstream
+    SC-QAM codeword error rate. The sample_time_elapsed argument specifies the
+    capture duration in seconds. A POST request is issued and the JSON
+    response is printed when available. The return value is an exit status
+    where zero indicates success and a non-zero value indicates a transport
+    or HTTP error.
+    """
+    url: str = _join_url(base_url, endpoint_path)
+    payload: CableModemCaptureRequestPayload = build_cable_modem_capture_payload(
+        mac=mac,
+        ip=ip,
+        community=community,
+        sample_time_elapsed=sample_time_elapsed,
+    )
+
+    print()
+    print(f"Sending POST to {url} with payload:")
+    print(json.dumps(payload, indent=2))
+
+    try:
+        response = requests.post(url, json=payload, timeout=DEFAULT_HTTP_TIMEOUT_SEC)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print()
+        print("Request failed:")
+        print(str(exc))
+        return EXIT_REQUEST_ERROR
+
+    print()
+    print("Response:")
+    try:
+        print(json.dumps(response.json(), indent=2))
+    except ValueError:
+        print(response.text)
+
+    return EXIT_SUCCESS
+
+
+def send_cable_modem_pnm_and_analysis_request(
+    endpoint_path: str,
+    base_url: str,
+    mac: str,
+    ip: str,
+    community: SnmpCommunity,
+    tftp_ipv4: str | None,
+    tftp_ipv6: str | None,
+    analysis: Dict[str, Any],
+    capture_parameters: Dict[str, Any] | None = None,
+) -> int:
+    """
+    Send A POST Request With cable_modem, pnm_parameters, analysis, And Optional capture_parameters.
+
+    This helper is intended for PNM endpoints that require:
+      * cable_modem configuration
+      * pnm_parameters.tftp (IPv4 / IPv6)
+      * analysis configuration (type, output, plot, etc.)
+      * optional capture_parameters
+
+    The endpoint_path argument supplies the REST path, such as
+    "/docs/pnm/ds/histogram/getCapture". The base_url argument defines the
+    server root, for example "http://127.0.0.1:8000".
+    """
+    url: str = _join_url(base_url, endpoint_path)
+
+    base_payload: CableModemRequestPayload = build_cable_modem_payload(mac, ip, community)
+
+    tftp_ipv4_value = tftp_ipv4 if tftp_ipv4 and tftp_ipv4.strip() else None
+    tftp_ipv6_value = tftp_ipv6 if tftp_ipv6 and tftp_ipv6.strip() else None
+
+    body: Dict[str, Any] = {
+        "cable_modem": {
+            **base_payload["cable_modem"],
+            "pnm_parameters": {
+                "tftp": {
+                    "ipv4": tftp_ipv4_value,
+                    "ipv6": tftp_ipv6_value,
+                },
+            },
+        },
+        "analysis": analysis,
+    }
+
+    if capture_parameters is not None:
+        body["capture_parameters"] = capture_parameters
+
+    print()
+    print(f"Sending POST to {url} with payload:")
+    print(json.dumps(body, indent=2))
+
+    try:
+        response = requests.post(url, json=body, timeout=DEFAULT_HTTP_TIMEOUT_SEC)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print()
+        print("Request failed:")
+        print(str(exc))
+        return EXIT_REQUEST_ERROR
+
+    print()
+    print("Response:")
+    try:
+        print(json.dumps(response.json(), indent=2))
+    except ValueError:
+        print(response.text)
+
+    return EXIT_SUCCESS
+
+
+def _join_url(base_url: str, endpoint_path: str) -> str:
+    """
+    Join Base URL And Endpoint Path Into A Single URL String.
+    """
+    base: str = base_url.rstrip("/")
+    path: str = endpoint_path.lstrip("/")
+    return f"{base}/{path}"
+# FILE: src/pypnm/examples/fast_api/api-docs-dev-eventlog.py
+#!/usr/bin/env python3
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import argparse
+import sys
+
+from pypnm.examples.common.common_cli import (
+    DEFAULT_BASE_URL,
+    DEFAULT_SNMP_COMMUNITY,
+    send_cable_modem_request,
+)
+from pypnm.lib.types import SnmpCommunity
+
+
+EVENT_LOG_ENDPOINT: str = "/docs/dev/eventLog"
+
+
+def main() -> int:
+    """
+    Test The /docs/dev/eventLog Endpoint Using A CLI Example.
+
+    This entry point parses the MAC address, IP address, optional base URL,
+    and SNMP v2c community string from the command line. It then uses the
+    shared send_cable_modem_request helper to POST a cable_modem payload to
+    the /docs/dev/eventLog endpoint. The resulting exit status is propagated
+    as the process exit code so that automated scripts can detect failures.
+    """
+    parser = argparse.ArgumentParser(description="CLI example for the /docs/dev/eventLog endpoint.")
+    parser.add_argument(
+        "--mac",
+        "-m",
+        required=True,
+        help="MAC address of the cable modem (example: aa:bb:cc:dd:ee:ff)",
+    )
+    parser.add_argument(
+        "--inet",
+        "-i",
+        required=True,
+        help="IP address of the cable modem (example: 192.168.0.100)",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=DEFAULT_BASE_URL,
+        help=f"Base URL for the PyPNM API (default: {DEFAULT_BASE_URL})",
+    )
+    parser.add_argument(
+        "--snmp-community",
+        default=DEFAULT_SNMP_COMMUNITY,
+        help=f"SNMP v2c community string (default: {DEFAULT_SNMP_COMMUNITY})",
+    )
+
+    args = parser.parse_args()
+
+    community = SnmpCommunity(args.snmp_community)
+    return send_cable_modem_request(
+        endpoint_path=EVENT_LOG_ENDPOINT,
+        base_url=args.base_url,
+        mac=args.mac,
+        ip=args.inet,
+        community=community,
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main())

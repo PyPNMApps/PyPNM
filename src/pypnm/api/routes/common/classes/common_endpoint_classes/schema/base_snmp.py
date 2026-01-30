@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.alias_generators import to_camel
 
 from pypnm.config.system_config_settings import SystemConfigSettings as SCSC
+from pypnm.lib.types import SnmpCommunity
 
 
 class SNMPv2c(BaseModel):
@@ -23,13 +24,13 @@ class SNMPv2c(BaseModel):
     Attributes:
         community (str): Write community string. Must not be blank.
     """
-    community: str | None = Field(
+    community: SnmpCommunity | None = Field(
         ...,
         description=f"Write community string (null uses {SCSC.snmp_write_community()})",
     )
 
     @field_validator("community")
-    def community_not_blank(cls, v: str | None) -> str | None:
+    def community_not_blank(cls, v: SnmpCommunity | None) -> SnmpCommunity | None:
         """
         Validate that the community string is not blank.
         """

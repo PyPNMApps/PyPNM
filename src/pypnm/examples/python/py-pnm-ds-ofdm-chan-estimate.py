@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlStatus
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 from pypnm.lib.utils import Generate
 
 LOG_FORMAT: str                    = "%(asctime)s - %(levelname)s - %(message)s"
@@ -28,7 +28,7 @@ logger = logging.getLogger("PyPnmDsOfdmChanEstCli")
 async def _build_cable_modem(
     mac_address: MacAddressStr,
     ip_address: InetAddressStr,
-    write_community: str,
+    write_community: SnmpCommunity,
 ) -> CableModem:
     """
     Build And Verify A CableModem Instance For PNM Operations.
@@ -166,7 +166,7 @@ async def _run_chan_estimation_capture(
     ip: InetAddressStr,
     tftp_ipv4: InetAddressStr,
     tftp_dest_dir: str,
-    write_community: str,
+    write_community: SnmpCommunity,
 ) -> None:
     """
     Run A Downstream OFDM Channel Estimation Capture And Print Results As JSON.
@@ -232,7 +232,7 @@ async def main() -> None:
     ip: InetAddressStr        = InetAddressStr(args.inet)
     tftp_ipv4: InetAddressStr = InetAddressStr(args.tftp_ipv4)
     tftp_dest_dir: str        = str(args.tftp_dest_dir)
-    write_community: str      = str(args.community_write)
+    write_community: SnmpCommunity      = SnmpCommunity(args.community_write)
 
     try:
         await _run_chan_estimation_capture(

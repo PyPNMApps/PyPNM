@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pypnm.examples.common.common_cli import (
     DEFAULT_SNMP_COMMUNITY,
     send_cable_modem_request,
 )
+from pypnm.lib.types import SnmpCommunity
 
 
 SCQAM_DS_STATS_ENDPOINT: str = "/docs/if30/ds/scqam/chan/stats"
@@ -57,12 +58,13 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    community = SnmpCommunity(args.snmp_community)
     return send_cable_modem_request(
         endpoint_path=SCQAM_DS_STATS_ENDPOINT,
         base_url=args.base_url,
         mac=args.mac,
         ip=args.inet,
-        community=args.snmp_community,
+        community=community,
     )
 
 

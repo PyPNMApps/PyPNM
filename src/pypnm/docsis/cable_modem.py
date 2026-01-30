@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 import logging
 
 from pypnm.config.pnm_config_manager import PnmConfigManager
@@ -10,6 +10,7 @@ from pypnm.docsis.cm_snmp_operation import CmSnmpOperation
 from pypnm.lib.inet import Inet, InetAddressStr
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.ping import Ping
+from pypnm.lib.types import SnmpCommunity
 
 
 class CableModem(CmSnmpOperation):
@@ -24,16 +25,20 @@ class CableModem(CmSnmpOperation):
 
     def __init__(self, mac_address: MacAddress,
                  inet: Inet,
-                 write_community: str = PnmConfigManager.get_write_community()) -> None:
+                 write_community: SnmpCommunity | None = None) -> None:
         """
         Initialize the CableModem instance.
 
         Args:
             mac_address (MacAddress): The MAC address of the cable modem.
             inet (Inet): The IP address of the cable modem.
-            write_community (str, optional): SNMP write community string. Defaults to the configured value.
+            write_community (SnmpCommunity | None, optional): SNMP write community string.
+                Defaults to the configured value when not provided.
         """
-        super().__init__(inet=inet, write_community=write_community)
+        resolved_community = write_community
+        if resolved_community is None:
+            resolved_community = PnmConfigManager.get_write_community()
+        super().__init__(inet=inet, write_community=resolved_community)
         self.logger = logging.getLogger(self.__class__.__name__)
         self._mac_address: MacAddress = mac_address
 

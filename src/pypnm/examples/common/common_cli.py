@@ -9,6 +9,8 @@ import json
 import sys
 from typing import Any, Dict, TypedDict
 
+from pypnm.lib.types import SnmpCommunity
+
 try:
     import requests
 except ImportError:
@@ -20,7 +22,7 @@ EXIT_SUCCESS: int                      = 0
 EXIT_IMPORT_ERROR: int                 = 2
 EXIT_REQUEST_ERROR: int                = 3
 
-DEFAULT_SNMP_COMMUNITY: str            = "private"
+DEFAULT_SNMP_COMMUNITY: SnmpCommunity  = SnmpCommunity("private")
 DEFAULT_BASE_URL: str                  = "http://127.0.0.1:8000"
 DEFAULT_SAMPLE_TIME_ELAPSED_SEC: int   = 5
 DEFAULT_HTTP_TIMEOUT_SEC: float        = 120.0
@@ -30,7 +32,7 @@ DEFAULT_TFTP_IPV6: str                 = "::1"
 
 
 class SnmpV2CPayload(TypedDict):
-    community: str
+    community: SnmpCommunity
 
 
 class SnmpPayload(TypedDict):
@@ -76,7 +78,7 @@ class CableModemCaptureRequestPayload(TypedDict):
     capture_parameters: CaptureParametersPayload
 
 
-def build_cable_modem_payload(mac: str, ip: str, community: str) -> CableModemRequestPayload:
+def build_cable_modem_payload(mac: str, ip: str, community: SnmpCommunity) -> CableModemRequestPayload:
     """
     Build The Common cable_modem Request Payload.
 
@@ -100,7 +102,7 @@ def build_cable_modem_payload(mac: str, ip: str, community: str) -> CableModemRe
 def build_cable_modem_capture_payload(
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     sample_time_elapsed: int,
 ) -> CableModemCaptureRequestPayload:
     """
@@ -120,7 +122,7 @@ def build_cable_modem_capture_payload(
     }
 
 
-def send_cable_modem_request(endpoint_path: str, base_url: str, mac: str, ip: str, community: str) -> int:
+def send_cable_modem_request(endpoint_path: str, base_url: str, mac: str, ip: str, community: SnmpCommunity) -> int:
     """
     Send A POST Request To A PyPNM Endpoint Using The cable_modem Payload.
 
@@ -162,7 +164,7 @@ def send_cable_modem_capture_request(
     base_url: str,
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     sample_time_elapsed: int,
 ) -> int:
     """
@@ -212,7 +214,7 @@ def send_cable_modem_pnm_and_analysis_request(
     base_url: str,
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     tftp_ipv4: str | None,
     tftp_ipv6: str | None,
     analysis: Dict[str, Any],

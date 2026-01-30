@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # Example CLI client for:
 # POST /docs/if31/us/ofdma/channel/stats
@@ -13,14 +13,16 @@ from typing import Any
 
 import requests
 
+from pypnm.lib.types import SnmpCommunity
+
 
 DEFAULT_FAST_API_HOST: str = "127.0.0.1"
 DEFAULT_FAST_API_PORT: int = 8000
-DEFAULT_SNMP_COMMUNITY: str = "private"
+DEFAULT_SNMP_COMMUNITY: SnmpCommunity = SnmpCommunity("private")
 DEFAULT_TIMEOUT_SEC: float = 30.0
 
 
-def build_payload(mac_address: str, ip_address: str, community: str) -> dict[str, Any]:
+def build_payload(mac_address: str, ip_address: str, community: SnmpCommunity) -> dict[str, Any]:
     """
     Build The Request Payload For The OFDMA Upstream Channel Stats Endpoint.
     """
@@ -97,10 +99,11 @@ def main() -> None:
     args = parse_args()
 
     url: str = f"http://{args.host}:{args.port}/docs/if31/us/ofdma/channel/stats"
+    community = SnmpCommunity(args.community)
     payload: dict[str, Any] = build_payload(
         mac_address=args.mac_address,
         ip_address=args.ip_address,
-        community=args.community,
+        community=community,
     )
 
     print(f"Sending POST to {url} with payload:")

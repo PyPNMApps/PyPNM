@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 import argparse
 import sys
@@ -13,6 +13,7 @@ from pypnm.examples.common.common_cli import (
     DEFAULT_SNMP_COMMUNITY,
     send_cable_modem_pnm_and_analysis_request,
 )
+from pypnm.lib.types import SnmpCommunity
 
 ENDPOINT_PATH: str = "/docs/pnm/ds/ofdm/channelEstCoeff/getCapture"
 
@@ -68,12 +69,13 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    community = SnmpCommunity(args.community)
     return send_cable_modem_pnm_and_analysis_request(
         endpoint_path=ENDPOINT_PATH,
         base_url=args.base_url,
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
         tftp_ipv4=args.tftp_ipv4,
         tftp_ipv6=args.tftp_ipv6,
     )

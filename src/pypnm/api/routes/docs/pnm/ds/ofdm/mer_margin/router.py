@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 
 
 class RxMerMarginRouter:
@@ -59,7 +59,7 @@ class RxMerMarginRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community: str = request.cable_modem.snmp.snmp_v2c.community
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
 
             self.logger.info(f"Retrieving MER Margin measurement template for MAC: {mac}, IP: {ip}")
 
@@ -162,7 +162,7 @@ class RxMerMarginRouter:
             """
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
-            community: str = request.cable_modem.snmp.snmp_v2c.community
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
             self.logger.info(f"Fetching MER Margin measurement statistics for MAC: {mac}, IP: {ip}")
 
             cm = CableModem(mac_address=MacAddress(mac), inet=Inet(ip), write_community=community)

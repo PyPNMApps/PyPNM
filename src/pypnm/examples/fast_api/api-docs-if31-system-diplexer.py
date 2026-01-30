@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 import argparse
 import json
@@ -11,15 +11,17 @@ from typing import Any, Dict
 
 import requests
 
+from pypnm.lib.types import SnmpCommunity
+
 
 DEFAULT_BASE_URL: str = "http://127.0.0.1:8000"
-DEFAULT_SNMP_COMMUNITY: str = "private"
+DEFAULT_SNMP_COMMUNITY: SnmpCommunity = SnmpCommunity("private")
 DEFAULT_MAC_ADDRESS: str = "aa:bb:cc:dd:ee:ff"
 DEFAULT_IP_ADDRESS: str = "192.168.0.100"
 DEFAULT_TIMEOUT_SEC: float = 30.0
 
 
-def build_payload(mac_address: str, ip_address: str, community: str) -> Dict[str, Any]:
+def build_payload(mac_address: str, ip_address: str, community: SnmpCommunity) -> Dict[str, Any]:
     """
     Build The Common Request Payload For Diplexer System Info.
 
@@ -83,7 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     url = args.base_url.rstrip("/") + "/docs/if31/system/diplexer"
-    payload = build_payload(args.mac_address, args.ip_address, args.community)
+    community = SnmpCommunity(args.community)
+    payload = build_payload(args.mac_address, args.ip_address, community)
 
     print(f"Sending POST to {url} with payload:")
     print(json.dumps(payload, indent=2))

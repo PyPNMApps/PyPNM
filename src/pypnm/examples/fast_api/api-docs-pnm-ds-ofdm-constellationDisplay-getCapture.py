@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from pypnm.examples.common.common_cli import (
     _join_url,
     build_cable_modem_payload,
 )
+from pypnm.lib.types import SnmpCommunity
 
 
 ENDPOINT_PATH: str = "/docs/pnm/ds/ofdm/constellationDisplay/getCapture"
@@ -29,7 +30,7 @@ ENDPOINT_PATH: str = "/docs/pnm/ds/ofdm/constellationDisplay/getCapture"
 def build_constellation_display_payload(
     mac: str,
     ip: str,
-    community: str,
+    community: SnmpCommunity,
     tftp_ipv4: str,
     tftp_ipv6: str,
 ) -> Dict[str, Any]:
@@ -128,10 +129,11 @@ def main() -> int:
     args = parser.parse_args()
 
     url: str = _join_url(args.base_url, ENDPOINT_PATH)
+    community = SnmpCommunity(args.community)
     payload: Dict[str, Any] = build_constellation_display_payload(
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
         tftp_ipv4=args.tftp_ipv4,
         tftp_ipv6=args.tftp_ipv6,
     )

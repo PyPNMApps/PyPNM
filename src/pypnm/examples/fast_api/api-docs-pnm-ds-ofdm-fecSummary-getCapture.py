@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from pypnm.examples.common.common_cli import (
     CableModemRequestPayload,
     build_cable_modem_payload,
 )
+from pypnm.lib.types import SnmpCommunity
 
 ENDPOINT_PATH: str = "/docs/pnm/ds/ofdm/fecSummary/getCapture"
 
@@ -65,10 +66,11 @@ def main() -> int:
 
     url: str = _join_url(args.base_url, ENDPOINT_PATH)
 
+    community = SnmpCommunity(args.community)
     base_payload: CableModemRequestPayload = build_cable_modem_payload(
         mac=args.mac,
         ip=args.inet,
-        community=args.community,
+        community=community,
     )
 
     request_body: Dict[str, Any] = {

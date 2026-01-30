@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlStatus
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 
 DEFAULT_PNM_POLL_INTERVAL_SECONDS: float = 1.0
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 async def build_cable_modem(
     mac_address: MacAddressStr,
     ip_address: InetAddressStr,
-    write_community: str,
+    write_community: SnmpCommunity,
 ) -> CableModem:
     """
     Build And Verify A CableModem Instance For PNM Operations.

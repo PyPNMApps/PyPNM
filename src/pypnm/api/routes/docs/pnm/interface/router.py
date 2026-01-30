@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 import logging
 
 from fastapi import APIRouter
@@ -17,7 +17,7 @@ from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.docs.pnm.interface.service import InterfaceStatsService
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.router import FAST_API_RESPONSE
-from pypnm.lib.types import InetAddressStr, MacAddressStr
+from pypnm.lib.types import InetAddressStr, MacAddressStr, SnmpCommunity
 
 
 class InterfaceStatsRouter:
@@ -44,7 +44,7 @@ class InterfaceStatsRouter:
             """
             mac: MacAddressStr = request.cable_modem.mac_address
             ip: InetAddressStr = request.cable_modem.ip_address
-            community: str = request.cable_modem.snmp.snmp_v2c.community
+            community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
             self.logger.info(f"Retrieving interface statistics for MAC: {mac}, IP: {ip}")
 
             status, msg = await CableModemServicePreCheck(mac_address   =   mac,
