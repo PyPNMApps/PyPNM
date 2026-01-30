@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 import json
 from enum import Enum
 import logging
-from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.pnm_config_manager import SystemConfigSettings
@@ -23,80 +24,95 @@ class MessageResponseType(Enum):
     PNM_FILE_SESSION            = 2
     SNMP_DATA_RTN_SPEC_ANALYSIS = 10
 
-class MessageResponse:
+class MessagePayload(BaseModel):
+    """
+    Typed payload entry for MessageResponse.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    status: str = Field(..., description="Status for this payload entry.")
+    message_type: str | None = Field(None, description="Message type identifier.")
+    message: object | None = Field(None, description="Message-specific content.")
+
+    def as_dict(self) -> dict[str, object]:
+        """
+        Return this payload as a dictionary, preserving extra fields.
+        """
+        return self.model_dump()
+
+
+class MessageResponse(BaseModel):
     """
     Represents a structured response with a status and optional data payload.
-
-    Attributes:
-        status (ServiceStatusCode): Status of the message.
-        payload (Optional[Any]): Associated payload (list, dict, etc.).
-
-    Example:
-
-        {
-            "status":"SUCCESS",
-            "payload":[
-                {
-                    "status":"SUCCESS",
-                    "message_type":"PNM_FILE_TRANSACTION",
-                    "message":{
-                        "transaction_id":"275de83146e904d7",
-                        "filename":"ds_ofdm_rxmer_per_subcar_00:50:f1:12:e2:63_954000000_1746501260.bin"
-                    }
-                }
-            ]
-        }
-
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
-    def __init__(self, status: ServiceStatusCode, payload: Any | None = None) -> None:
-        """
-        Initializes a MessageResponse instance.
+    status: ServiceStatusCode = Field(..., description="Status of the message.")
+    payload: list[MessagePayload] | None = Field(None, description="Associated payload entries.")
 
-        Args:
-            status (ServiceStatusCode): Status of the message.
-            payload (Optional[Any]): Optional message payload.
-        """
-        self.status:ServiceStatusCode = status
-        self.payload:Any | None = payload
+    def __init__(self, status: ServiceStatusCode, payload: list[MessagePayload] | list[dict[str, object]] | None = None) -> None:
+        super().__init__(status=status, payload=payload)
 
-    def get(self) -> dict[str, Any]:
+    @field_validator("payload", mode="before")
+    @classmethod
+    def _coerce_payload(cls, value: object) -> list[MessagePayload] | None:
+        if value is None:
+            return None
+        if isinstance(value, list):
+            items: list[MessagePayload] = []
+            for entry in value:
+                if isinstance(entry, MessagePayload):
+                    items.append(entry)
+                    continue
+                if isinstance(entry, dict):
+                    items.append(MessagePayload(**entry))
+                    continue
+                items.append(MessagePayload(status="UNKNOWN", message=entry))
+            return items
+        raise ValueError("payload must be a list or None")
+
+    @field_serializer("status")
+    def _serialize_status(self, status: ServiceStatusCode) -> str:
+        return status.name
+
+    def get(self) -> dict[str, object]:
         """
         Serializes the message response to a dictionary.
 
         Returns:
-            Dict[str, Any]: Dictionary with 'status' and 'data'.
+            Dict[str, object]: Dictionary with 'status' and 'payload'.
         """
         return {
             "status": self.status.name,
-            "payload": self.payload
+            "payload": self._payload_as_dict_list(),
         }
 
     def __repr__(self) -> str:
-        return json.dumps({
-            "status": self.status.name,
-            "payload": self.payload
-        })
+        return json.dumps(self.get())
 
     def __str__(self) -> str:
         return self.__repr__()
 
-    def get_payload_msg(payload_element: dict[str, Any]) -> tuple[str, str, Any]:
+    def get_payload_msg(payload_element: MessagePayload | dict[str, object]) -> tuple[str, str, object | None]:
         """
         Extracts 'status', 'message_type', and 'message' from a payload element.
 
         Args:
-            payload_element (Dict[str, Any]): The payload dictionary.
+            payload_element (MessagePayload | Dict[str, object]): The payload element.
 
         Returns:
-            Tuple[str, str, Any]: A tuple containing the status, message type, and message content.
+            Tuple[str, str, object | None]: A tuple containing the status, message type, and message content.
         """
-        status = payload_element.get("status", "UNKNOWN")
-        message_type = payload_element.get("message_type", "UNKNOWN")
-        message = payload_element.get("message", None)
+        if isinstance(payload_element, MessagePayload):
+            payload_dict = payload_element.as_dict()
+        else:
+            payload_dict = payload_element
+        status = str(payload_dict.get("status", "UNKNOWN"))
+        message_type = str(payload_dict.get("message_type", "UNKNOWN"))
+        message = payload_dict.get("message", None)
         return status, message_type, message
 
-    def payload_to_dict(self, key: int | str = "data") -> dict[int | str, Any]:
+    def payload_to_dict(self, key: int | str = "data") -> dict[int | str, object]:
         """
         Wraps the internal payload in a dictionary under the specified key.
 
@@ -104,21 +120,35 @@ class MessageResponse:
             key (int | str): The key under which the payload will be stored. Defaults to "data".
 
         Returns:
-            Dict[Any, Any]: A dictionary containing the payload under the given key.
+            Dict[int | str, object]: A dictionary containing the payload under the given key.
         """
-        return {key: self.payload}
+        return {key: self._payload_as_dict_list()}
 
-    def log_payload(self, filename_prefix:str = "") -> None:
+    def log_payload(self, filename_prefix: str = "") -> None:
         """
         Logs the payload content for debugging purposes.
         """
-        prefix:str = ""
+        prefix: str = ""
         if filename_prefix:
             prefix = f'{filename_prefix}_'
 
         LogFile.write(f'{prefix}payload_{Generate.time_stamp(TimeUnit.MILLISECONDS)}.msgrsp',
                       self.payload_to_dict(),
                       log_dir = SystemConfigSettings.message_response_dir())
+
+    def _payload_as_dict_list(self) -> list[dict[str, object]] | None:
+        if self.payload is None:
+            return None
+        payload_list: list[dict[str, object]] = []
+        for entry in self.payload:
+            if isinstance(entry, MessagePayload):
+                payload_list.append(entry.as_dict())
+                continue
+            if isinstance(entry, dict):
+                payload_list.append(dict(entry))
+                continue
+            payload_list.append({"status": "UNKNOWN", "message": entry})
+        return payload_list
 
 
 class CommonMessagingService:
@@ -129,7 +159,7 @@ class CommonMessagingService:
     batch operations, chained service calls, and aggregating results for client APIs.
 
     Attributes:
-        _messages (List[Tuple[ServiceStatusCode, Dict[str, Any]]]): Queue of messages.
+        _messages (List[Tuple[ServiceStatusCode, Dict[str, object]]]): Queue of messages.
         _last_non_success_status (ServiceStatusCode): Most recent non-success status seen.
     """
 
@@ -138,16 +168,16 @@ class CommonMessagingService:
         Initializes an empty messaging service instance.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._messages: list[tuple[ServiceStatusCode, dict[str, Any]]] = []
+        self._messages: list[tuple[ServiceStatusCode, dict[str, object]]] = []
         self._last_non_success_status = ServiceStatusCode.SUCCESS
 
-    def build_msg(self, status: ServiceStatusCode, payload: dict[str, Any] | None = None) -> None:
+    def build_msg(self, status: ServiceStatusCode, payload: dict[str, object] | None = None) -> None:
         """
         Queues a new message with status and optional data.
 
         Args:
             status (ServiceStatusCode): Message status.
-            payload (Optional[Dict[str, Any]]): Associated data for the message.
+            payload (Optional[Dict[str, object]]): Associated data for the message.
 
         Returns:
             bool: Always returns True after storing the message.
@@ -175,17 +205,18 @@ class CommonMessagingService:
         )
 
         combined_data = [
-            {
-                "status": status.name,
-                **data
-            } for status, data in self._messages
+            MessagePayload(
+                status=status.name,
+                **data,
+            )
+            for status, data in self._messages
         ]
 
         self._messages.clear()
 
         return MessageResponse(final_status, combined_data)
 
-    def build_send_msg(self, status: ServiceStatusCode, data: dict[str, Any] | None = None) -> MessageResponse:
+    def build_send_msg(self, status: ServiceStatusCode, data: dict[str, object] | None = None) -> MessageResponse:
         """
         Builds and immediately sends a single message.
 
@@ -220,9 +251,9 @@ class CommonMessagingService:
             }
         })
 
-    def build_transaction_msg_extension(self, transaction_id: TransactionId, 
+    def build_transaction_msg_extension(self, transaction_id: TransactionId,
                                         filename: FileNameStr,
-                                        extension: dict[Any, Any],
+                                        extension: dict[str, object],
                                         status: ServiceStatusCode = ServiceStatusCode.SUCCESS) -> None:
         """
         Adds a transaction message with an ID and filename to the message queue.
@@ -268,7 +299,7 @@ class CommonMessagingService:
             },
         )
 
-    def get_first_of_type(self, msg_type: MessageResponseType) -> dict[str, Any] | None:
+    def get_first_of_type(self, msg_type: MessageResponseType) -> dict[str, object] | None:
         """
         Retrieves the first message of a specified type, if available.
 
@@ -276,7 +307,7 @@ class CommonMessagingService:
             msg_type (MessageResponseType): The type to look for.
 
         Returns:
-            Optional[Dict[str, Any]]: The first message of the given type, or None.
+            Optional[Dict[str, object]]: The first message of the given type, or None.
         """
         for _, data in self._messages:
             if data.get("message_type") == msg_type.name:

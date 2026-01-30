@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 from __future__ import annotations
 
 import asyncio
@@ -288,7 +288,7 @@ class AbstractCaptureService(ABC):
         samples: list[CaptureSample] = []
         for idx, entry in enumerate(payload):
             try:
-                status_str, msg_type, body = MessageResponse.get_payload_msg(entry) # type: ignore
+                status_str, msg_type, body = MessageResponse.get_payload_msg(entry)
 
             except Exception as exc:
                 err = f"Failed to parse payload entry {idx}: {exc}"
@@ -381,4 +381,3 @@ class AbstractCaptureService(ABC):
           ``status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE``.
         """
         ...
-

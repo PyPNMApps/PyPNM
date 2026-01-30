@@ -64,6 +64,10 @@ class CommonProcessService(CommonMessagingService):
             MessageResponse: A success message if all payloads are processed,
                             or an error message if a transaction record is missing.
         """
+        if not self._msg_rsp.payload:
+            self.logger.warning("Message response payload is empty.")
+            return self.send_msg()
+
         for payload in self._msg_rsp.payload:
             status, message_type, message = MessageResponse.get_payload_msg(payload)
 
