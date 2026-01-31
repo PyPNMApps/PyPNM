@@ -25,7 +25,10 @@ from pypnm.api.routes.common.extended.common_messaging_service import (
     CommonMessagingService,
     MessageResponse,
 )
-from pypnm.api.routes.common.extended.types import CommonMessagingServiceExtension as CMSE
+from pypnm.api.routes.common.extended.types import (
+    CommonMessagingServiceExtension as CMSE,
+    SpectrumAnalysisSnmpSegmentPowerEntry,
+)
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.config_manager import ConfigManager
 from pypnm.config.pnm_config_manager import PnmConfigManager
@@ -37,6 +40,9 @@ from pypnm.docsis.cm_snmp_operation import (
     FecSummaryType,
 )
 from pypnm.docsis.data_type.enums import MeasStatusType
+from pypnm.docsis.data_type.DocsIf3CmSpectrumAnalysisMeasEntry import (
+    DocsIf3CmSpectrumAnalysisMeasEntry,
+)
 from pypnm.docsis.data_type.pnm.DocsIf3CmSpectrumAnalysisEntry import (
     DocsIf3CmSpectrumAnalysisEntry,
 )
@@ -62,7 +68,16 @@ from pypnm.lib.inet import Inet
 from pypnm.lib.ping import Ping
 from pypnm.lib.ssh.ssh_connector import SSHConnector
 from pypnm.lib.tftp.tftp_connector import TFTPConnector
-from pypnm.lib.types import ChannelId, FileNameStr, InterfaceIndex, TransactionId, HostNameStr, SnmpCommunity
+from pypnm.lib.types import (
+    ChannelId,
+    FileNameStr,
+    FrequencyHz,
+    HostNameStr,
+    InterfaceIndex,
+    PowerdBmV,
+    SnmpCommunity,
+    TransactionId,
+)
 from pypnm.lib.utils import Generate
 from pypnm.pnm.data_type.DocsIf3CmSpectrumAnalysisCtrlCmd import (
     DocsIf3CmSpectrumAnalysisCtrlCmd,
@@ -72,7 +87,6 @@ from pypnm.pnm.data_type.DocsIf3CmSpectrumAnalysisCtrlCmd import (
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 from pypnm.snmp.modules import DocsisIfType
 from pypnm.snmp.snmp_v2c import Snmp_v2c
-from pypnm.api.routes.common.extended.types import CommonMessagingServiceExtension as CMSE
 
 
 class MeasureServiceReturnTypes(Enum):
@@ -232,7 +246,13 @@ class CommonMeasureService(CommonMessagingService):
 
             if status == ServiceStatusCode.SUCCESS:
                 self.logger.info(f"{self.log_prefix} - Spectrum Amplitude Data is READY, collecting amplitude data, may take a while...")
-                amp_data: bytes = await self.cm.getSpectrumAmplitudeData()
+                meas_entries = await self.cm.getDocsIf3CmSpectrumAnalysisMeasEntry()
+                segment_power_entries: list[SpectrumAnalysisSnmpSegmentPowerEntry] = []
+                if meas_entries:
+                    amp_data, segment_power_entries = self._build_snmp_meas_entry_payload(meas_entries)
+                else:
+                    amp_data = await self.cm.getSpectrumAmplitudeData()
+                    segment_power_entries = await self._build_snmp_segment_power_fallback()
                 self.logger.info(f"{self.log_prefix} - Spectrum Amplitude Data collection COMPLETE, total bytes: {len(amp_data)}.")
                 #################################################################################################
                 # Build binary filename and save file - START
@@ -253,9 +273,15 @@ class CommonMeasureService(CommonMessagingService):
                 # Build binary filename and save file - END
                 #################################################################################################
                 capture_para:SpecAnCapturePara = self.getSpectrumCaptureParameters()
+                extension_data: dict[str, object] = {
+                    f'{CMSE.SPECTRUM_ANALYSIS_SNMP_CAPTURE_PARAMETER}': capture_para.model_dump(),
+                    f'{CMSE.SPECTRUM_ANALYSIS_SNMP_SEGMENT_POWER}': [
+                        entry.model_dump() for entry in segment_power_entries
+                    ],
+                }
                 self.build_transaction_msg_extension(tx_id, 
                                                      filename, 
-                                                     extension={f'{CMSE.SPECTRUM_ANALYSIS_SNMP_CAPTURE_PARAMETER}': capture_para.model_dump()})
+                                                     extension=extension_data)
 
             return self.build_send_msg(status)
 
@@ -896,6 +922,49 @@ class CommonMeasureService(CommonMessagingService):
             self.logger.info(f'{self.log_prefix} - Waiting for Amplitude Data ({now} of {timeout_seconds})')
 
             await asyncio.sleep(1)
+
+    @staticmethod
+    def _build_snmp_meas_entry_payload(
+        entries: list[DocsIf3CmSpectrumAnalysisMeasEntry],
+    ) -> tuple[bytes, list[SpectrumAnalysisSnmpSegmentPowerEntry]]:
+        """
+        Build SNMP spectrum analyzer payloads from measurement entries.
+
+        Parameters
+        ----------
+        entries : list[DocsIf3CmSpectrumAnalysisMeasEntry]
+            Measurement entries containing amplitude data and total segment power.
+
+        Returns
+        -------
+        tuple[bytes, list[SpectrumAnalysisSnmpSegmentPowerEntry]]
+            Concatenated amplitude data bytes and segment power entries.
+        """
+        amp_chunks: list[bytes] = []
+        segment_power: list[SpectrumAnalysisSnmpSegmentPowerEntry] = []
+        for entry in entries:
+            amp_chunks.append(entry.entry.docsIf3CmSpectrumAnalysisMeasAmplitudeData)
+            segment_power.append(SpectrumAnalysisSnmpSegmentPowerEntry(
+                segment_freq=entry.entry.docsIf3CmSpectrumAnalysisMeasFrequency,
+                power_dbmv=entry.entry.docsIf3CmSpectrumAnalysisMeasTotalSegmentPower,
+            ))
+        return b"".join(amp_chunks), segment_power
+
+    async def _build_snmp_segment_power_fallback(self) -> list[SpectrumAnalysisSnmpSegmentPowerEntry]:
+        values = await self.cm.getSpectrumMeasTotalSegmentPower()
+        if not values:
+            return []
+        self.logger.warning(
+            "%s - Using total segment power fallback without frequency mapping.",
+            self.log_prefix,
+        )
+        entries: list[SpectrumAnalysisSnmpSegmentPowerEntry] = []
+        for idx, power in values:
+            entries.append(SpectrumAnalysisSnmpSegmentPowerEntry(
+                segment_freq=FrequencyHz(int(idx)),
+                power_dbmv=PowerdBmV(float(power)),
+            ))
+        return entries
 
     async def _handle_local_fetch(self, pnm_file_name: str) -> ServiceStatusCode:
         """
