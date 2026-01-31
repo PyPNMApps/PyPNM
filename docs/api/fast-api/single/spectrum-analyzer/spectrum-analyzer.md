@@ -313,6 +313,7 @@ Top-level envelope:
 | signal_analysis.segment_length   | int    | Number of FFT bins per segment used in analysis.                     |
 | signal_analysis.frequencies      | array  | Frequency axis for the analyzed spectrum (per-bin center frequency). |
 | signal_analysis.magnitudes       | array  | Amplitude values aligned with `frequencies`.                         |
+| signal_analysis.channel_power_dbmv | float | Total channel power derived from the magnitudes, in dBmV (rounded to 2 decimals). |
 | signal_analysis.window_average.* | object | Optional moving-average smoothing applied to `magnitudes`.           |
 
 **Payload: `data.primative[]`**

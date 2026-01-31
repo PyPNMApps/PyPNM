@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -47,6 +47,7 @@ class SpecAnaAnalysisResults(BaseModel):
     frequencies: FrequencySeriesHz  = Field(..., description="Frequency points for each FFT bin, in Hz.")
     magnitudes: MagnitudeSeries     = Field(..., description="Raw magnitude values for each frequency point, in dB.")
     window_average: WindowAverage   = Field(..., description="Smoothed magnitudes computed using a moving average window.")
+    channel_power_dbmv: float       = Field(..., description="Total channel power computed from magnitudes, in dBmV.")
 
 
 class SpectrumAnalyzerAnalysisModel(BaseAnalysisModel):
