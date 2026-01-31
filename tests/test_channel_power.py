@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 # tests/test_channel_power.py
 from __future__ import annotations
@@ -9,7 +9,7 @@ import math
 import pytest
 
 try:
-    from pypnm.pnm.lib.channel_power import ChannelPower
+    from pypnm.pnm.lib.channel_power import ChannelPower, ChannelPowerDbmv
 except ImportError as e:
     pytest.skip(f"ChannelPower not importable: {e}", allow_module_level=True)
 
@@ -43,3 +43,36 @@ def test_channel_power_monotonicity() -> None:
     p1 = ChannelPower.calculate_channel_power(base)
     p2 = ChannelPower.calculate_channel_power(more)
     assert p2 >= p1 - 1e-12
+
+
+def test_channel_power_dbmv_two_equal_bins_75_ohm() -> None:
+    vals = [0.0, 0.0]
+    total = ChannelPowerDbmv.calculate_channel_power_dbmv(
+        vals,
+        ChannelPowerDbmv.ImpedanceOhm.SEVENTY_FIVE,
+    )
+    expected = 10.0 * math.log10(2.0)
+    assert total == pytest.approx(expected, rel=1e-12)
+
+
+def test_channel_power_dbmv_two_equal_bins_50_ohm() -> None:
+    vals = [0.0, 0.0]
+    total = ChannelPowerDbmv.calculate_channel_power_dbmv(
+        vals,
+        ChannelPowerDbmv.ImpedanceOhm.FIFTY,
+    )
+    expected = 10.0 * math.log10(2.0)
+    assert total == pytest.approx(expected, rel=1e-12)
+
+
+def test_channel_power_dbmv_empty_returns_negative_inf() -> None:
+    total = ChannelPowerDbmv.calculate_channel_power_dbmv([])
+    assert total == float("-inf")
+
+
+def test_channel_power_dbmv_invalid_impedance_raises() -> None:
+    with pytest.raises(ValueError):
+        ChannelPowerDbmv.calculate_channel_power_dbmv(
+            [0.0],
+            25,
+        )
