@@ -941,14 +941,19 @@ class CommonMeasureService(CommonMessagingService):
             Concatenated amplitude data bytes and segment power entries.
         """
         amp_chunks: list[bytes] = []
-        segment_power: list[SpectrumAnalysisSnmpSegmentPowerEntry] = []
+        segment_frequencies: list[FrequencyHz] = []
+        segment_powers: list[PowerdBmV] = []
         for entry in entries:
             amp_chunks.append(entry.entry.docsIf3CmSpectrumAnalysisMeasAmplitudeData)
-            segment_power.append(SpectrumAnalysisSnmpSegmentPowerEntry(
-                segment_freq=entry.entry.docsIf3CmSpectrumAnalysisMeasFrequency,
-                power_dbmv=entry.entry.docsIf3CmSpectrumAnalysisMeasTotalSegmentPower,
-            ))
-        return b"".join(amp_chunks), segment_power
+            segment_frequencies.append(entry.entry.docsIf3CmSpectrumAnalysisMeasFrequency)
+            segment_powers.append(
+                PowerdBmV(math.trunc(float(entry.entry.docsIf3CmSpectrumAnalysisMeasTotalSegmentPower) * 10) / 10),
+            )
+        segment_power = SpectrumAnalysisSnmpSegmentPowerEntry(
+            segment_frequencies=segment_frequencies,
+            power_dbmv=segment_powers,
+        )
+        return b"".join(amp_chunks), [segment_power]
 
     async def _build_snmp_segment_power_fallback(self) -> list[SpectrumAnalysisSnmpSegmentPowerEntry]:
         values = await self.cm.getSpectrumMeasTotalSegmentPower()
@@ -958,13 +963,15 @@ class CommonMeasureService(CommonMessagingService):
             "%s - Using total segment power fallback without frequency mapping.",
             self.log_prefix,
         )
-        entries: list[SpectrumAnalysisSnmpSegmentPowerEntry] = []
+        segment_frequencies: list[FrequencyHz] = []
+        segment_powers: list[PowerdBmV] = []
         for idx, power in values:
-            entries.append(SpectrumAnalysisSnmpSegmentPowerEntry(
-                segment_freq=FrequencyHz(int(idx)),
-                power_dbmv=PowerdBmV(float(power)),
-            ))
-        return entries
+            segment_frequencies.append(FrequencyHz(int(idx)))
+            segment_powers.append(PowerdBmV(math.trunc(float(power) * 10) / 10))
+        return [SpectrumAnalysisSnmpSegmentPowerEntry(
+            segment_frequencies=segment_frequencies,
+            power_dbmv=segment_powers,
+        )]
 
     async def _handle_local_fetch(self, pnm_file_name: str) -> ServiceStatusCode:
         """

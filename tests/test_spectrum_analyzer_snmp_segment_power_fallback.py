@@ -13,7 +13,7 @@ from pypnm.lib.types import FrequencyHz, PowerdBmV
 
 class _FakeCableModem:
     async def getSpectrumMeasTotalSegmentPower(self) -> list[tuple[int, float]]:
-        return [(0, 1.5), (1, 2.5)]
+        return [(0, 1.54), (1, 2.55)]
 
 
 @pytest.mark.asyncio
@@ -24,8 +24,6 @@ async def test_build_snmp_segment_power_fallback_maps_indices() -> None:
     service.log_prefix = "MAC: aa:bb:cc:dd:ee:ff - INET: 192.168.0.100"
     entries = await service._build_snmp_segment_power_fallback()
 
-    assert len(entries) == 2
-    assert entries[0].segment_freq == FrequencyHz(0)
-    assert entries[0].power_dbmv == PowerdBmV(1.5)
-    assert entries[1].segment_freq == FrequencyHz(1)
-    assert entries[1].power_dbmv == PowerdBmV(2.5)
+    assert len(entries) == 1
+    assert entries[0].segment_frequencies == [FrequencyHz(0), FrequencyHz(1)]
+    assert entries[0].power_dbmv == [PowerdBmV(1.5), PowerdBmV(2.5)]

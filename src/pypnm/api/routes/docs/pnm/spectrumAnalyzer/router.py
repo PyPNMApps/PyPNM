@@ -38,6 +38,9 @@ from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
 )
 from pypnm.api.routes.common.extended.common_messaging_service import MessageResponse
 from pypnm.api.routes.common.extended.common_process_service import CommonProcessService
+from pypnm.api.routes.common.extended.types import (
+    CommonMessagingServiceExtension as CMSE,
+)
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.docs.pnm.files.service import PnmFileService
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import (
@@ -93,6 +96,7 @@ class SpectrumAnalyzerRouter:
         cls,
         measurement_stats: dict[ChannelId, list[DocsIf3CmSpectrumAnalysisEntry]],
         channel_entries: list[DocsIf31CmDsOfdmChanChannelEntry | DocsIfDownstreamChannelEntry],
+        measure_segment_power_by_channel: dict[ChannelId, list[dict[str, Any]]] | None = None,
     ) -> list[dict[str, Any]]:
         channel_lookup = cls._build_channel_entry_lookup(channel_entries)
         out: list[dict[str, Any]] = []
@@ -100,15 +104,35 @@ class SpectrumAnalyzerRouter:
         for channel_id, entries in measurement_stats.items():
             channel_entry = channel_lookup.get(channel_id)
             channel_stats = channel_entry.model_dump() if channel_entry is not None else None
+            segment_power = None
+            if measure_segment_power_by_channel is not None:
+                segment_power = measure_segment_power_by_channel.get(channel_id)
 
             for entry in entries:
                 payload = entry.model_dump()
                 payload["channel_id"] = channel_id
                 if channel_stats is not None:
                     payload["channel_stats"] = channel_stats
+                if segment_power:
+                    payload[CMSE.SPECTRUM_ANALYSIS_SNMP_SEGMENT_POWER.value] = segment_power
                 out.append(payload)
 
         return out
+
+    @staticmethod
+    def _extract_measure_segment_power(msg_rsp: MessageResponse) -> list[dict[str, Any]] | None:
+        if msg_rsp.payload is None:
+            return None
+
+        for payload in msg_rsp.payload:
+            _status, _message_type, message = MessageResponse.get_payload_msg(payload)
+            if not isinstance(message, dict):
+                continue
+            value = message.get(CMSE.SPECTRUM_ANALYSIS_SNMP_SEGMENT_POWER.value)
+            if isinstance(value, list):
+                return [dict(entry) for entry in value if isinstance(entry, dict)]
+
+        return None
 
     def __routes(self) -> None:
         @self.router.post(
@@ -384,19 +408,14 @@ class SpectrumAnalyzerRouter:
 
             measurement_stats = await service.getPnmMeasurementStatistics()
             channel_entries = await service.getChannelEntry()
-            measurement_stats_with_channels = self._build_measurement_stats_with_channel_stats(
-                measurement_stats,
-                channel_entries,
-            )
-            measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
-            for entry in measurement_stats_with_channels:
-                channel_id = cast(ChannelId, entry["channel_id"])
-                measurement_stats_by_channel.setdefault(channel_id, []).append(entry)
-
             primative: dict[str, dict[Any, Any]] = {"primative": {}}
+            measure_segment_power_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
 
             for idx, (chan_id, msg_rsp) in enumerate(msg_responses):
                 cps_msg_rsp = CommonProcessService(msg_rsp).process()
+                segment_power = self._extract_measure_segment_power(cps_msg_rsp)
+                if segment_power:
+                    measure_segment_power_by_channel[chan_id] = segment_power
 
                 analysis = Analysis(AnalysisType.BASIC, cps_msg_rsp, skip_automatic_process=True,)
                 analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
@@ -404,6 +423,16 @@ class SpectrumAnalyzerRouter:
 
                 primative_entry = cps_msg_rsp.payload_to_dict(idx)
                 primative["primative"].update(primative_entry)
+
+            measurement_stats_with_channels = self._build_measurement_stats_with_channel_stats(
+                measurement_stats,
+                channel_entries,
+                measure_segment_power_by_channel,
+            )
+            measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
+            for entry in measurement_stats_with_channels:
+                channel_id = cast(ChannelId, entry["channel_id"])
+                measurement_stats_by_channel.setdefault(channel_id, []).append(entry)
 
             analyzer_rpt = OfdmSpecAnalyzerAnalysisReport(
                 multi_analysis,
@@ -497,19 +526,14 @@ class SpectrumAnalyzerRouter:
 
             measurement_stats = await service.getPnmMeasurementStatistics()
             channel_entries = await service.getChannelEntry()
-            measurement_stats_with_channels = self._build_measurement_stats_with_channel_stats(
-                measurement_stats,
-                channel_entries,
-            )
-            measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
-            for entry in measurement_stats_with_channels:
-                channel_id = cast(ChannelId, entry["channel_id"])
-                measurement_stats_by_channel.setdefault(channel_id, []).append(entry)
-
             primative: dict[str, dict[Any, Any]] = {"primative": {}}
+            measure_segment_power_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
 
             for idx, (chan_id, msg_rsp) in enumerate(msg_responses):
                 cps_msg_rsp = CommonProcessService(msg_rsp).process()
+                segment_power = self._extract_measure_segment_power(cps_msg_rsp)
+                if segment_power:
+                    measure_segment_power_by_channel[chan_id] = segment_power
 
                 analysis = Analysis(AnalysisType.BASIC, cps_msg_rsp, skip_automatic_process=True,)
                 analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
@@ -517,6 +541,16 @@ class SpectrumAnalyzerRouter:
 
                 primative_entry = cps_msg_rsp.payload_to_dict(idx)
                 primative["primative"].update(primative_entry)
+
+            measurement_stats_with_channels = self._build_measurement_stats_with_channel_stats(
+                measurement_stats,
+                channel_entries,
+                measure_segment_power_by_channel,
+            )
+            measurement_stats_by_channel: dict[ChannelId, list[dict[str, Any]]] = {}
+            for entry in measurement_stats_with_channels:
+                channel_id = cast(ChannelId, entry["channel_id"])
+                measurement_stats_by_channel.setdefault(channel_id, []).append(entry)
 
             analyzer_rpt = ScQamSpecAnalyzerAnalysisReport(
                 multi_analysis,

@@ -90,3 +90,30 @@ def test_measurement_stats_without_channel_stats() -> None:
     assert len(out) == 1
     assert out[0]["channel_id"] == ChannelId(5)
     assert "channel_stats" not in out[0]
+
+
+def test_measurement_stats_include_measure_segment_power() -> None:
+    measurement_stats = {ChannelId(6): [_measurement_entry(3)]}
+    measure_segment_power_by_channel = {
+        ChannelId(6): [
+            {
+                "segment_frequencies": [100, 200],
+                "power_dbmv": [1.1, 2.2],
+            }
+        ]
+    }
+
+    out = SpectrumAnalyzerRouter._build_measurement_stats_with_channel_stats(
+        measurement_stats,
+        [],
+        measure_segment_power_by_channel,
+    )
+
+    assert len(out) == 1
+    assert out[0]["channel_id"] == ChannelId(6)
+    assert out[0]["measure_segment_power"] == [
+        {
+            "segment_frequencies": [100, 200],
+            "power_dbmv": [1.1, 2.2],
+        }
+    ]

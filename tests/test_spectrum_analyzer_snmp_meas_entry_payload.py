@@ -18,7 +18,7 @@ def test_build_snmp_meas_entry_payload_concatenates_amp_data() -> None:
             entry=DocsIf3CmSpectrumAnalysisMeasEntryFields(
                 docsIf3CmSpectrumAnalysisMeasFrequency=FrequencyHz(100_000_000),
                 docsIf3CmSpectrumAnalysisMeasAmplitudeData=b"\x01\x02",
-                docsIf3CmSpectrumAnalysisMeasTotalSegmentPower=PowerdBmV(1.2),
+                docsIf3CmSpectrumAnalysisMeasTotalSegmentPower=PowerdBmV(1.23),
             ),
         ),
         DocsIf3CmSpectrumAnalysisMeasEntry(
@@ -26,7 +26,7 @@ def test_build_snmp_meas_entry_payload_concatenates_amp_data() -> None:
             entry=DocsIf3CmSpectrumAnalysisMeasEntryFields(
                 docsIf3CmSpectrumAnalysisMeasFrequency=FrequencyHz(200_000_000),
                 docsIf3CmSpectrumAnalysisMeasAmplitudeData=b"\x03",
-                docsIf3CmSpectrumAnalysisMeasTotalSegmentPower=PowerdBmV(2.3),
+                docsIf3CmSpectrumAnalysisMeasTotalSegmentPower=PowerdBmV(2.36),
             ),
         ),
     ]
@@ -34,8 +34,12 @@ def test_build_snmp_meas_entry_payload_concatenates_amp_data() -> None:
     amp_data, segment_power = CommonMeasureService._build_snmp_meas_entry_payload(entries)
 
     assert amp_data == b"\x01\x02\x03"
-    assert len(segment_power) == 2
-    assert segment_power[0].segment_freq == FrequencyHz(100_000_000)
-    assert segment_power[0].power_dbmv == PowerdBmV(1.2)
-    assert segment_power[1].segment_freq == FrequencyHz(200_000_000)
-    assert segment_power[1].power_dbmv == PowerdBmV(2.3)
+    assert len(segment_power) == 1
+    assert segment_power[0].segment_frequencies == [
+        FrequencyHz(100_000_000),
+        FrequencyHz(200_000_000),
+    ]
+    assert segment_power[0].power_dbmv == [
+        PowerdBmV(1.2),
+        PowerdBmV(2.3),
+    ]
