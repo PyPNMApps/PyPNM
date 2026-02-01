@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -123,3 +123,13 @@ def per_thousand(v: ScalarValue, *, ndigits: int = 3) -> float:
     Rounds To ``ndigits`` Decimal Places.
     """
     return round(float(v) / 1000.0, ndigits)
+
+
+def tenthdB(v: ScalarValue, *, ndigits: int = 1) -> float:
+    """
+    Normalize A Scalar Expressed In Tenths Of A dB.
+
+    Divides ``v`` By ``10.0`` And Rounds To ``ndigits`` Decimal
+    Places. Used For MIB fields that are defined as TenthdB.
+    """
+    return round(float(v) / 10.0, ndigits)
