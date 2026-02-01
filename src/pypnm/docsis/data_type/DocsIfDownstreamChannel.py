@@ -1,13 +1,14 @@
-from __future__ import annotations
-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from pypnm.lib.constants import INVALID_CHANNEL_ID
+from pypnm.lib.constants import INVALID_CHANNEL_ID, DocsIfDownChannelModulation
 from pypnm.lib.types import ChannelId, FrequencyHz
 from pypnm.snmp.casts import tenthdB
 from pypnm.snmp.snmp_v2c import Snmp_v2c
@@ -33,8 +34,8 @@ class DocsIfDownstreamEntry(BaseModel):
         Center frequency in Hz, from ``docsIfDownChannelFrequency``.
     docsIfDownChannelWidth : Optional[int]
         Channel width in Hz, from ``docsIfDownChannelWidth``.
-    docsIfDownChannelModulation : Optional[int]
-        Modulation enum value, from ``docsIfDownChannelModulation``.
+    docsIfDownChannelModulation : Optional[str]
+        Modulation name, from ``docsIfDownChannelModulation``.
     docsIfDownChannelInterleave : Optional[int]
         Interleave depth/setting, from ``docsIfDownChannelInterleave``.
     docsIfDownChannelPower : Optional[float]
@@ -59,7 +60,7 @@ class DocsIfDownstreamEntry(BaseModel):
     docsIfDownChannelId: ChannelId = INVALID_CHANNEL_ID
     docsIfDownChannelFrequency: FrequencyHz | None = None
     docsIfDownChannelWidth: FrequencyHz | None = None
-    docsIfDownChannelModulation: int | None = None
+    docsIfDownChannelModulation: DocsIfDownChannelModulation | None = None
     docsIfDownChannelInterleave: int | None = None
     docsIfDownChannelPower: float | None = None
     docsIfSigQUnerroreds: int | None = None
@@ -184,7 +185,9 @@ class DocsIfDownstreamChannelEntry(BaseModel):
             docsIfDownChannelId         =   await fetch("docsIfDownChannelId", int),
             docsIfDownChannelFrequency  =   await fetch("docsIfDownChannelFrequency", int),
             docsIfDownChannelWidth      =   await fetch("docsIfDownChannelWidth", int),
-            docsIfDownChannelModulation =   await fetch("docsIfDownChannelModulation", int),
+            docsIfDownChannelModulation =   DocsIfDownChannelModulation.from_int(
+                await fetch("docsIfDownChannelModulation", int),
+            ),
             docsIfDownChannelInterleave =   await fetch("docsIfDownChannelInterleave", int),
             docsIfDownChannelPower      =   await fetch("docsIfDownChannelPower", tenthdBmV_to_float),
             docsIfSigQUnerroreds        =   await fetch("docsIfSigQUnerroreds", int),

@@ -76,6 +76,28 @@ class MediaType(StringEnum):
     APPLICATION_OCTET_STREAM = "application/octet-stream"
     TEXT_CSV                 = "text/csv"
 
+class DocsIfDownChannelModulation(StringEnum):
+    UNKNOWN = "unknown"
+    OTHER   = "other"
+    QAM64   = "qam64"
+    QAM256  = "qam256"
+
+    @classmethod
+    def from_int(cls, value: int | None) -> DocsIfDownChannelModulation | None:
+        if value is None:
+            return None
+        match value:
+            case 1:
+                return cls.UNKNOWN
+            case 2:
+                return cls.OTHER
+            case 3:
+                return cls.QAM64
+            case 4:
+                return cls.QAM256
+            case _:
+                return None
+
 T = TypeVar("T")
 
 DEFAULT_SPECTRUM_ANALYZER_INDICES: Final[list[int]] = [0]
@@ -108,6 +130,7 @@ __all__ = [
     "INVALID_START_VALUE", "INVALID_SCHEMA_TYPE", "INVALID_CAPTURE_TIME",
     "DEFAULT_CAPTURE_TIME",
     "CableTypes", "CABLE_VF",
+    "DocsIfDownChannelModulation",
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS", "FEC_SUMMARY_TYPE_LABEL",
 ]
