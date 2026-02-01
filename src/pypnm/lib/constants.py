@@ -160,6 +160,28 @@ class DocsIf3CmStatusUsRangingStatus(StringEnum):
             case _:
                 return None
 
+class DocsIf31CmDsOfdmChanIndicator(StringEnum):
+    OTHER = "other"
+    PRIMARY = "primary"
+    BACKUP_PRIMARY = "backupPrimary"
+    NON_PRIMARY = "nonPrimary"
+
+    @classmethod
+    def from_int(cls, value: int | None) -> DocsIf31CmDsOfdmChanIndicator | None:
+        if value is None:
+            return None
+        match value:
+            case 1:
+                return cls.OTHER
+            case 2:
+                return cls.PRIMARY
+            case 3:
+                return cls.BACKUP_PRIMARY
+            case 4:
+                return cls.NON_PRIMARY
+            case _:
+                return None
+
 T = TypeVar("T")
 
 DEFAULT_SPECTRUM_ANALYZER_INDICES: Final[list[int]] = [0]
@@ -195,6 +217,7 @@ __all__ = [
     "DocsIfDownChannelModulation",
     "DocsIfDownChannelInterleave",
     "DocsIf3CmStatusUsRangingStatus",
+    "DocsIf31CmDsOfdmChanIndicator",
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS", "FEC_SUMMARY_TYPE_LABEL",
 ]

@@ -1,13 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
 from __future__ import annotations
 
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
 import logging
 from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from pypnm.lib.constants import INVALID_CHANNEL_ID, KHZ
+from pypnm.lib.constants import (
+    INVALID_CHANNEL_ID,
+    KHZ,
+    DocsIf31CmDsOfdmChanIndicator,
+)
 from pypnm.lib.types import ChannelId, FrequencyHz
 from pypnm.snmp.snmp_v2c import Snmp_v2c
 
@@ -22,7 +27,7 @@ class DocsIf31CmDsOfdmChanEntry(BaseModel):
     - Presence of fields depends on device/MIB support.
     """
     docsIf31CmDsOfdmChanChannelId:                ChannelId = INVALID_CHANNEL_ID
-    docsIf31CmDsOfdmChanChanIndicator:            int | None = None
+    docsIf31CmDsOfdmChanChanIndicator:            DocsIf31CmDsOfdmChanIndicator | None = None
     docsIf31CmDsOfdmChanSubcarrierZeroFreq:       FrequencyHz | None = None
     docsIf31CmDsOfdmChanFirstActiveSubcarrierNum: int | None = None
     docsIf31CmDsOfdmChanLastActiveSubcarrierNum:  int | None = None
@@ -92,7 +97,9 @@ class DocsIf31CmDsOfdmChanChannelEntry(BaseModel):
 
         entry = DocsIf31CmDsOfdmChanEntry(
             docsIf31CmDsOfdmChanChannelId                 = await fetch("docsIf31CmDsOfdmChanChannelId", ChannelId),
-            docsIf31CmDsOfdmChanChanIndicator             = await fetch("docsIf31CmDsOfdmChanChanIndicator", int),
+            docsIf31CmDsOfdmChanChanIndicator             = DocsIf31CmDsOfdmChanIndicator.from_int(
+                await fetch("docsIf31CmDsOfdmChanChanIndicator", int),
+            ),
             docsIf31CmDsOfdmChanSubcarrierZeroFreq        = await fetch("docsIf31CmDsOfdmChanSubcarrierZeroFreq", FrequencyHz),
             docsIf31CmDsOfdmChanFirstActiveSubcarrierNum  = await fetch("docsIf31CmDsOfdmChanFirstActiveSubcarrierNum", int),
             docsIf31CmDsOfdmChanLastActiveSubcarrierNum   = await fetch("docsIf31CmDsOfdmChanLastActiveSubcarrierNum", int),

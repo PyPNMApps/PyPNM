@@ -29,7 +29,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
       "index": 48,
       "channel_id": 34,
       "entry": {
-        "docsIf31CmDsOfdmChanChanIndicator": 4,
+        "docsIf31CmDsOfdmChanChanIndicator": "nonPrimary",
         "docsIf31CmDsOfdmChanSubcarrierZeroFreq": 847100000,
         "docsIf31CmDsOfdmChanFirstActiveSubcarrierNum": 1238,
         "docsIf31CmDsOfdmChanLastActiveSubcarrierNum": 2857,
@@ -50,7 +50,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
       "index": 49,
       "channel_id": 33,
       "entry": {
-        "docsIf31CmDsOfdmChanChanIndicator": 4,
+        "docsIf31CmDsOfdmChanChanIndicator": "nonPrimary",
         "docsIf31CmDsOfdmChanSubcarrierZeroFreq": 758600000,
         "docsIf31CmDsOfdmChanFirstActiveSubcarrierNum": 1148,
         "docsIf31CmDsOfdmChanLastActiveSubcarrierNum": 2947,
@@ -83,7 +83,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
 
 | Field                                          | Type | Units | Description                                                      |
 | ---------------------------------------------- | ---- | ----- | ---------------------------------------------------------------- |
-| `docsIf31CmDsOfdmChanChanIndicator`            | int  | —     | Channel indicator/flags (device-specific bitmask per MIB).       |
+| `docsIf31CmDsOfdmChanChanIndicator`            | string | —   | Channel indicator (e.g., `primary`, `backupPrimary`, `nonPrimary`). |
 | `docsIf31CmDsOfdmChanSubcarrierZeroFreq`       | int  | Hz    | Frequency of subcarrier **0**.                                   |
 | `docsIf31CmDsOfdmChanFirstActiveSubcarrierNum` | int  | —     | Index of the first active subcarrier.                            |
 | `docsIf31CmDsOfdmChanLastActiveSubcarrierNum`  | int  | —     | Index of the last active subcarrier.                             |
