@@ -31,7 +31,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
         "docsIfDownChannelFrequency": 639000000,
         "docsIfDownChannelWidth": 6000000,
         "docsIfDownChannelModulation": "qam256",
-        "docsIfDownChannelInterleave": 5,
+        "docsIfDownChannelInterleave": "taps32Increment4",
         "docsIfDownChannelPower": 1.1,
         "docsIfSigQUnerroreds": 260152637,
         "docsIfSigQCorrecteds": 351,
@@ -51,7 +51,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
         "docsIfDownChannelFrequency": 633000000,
         "docsIfDownChannelWidth": 6000000,
         "docsIfDownChannelModulation": "qam256",
-        "docsIfDownChannelInterleave": 5,
+        "docsIfDownChannelInterleave": "taps32Increment4",
         "docsIfDownChannelPower": 0.8,
         "docsIfSigQUnerroreds": 89334852,
         "docsIfSigQCorrecteds": 460,
@@ -83,7 +83,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
 | `docsIfDownChannelFrequency`   | int   | Hz     | Center frequency.                                            |
 | `docsIfDownChannelWidth`       | int   | Hz     | Channel width.                                               |
 | `docsIfDownChannelModulation`  | string | —      | Modulation name (e.g., `qam256`).                           |
-| `docsIfDownChannelInterleave`  | int   | —      | Interleaver depth (implementation-specific).                 |
+| `docsIfDownChannelInterleave`  | string | —      | Interleaver mode name (e.g., `taps32Increment4`).            |
 | `docsIfDownChannelPower`       | float | dBmV   | Received RF power level.                                     |
 | `docsIfSigQUnerroreds`         | int   | cw     | Unerrored codewords (base counter).                          |
 | `docsIfSigQCorrecteds`         | int   | cw     | Corrected codewords (base counter).                          |
@@ -99,3 +99,4 @@ This endpoint returns the standard envelope described in [Common → Response](.
 * `docsIfDownChannelModulation` is normalized to a modulation name (e.g., `qam256`).
 * Prefer extended (64-bit) counters when available to avoid rollover on high-traffic channels.
 * Metrics such as RxMER, Uncorrectables, And Micro-Reflections Are Critical For Diagnosing RF Impairments.
+* `docsIfDownChannelInterleave` is normalized to an interleaver mode name.

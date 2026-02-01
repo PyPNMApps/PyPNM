@@ -1,13 +1,15 @@
 
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
 from __future__ import annotations
 
-# SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
 import logging
 from collections.abc import Callable
 
 from pydantic import BaseModel
 
+from pypnm.lib.constants import DocsIf3CmStatusUsRangingStatus
 from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
@@ -37,7 +39,7 @@ class DocsIfUpstreamEntry(BaseModel):
     docsIf3CmStatusUsEqData: str | None = None
     docsIf3CmStatusUsT3Exceededs: int | None = None
     docsIf3CmStatusUsIsMuted: bool | None = None
-    docsIf3CmStatusUsRangingStatus: int | None = None
+    docsIf3CmStatusUsRangingStatus: DocsIf3CmStatusUsRangingStatus | None = None
 
 class DocsIfUpstreamChannelEntry(BaseModel):
     index: int
@@ -106,7 +108,9 @@ class DocsIfUpstreamChannelEntry(BaseModel):
             docsIf3CmStatusUsEqData            =   await fetch("docsIf3CmStatusUsEqData", str),
             docsIf3CmStatusUsT3Exceededs       =   await fetch("docsIf3CmStatusUsT3Exceededs", int),
             docsIf3CmStatusUsIsMuted           =   await fetch("docsIf3CmStatusUsIsMuted", Snmp_v2c.truth_value),
-            docsIf3CmStatusUsRangingStatus     =   await fetch("docsIf3CmStatusUsRangingStatus", int)
+            docsIf3CmStatusUsRangingStatus     =   DocsIf3CmStatusUsRangingStatus.from_int(
+                await fetch("docsIf3CmStatusUsRangingStatus", int),
+            )
         )
 
         return cls(

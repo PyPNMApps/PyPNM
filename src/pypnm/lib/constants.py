@@ -98,6 +98,68 @@ class DocsIfDownChannelModulation(StringEnum):
             case _:
                 return None
 
+class DocsIfDownChannelInterleave(StringEnum):
+    UNKNOWN = "unknown"
+    OTHER = "other"
+    TAPS8_INCREMENT16 = "taps8Increment16"
+    TAPS16_INCREMENT8 = "taps16Increment8"
+    TAPS32_INCREMENT4 = "taps32Increment4"
+    TAPS64_INCREMENT2 = "taps64Increment2"
+    TAPS128_INCREMENT1 = "taps128Increment1"
+    TAPS12_INCREMENT17 = "taps12increment17"
+
+    @classmethod
+    def from_int(cls, value: int | None) -> DocsIfDownChannelInterleave | None:
+        if value is None:
+            return None
+        match value:
+            case 1:
+                return cls.UNKNOWN
+            case 2:
+                return cls.OTHER
+            case 3:
+                return cls.TAPS8_INCREMENT16
+            case 4:
+                return cls.TAPS16_INCREMENT8
+            case 5:
+                return cls.TAPS32_INCREMENT4
+            case 6:
+                return cls.TAPS64_INCREMENT2
+            case 7:
+                return cls.TAPS128_INCREMENT1
+            case 8:
+                return cls.TAPS12_INCREMENT17
+            case _:
+                return None
+
+class DocsIf3CmStatusUsRangingStatus(StringEnum):
+    OTHER = "other"
+    ABORTED = "aborted"
+    RETRIES_EXCEEDED = "retriesExceeded"
+    SUCCESS = "success"
+    CONTINUE = "continue"
+    TIMEOUT_T4 = "timeoutT4"
+
+    @classmethod
+    def from_int(cls, value: int | None) -> DocsIf3CmStatusUsRangingStatus | None:
+        if value is None:
+            return None
+        match value:
+            case 1:
+                return cls.OTHER
+            case 2:
+                return cls.ABORTED
+            case 3:
+                return cls.RETRIES_EXCEEDED
+            case 4:
+                return cls.SUCCESS
+            case 5:
+                return cls.CONTINUE
+            case 6:
+                return cls.TIMEOUT_T4
+            case _:
+                return None
+
 T = TypeVar("T")
 
 DEFAULT_SPECTRUM_ANALYZER_INDICES: Final[list[int]] = [0]
@@ -131,6 +193,8 @@ __all__ = [
     "DEFAULT_CAPTURE_TIME",
     "CableTypes", "CABLE_VF",
     "DocsIfDownChannelModulation",
+    "DocsIfDownChannelInterleave",
+    "DocsIf3CmStatusUsRangingStatus",
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS", "FEC_SUMMARY_TYPE_LABEL",
 ]

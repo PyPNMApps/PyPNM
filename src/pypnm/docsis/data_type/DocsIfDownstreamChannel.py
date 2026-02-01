@@ -8,7 +8,11 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from pypnm.lib.constants import INVALID_CHANNEL_ID, DocsIfDownChannelModulation
+from pypnm.lib.constants import (
+    INVALID_CHANNEL_ID,
+    DocsIfDownChannelInterleave,
+    DocsIfDownChannelModulation,
+)
 from pypnm.lib.types import ChannelId, FrequencyHz
 from pypnm.snmp.casts import tenthdB
 from pypnm.snmp.snmp_v2c import Snmp_v2c
@@ -36,8 +40,8 @@ class DocsIfDownstreamEntry(BaseModel):
         Channel width in Hz, from ``docsIfDownChannelWidth``.
     docsIfDownChannelModulation : Optional[str]
         Modulation name, from ``docsIfDownChannelModulation``.
-    docsIfDownChannelInterleave : Optional[int]
-        Interleave depth/setting, from ``docsIfDownChannelInterleave``.
+    docsIfDownChannelInterleave : Optional[str]
+        Interleave mode name, from ``docsIfDownChannelInterleave``.
     docsIfDownChannelPower : Optional[float]
         Average channel power in dBmV (float), converted from tenths-of-dBmV.
     docsIfSigQUnerroreds : Optional[int]
@@ -61,7 +65,7 @@ class DocsIfDownstreamEntry(BaseModel):
     docsIfDownChannelFrequency: FrequencyHz | None = None
     docsIfDownChannelWidth: FrequencyHz | None = None
     docsIfDownChannelModulation: DocsIfDownChannelModulation | None = None
-    docsIfDownChannelInterleave: int | None = None
+    docsIfDownChannelInterleave: DocsIfDownChannelInterleave | None = None
     docsIfDownChannelPower: float | None = None
     docsIfSigQUnerroreds: int | None = None
     docsIfSigQCorrecteds: int | None = None
@@ -188,7 +192,9 @@ class DocsIfDownstreamChannelEntry(BaseModel):
             docsIfDownChannelModulation =   DocsIfDownChannelModulation.from_int(
                 await fetch("docsIfDownChannelModulation", int),
             ),
-            docsIfDownChannelInterleave =   await fetch("docsIfDownChannelInterleave", int),
+            docsIfDownChannelInterleave =   DocsIfDownChannelInterleave.from_int(
+                await fetch("docsIfDownChannelInterleave", int),
+            ),
             docsIfDownChannelPower      =   await fetch("docsIfDownChannelPower", tenthdBmV_to_float),
             docsIfSigQUnerroreds        =   await fetch("docsIfSigQUnerroreds", int),
             docsIfSigQCorrecteds        =   await fetch("docsIfSigQCorrecteds", int),
