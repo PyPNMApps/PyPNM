@@ -70,7 +70,7 @@ Retrieves statistics and configuration parameters for upstream OFDMA channels fr
       "docsIf31CmStatusOfdmaUsRangingAborteds": 0,
       "docsIf31CmStatusOfdmaUsT3Exceededs": 0,
       "docsIf31CmStatusOfdmaUsIsMuted": false,
-      "docsIf31CmStatusOfdmaUsRangingStatus": "4"
+      "docsIf31CmStatusOfdmaUsRangingStatus": "success"
     }
   }
 ]
@@ -98,7 +98,7 @@ Retrieves statistics and configuration parameters for upstream OFDMA channels fr
 | `docsIf31CmStatusOfdmaUsRangingAborteds`        | int   | Number of aborted ranging attempts              |
 | `docsIf31CmStatusOfdmaUsT3Exceededs`            | int   | Number of times T3 retries exceeded             |
 | `docsIf31CmStatusOfdmaUsIsMuted`                | bool  | Indicates if the upstream is muted              |
-| `docsIf31CmStatusOfdmaUsRangingStatus`          | str   | Current ranging status (e.g., `4` = success)    |
+| `docsIf31CmStatusOfdmaUsRangingStatus`          | string | Ranging state name (e.g., `success`).           |
 
 
 ## Notes

@@ -160,6 +160,34 @@ class DocsIf3CmStatusUsRangingStatus(StringEnum):
             case _:
                 return None
 
+class DocsIf31CmStatusOfdmaUsRangingStatus(StringEnum):
+    OTHER = "other"
+    ABORTED = "aborted"
+    RETRIES_EXCEEDED = "retriesExceeded"
+    SUCCESS = "success"
+    CONTINUE = "continue"
+    TIMEOUT_T4 = "timeoutT4"
+
+    @classmethod
+    def from_int(cls, value: int | None) -> DocsIf31CmStatusOfdmaUsRangingStatus | None:
+        if value is None:
+            return None
+        match value:
+            case 1:
+                return cls.OTHER
+            case 2:
+                return cls.ABORTED
+            case 3:
+                return cls.RETRIES_EXCEEDED
+            case 4:
+                return cls.SUCCESS
+            case 5:
+                return cls.CONTINUE
+            case 6:
+                return cls.TIMEOUT_T4
+            case _:
+                return None
+
 class DocsIf31CmDsOfdmChanIndicator(StringEnum):
     OTHER = "other"
     PRIMARY = "primary"
@@ -217,6 +245,7 @@ __all__ = [
     "DocsIfDownChannelModulation",
     "DocsIfDownChannelInterleave",
     "DocsIf3CmStatusUsRangingStatus",
+    "DocsIf31CmStatusOfdmaUsRangingStatus",
     "DocsIf31CmDsOfdmChanIndicator",
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS", "FEC_SUMMARY_TYPE_LABEL",

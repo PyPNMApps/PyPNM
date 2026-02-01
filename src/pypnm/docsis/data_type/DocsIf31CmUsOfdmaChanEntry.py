@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 import logging
 from collections.abc import Callable
 
 from pydantic import BaseModel
 
+from pypnm.lib.constants import DocsIf31CmStatusOfdmaUsRangingStatus
 from pypnm.lib.types import ChannelId, FrequencyHz
 from pypnm.snmp.snmp_v2c import Snmp_v2c
 
@@ -30,7 +31,7 @@ class DocsIf31CmUsOfdmaChan(BaseModel):
     docsIf31CmStatusOfdmaUsRangingAborteds: int | None = None
     docsIf31CmStatusOfdmaUsT3Exceededs: int | None = None
     docsIf31CmStatusOfdmaUsIsMuted: bool | None = None
-    docsIf31CmStatusOfdmaUsRangingStatus: str | None = None
+    docsIf31CmStatusOfdmaUsRangingStatus: DocsIf31CmStatusOfdmaUsRangingStatus | None = None
 
 class DocsIf31CmUsOfdmaChanEntry(BaseModel):
     index: int
@@ -92,7 +93,9 @@ class DocsIf31CmUsOfdmaChanEntry(BaseModel):
             docsIf31CmStatusOfdmaUsRangingAborteds          =   await fetch("docsIf31CmStatusOfdmaUsRangingAborteds", int),
             docsIf31CmStatusOfdmaUsT3Exceededs              =   await fetch("docsIf31CmStatusOfdmaUsT3Exceededs", int),
             docsIf31CmStatusOfdmaUsIsMuted                  =   await fetch("docsIf31CmStatusOfdmaUsIsMuted", Snmp_v2c.truth_value),
-            docsIf31CmStatusOfdmaUsRangingStatus            =   await fetch("docsIf31CmStatusOfdmaUsRangingStatus", str)
+            docsIf31CmStatusOfdmaUsRangingStatus            =   DocsIf31CmStatusOfdmaUsRangingStatus.from_int(
+                await fetch("docsIf31CmStatusOfdmaUsRangingStatus", int),
+            )
         )
 
         try:
