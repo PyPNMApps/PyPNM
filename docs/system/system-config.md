@@ -273,6 +273,9 @@ Policy-Driven Compression And Cache Settings For `.data/pnm` Artifacts And `/tmp
 
 **Cache Settings**
 
+Tmp cache cleanup runs in a background thread at startup using `cleanup_interval_seconds`.
+The cron helper script provides a backup cleanup path when the application is not running.
+
 | Field                    | Type   | Description                                     |
 | ------------------------ | ------ | ----------------------------------------------- |
 | tmp_root                 | string | Root directory for ingress/materialized caches. |
