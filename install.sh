@@ -437,6 +437,36 @@ if ! command -v sshpass >/dev/null 2>&1; then
   fi
 fi
 
+if ! command -v zstd >/dev/null 2>&1; then
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  No package manager; cannot auto-install 'zstd'."
+  else
+    echo "🔧 Installing zstd..."
+    case "$PM" in
+      apt-get) $PM_INSTALL zstd ;;
+      dnf|yum) $PM_INSTALL zstd ;;
+      zypper)  $PM_INSTALL zstd ;;
+      apk)     $PM_INSTALL zstd ;;
+      brew)    $PM_INSTALL zstd ;;
+    esac
+  fi
+fi
+
+if ! command -v gzip >/dev/null 2>&1; then
+  if [[ "$PM" == "none" ]]; then
+    echo "⚠️  No package manager; cannot auto-install 'gzip'."
+  else
+    echo "🔧 Installing gzip..."
+    case "$PM" in
+      apt-get) $PM_INSTALL gzip ;;
+      dnf|yum) $PM_INSTALL gzip ;;
+      zypper)  $PM_INSTALL gzip ;;
+      apk)     $PM_INSTALL gzip ;;
+      brew)    $PM_INSTALL gzip ;;
+    esac
+  fi
+fi
+
 echo "🧮 Ensuring SciPy/NumPy build prerequisites (where applicable)..."
 case "$PM" in
   apt-get)
