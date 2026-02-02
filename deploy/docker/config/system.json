@@ -116,9 +116,9 @@
             "tmp_root": "/tmp/pypnm",
             "ingress_dir": "ingress",
             "materialized_dir": "materialized",
-            "ingress_ttl_seconds": 120,
-            "materialized_ttl_seconds": 120,
-            "cleanup_interval_seconds": 120
+            "ingress_ttl_seconds": 900,
+            "materialized_ttl_seconds": 86400,
+            "cleanup_interval_seconds": 3600
         }
     },
     "SNMP": {
