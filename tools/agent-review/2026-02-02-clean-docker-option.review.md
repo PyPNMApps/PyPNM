@@ -1,3 +1,11 @@
+## Agent Review Bundle Summary
+- Goal: Add a clean.sh option to prune unused Docker artifacts.
+- Changes: Added --docker option and handler; added SPDX copyright year line.
+- Files: tools/maintenance/clean.sh
+- Tests: Not run (shell script change only).
+- Notes: None.
+
+# FILE: tools/maintenance/clean.sh
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026
