@@ -546,7 +546,7 @@ class CommonMeasureService(CommonMessagingService):
                 Status code plus commit metadata when the file is stored locally.
         """
         method = SystemConfigSettings.retrieval_method()
-        self.logger.info(f"{self.log_prefix} - Retrieval method: {method}")
+        self.logger.debug(f"{self.log_prefix} - Retrieval method: {method}")
         trans_id = self._get_transaction_id_by_filename(str(pnm_file_name))
         if not trans_id:
             self.logger.warning("%s - Transaction ID not found for %s", self.log_prefix, pnm_file_name)
