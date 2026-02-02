@@ -33,6 +33,7 @@ deploy/docker/compose/.env
 AGENTS.md
 release-reports/
 tools/release-review/*
+tools/agent-review/*
 
 # PyPNM Dev tools
 log-level-rewriter.py
