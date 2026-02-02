@@ -152,7 +152,7 @@ class AbstractCaptureService(ABC):
 
                 try:
 
-                    self.logger.info(f'Runner ended, Final Invocation , One Last Cycle before ending'
+                    self.logger.debug(f'Runner ended, Final Invocation , One Last Cycle before ending'
                                     f'state={self._ops[operation_id]["state"]}'
                                     f'time-remaining={self._ops[operation_id]["time_remaining"]}')
 

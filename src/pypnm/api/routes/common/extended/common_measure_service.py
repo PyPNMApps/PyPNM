@@ -1047,7 +1047,7 @@ class CommonMeasureService(CommonMessagingService):
 
         src_dir = SystemConfigSettings.local_src_dir()
 
-        self.logger.info(
+        self.logger.debug(
             f'{self.log_prefix} - Local Copy - SRC: {src_dir} - SAVE: {dest_path} - FN: {pnm_file_name}'
         )
 

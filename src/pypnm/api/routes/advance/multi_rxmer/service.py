@@ -183,7 +183,7 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
         if not self._mod_profile_done and time_remaining <= self._half_life:
             self._mod_profile_done = True
 
-            self.logger.info(f'Collecting a Modulation Profile @ {time_remaining}s')
+            self.logger.debug(f'Collecting a Modulation Profile @ {time_remaining}s')
             try:
                 msg_rsp = await CmDsOfdmModProfileService(
                     self.cm,
@@ -200,16 +200,16 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
                 return MessageResponse(ServiceStatusCode.DS_OFDM_MOD_PROFILE_NOT_AVALAIBLE)
 
         # Every 10 min/600 seconds (and once at end), FEC summary
-        self.logger.info(f'Checking FEC Summary @ TimeRemaining={time_remaining}s')
+        self.logger.debug(f'Checking FEC Summary @ TimeRemaining={time_remaining}s')
 
         for thresh in self._fec_thresholds:
-            self.logger.info(f'INSIDE-THRESH-LOOP({thresh}): Checking FEC Summary @ TimeRemaining={time_remaining}s - Thresholds: {self._fec_thresholds}')
-            self.logger.info(f'Final-Invovcation: {self.getOperationFinalInvocation(operation_id)}')
+            self.logger.debug(f'INSIDE-THRESH-LOOP({thresh}): Checking FEC Summary @ TimeRemaining={time_remaining}s - Thresholds: {self._fec_thresholds}')
+            self.logger.debug(f'Final-Invovcation: {self.getOperationFinalInvocation(operation_id)}')
 
             if self.getOperationFinalInvocation(operation_id) or (time_remaining <= thresh) and (thresh not in self._handled_fec_thresholds):
 
                 self._handled_fec_thresholds.add(thresh)
-                self.logger.info(f'Collecting a FEC Summary @ TimeRemaining={time_remaining}s (threshold={thresh})')
+                self.logger.debug(f'Collecting a FEC Summary @ TimeRemaining={time_remaining}s (threshold={thresh})')
 
                 try:
                     msg_rsp = await CmDsOfdmFecSummaryService(
