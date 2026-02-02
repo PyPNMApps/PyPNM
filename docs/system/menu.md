@@ -78,9 +78,10 @@ Select an option:
   2) Edit SNMP
   3) Edit PnmBulkDataTransfer
   4) Edit PnmFileRetrieval (retrieval_method only)
-  5) Edit Logging
-  6) Edit TestMode
-  7) Run PnmFileRetrieval Setup (directory initialization)
+  5) Edit PnmArtifactStorage
+  6) Edit Logging
+  7) Edit TestMode
+  8) Run PnmFileRetrieval Setup (directory initialization)
   q) Quit
 Enter selection:
 ```
@@ -165,7 +166,28 @@ This lets you switch between local-directory retrieval, TFTP, SFTP, or
 HTTP(S)-based retrieval without accidentally altering any of the PNM storage
 layout fields.
 
-### 5. Edit logging
+### 5. Edit PnmArtifactStorage
+
+- **Script**: `tools/system_config/pnm_artifact_storage.py`
+- **Config Section**: `PnmArtifactStorage`
+
+This editor updates compression policy and cache settings for artifact storage.
+
+It supports:
+
+- Compression enable/threshold settings.
+- Compression lists (deny/always/conditional) using comma-separated input.
+- Codec selection and levels.
+- Cache root and subdirectory names.
+- Cache TTLs and cleanup interval.
+
+List prompts show the current values, for example:
+
+```text
+Deny list (PNM types) [current: ds_ofdm_chan_est_coef] (comma-separated, Enter to keep):
+```
+
+### 6. Edit logging
 
 - **Script**: `tools/system_config/logging_config.py`
 - **Config Section**: `logging`
@@ -179,7 +201,7 @@ This editor controls how PyPNM logs are written:
 It prints a small JSON preview of the updated `logging` section before asking
 for confirmation.
 
-### 6. Edit TestMode
+### 7. Edit TestMode
 
 - **Script**: `tools/system_config/testmode.py`
 - **Config Section**: `TestMode`
@@ -200,7 +222,7 @@ Typical usage:
 As with all editors, no changes are written until you confirm the proposed
 configuration.
 
-### 7. Run PnmFileRetrieval setup (directory initialization)
+### 8. Run PnmFileRetrieval setup (directory initialization)
 
 - **Script**: `tools/pnm/pnm_file_retrieval_setup.py`
 - **Config Section(s)**: Reads `PnmFileRetrieval`

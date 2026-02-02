@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 
 import subprocess
@@ -29,6 +29,7 @@ class SystemConfigMenu:
         self.snmp                    = self.base_dir / "snmp.py"
         self.pnm_bulk_data_transfer  = self.base_dir / "pnm_bulk_data_transfer.py"
         self.pnm_file_retrieval      = self.base_dir / "pnm_file_retrieval.py"
+        self.pnm_artifact_storage    = self.base_dir / "pnm_artifact_storage.py"
         self.logging_config          = self.base_dir / "logging_config.py"
         self.testmode                = self.base_dir / "testmode.py"
 
@@ -55,9 +56,10 @@ class SystemConfigMenu:
         print("  2) Edit SNMP")
         print("  3) Edit PnmBulkDataTransfer")
         print("  4) Edit PnmFileRetrieval (retrieval_method only)")
-        print("  5) Edit Logging")
-        print("  6) Edit TestMode")
-        print("  7) Run PnmFileRetrieval Setup (directory initialization)")
+        print("  5) Edit PnmArtifactStorage")
+        print("  6) Edit Logging")
+        print("  7) Edit TestMode")
+        print("  8) Run PnmFileRetrieval Setup (directory initialization)")
         print("  p) Print current system.json")
         print("  q) Quit")
 
@@ -135,14 +137,18 @@ class SystemConfigMenu:
                 continue
 
             if choice == "5":
-                self._run_script(self.logging_config)
+                self._run_script(self.pnm_artifact_storage)
                 continue
 
             if choice == "6":
-                self._run_script(self.testmode)
+                self._run_script(self.logging_config)
                 continue
 
             if choice == "7":
+                self._run_script(self.testmode)
+                continue
+
+            if choice == "8":
                 self._run_script(self.pnm_file_setup)
                 continue
 
