@@ -321,7 +321,7 @@ class CommonMeasureService(CommonMessagingService):
         ##############################################################################################
 
         status_index_channelId = await self._get_indexes_via_pnm_test_type(interface_parameters)
-        self.logger.info(f'{self.log_prefix} - Index/ChannelID List: {status_index_channelId[1]}')
+        self.logger.debug(f'{self.log_prefix} - Index/ChannelID List: {status_index_channelId[1]}')
         if status_index_channelId[0] != ServiceStatusCode.SUCCESS or status_index_channelId[1] is None:
             self.logger.error(f'{self.log_prefix} - Unable to aquire index from ChannelID, reason: {status_index_channelId[0]}')
             return self.build_send_msg(status_index_channelId[0])
