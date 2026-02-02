@@ -14,7 +14,8 @@ from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
 )
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.lib.types import GroupId, TransactionId
+from pypnm.lib.types import FileNameStr, GroupId, TransactionId
+from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
 
 
 class CaptureDataAggregator:
@@ -39,6 +40,7 @@ class CaptureDataAggregator:
         self._pnm_dir = Path(SystemConfigSettings.pnm_dir())
         self._trans_file_bin_entries: TransactionFileCollection = []
         self._trans_collection: TransactionCollection = TransactionCollection()
+        self._artifact_store = PnmArtifactStore(pnm_dir=self._pnm_dir)
 
     # ──────────────────────────────────────────────────────────────────────
     # Public API
@@ -62,21 +64,21 @@ class CaptureDataAggregator:
                 self.logger.error(f"Capture record missing filename: txn={txn_id}")
                 continue
 
-            file_path = self._safe_join(self._pnm_dir, record.filename)
-            if file_path.is_dir():
-                self.logger.error(f"Capture file path is a directory: {file_path}")
-                continue
-
             try:
-                bin:bytes = file_path.read_bytes()
-                self.logger.debug(f'Reading capture - count={file_count},  txn={txn_id},  file={file_path.name}, size={len(bin)}')
+                compression = record.compression.model_dump() if record.compression else None
+                bin:bytes = self._artifact_store.read_bytes(
+                    record.transaction_id,
+                    FileNameStr(str(record.filename)),
+                    compression,
+                )
+                self.logger.debug(f'Reading capture - count={file_count},  txn={txn_id},  file={record.filename}, size={len(bin)}')
 
             except FileNotFoundError:
-                self.logger.error(f'Capture file not found: {file_path}')
+                self.logger.error(f'Capture file not found: {record.filename}')
                 raise
 
             except Exception as exc:
-                self.logger.error(f'Error reading file {file_path}: {exc}')
+                self.logger.error(f'Error reading file {record.filename}: {exc}')
                 continue
 
             if not self._trans_collection.add(record, bin):

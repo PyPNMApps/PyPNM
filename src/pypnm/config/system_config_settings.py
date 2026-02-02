@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import cast
 
 from pypnm.config.config_manager import ConfigManager
+from pypnm.config.pnm_artifact_storage import PnmArtifactStorageConfig
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.secret.crypto_manager import SecretCryptoError, SecretCryptoManager
 from pypnm.lib.types import (
@@ -622,6 +623,14 @@ class SystemConfigSettings:
     @classmethod
     def json_db(cls) -> str:
         return cls._get_str("", "PnmFileRetrieval", "json_transaction_db")
+
+    @classmethod
+    def pnm_artifact_storage(cls) -> PnmArtifactStorageConfig:
+        """
+        Load PNM artifact storage configuration from system config.
+        """
+        config = cls._cfg.get("PnmArtifactStorage")
+        return PnmArtifactStorageConfig.from_config(config if isinstance(config, dict) else None)
 
     @classmethod
     def file_retrieval_retries(cls) -> int:

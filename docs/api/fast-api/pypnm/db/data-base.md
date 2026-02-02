@@ -141,9 +141,16 @@ Each transaction is indexed by a unique hash (for example, a digest of filename 
   "timestamp": 1751950064,
   "mac_address": "aa:bb:cc:dd:ee:ff",
   "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
-  "filename": "ds_ofdm_rxmer_per_subcar_aabbccddeeff_197_1751950064.bin",
+  "filename": "ds_ofdm_rxmer_per_subcar_aabbccddeeff_197_1751950064.bin.zst",
+  "compression": {
+    "is_compressed": true,
+    "codec": "zstd",
+    "level": 3,
+    "size_before": 38427,
+    "size_after": 21135
+  },
   "device_details": {
-    "sys_descr": {
+    "system_description": {
       "HW_REV": "1.0",
       "VENDOR": "LANCity",
       "BOOTR": "NONE",
@@ -161,8 +168,9 @@ Each transaction is indexed by a unique hash (for example, a digest of filename 
 | `timestamp`      | integer | Unix epoch seconds when the file was received or uploaded.                  |
 | `mac_address`    | string  | Cable modem MAC address.                                                    |
 | `pnm_test_type`  | string  | Test type that produced the file (for example, `DS_OFDM_RXMER_PER_SUBCAR`). |
-| `filename`       | string  | Saved binary filename in `.data/pnm/`.                                      |
-| `device_details` | object  | Parsed device metadata from SNMP when available (`sys_descr` fields shown). |
+| `filename`       | string  | Saved binary filename in `.data/pnm/` (includes `.zst` or `.gz` when used). |
+| `compression`    | object  | Compression metadata when stored in compressed form.                        |
+| `device_details` | object  | Parsed device metadata from SNMP when available.                            |
 
 ## JSON Capture Ledger
 

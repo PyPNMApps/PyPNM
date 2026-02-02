@@ -90,6 +90,37 @@
         "transaction_db": ".data/db/transactions.json",
         "xlsx_dir": ".data/xlsx"
     },
+    "PnmArtifactStorage": {
+        "compression": {
+            "enabled": true,
+            "min_bytes": 4096,
+            "conditional_max_ratio": 0.92,
+            "conditional_min_savings_bytes": 8192,
+            "deny": [
+                "ds_ofdm_chan_est_coef"
+            ],
+            "always": [
+                "ds_ofdm_codeword_error_rate",
+                "ds_ofdm_modulation_profile"
+            ],
+            "conditional": [
+                "ds_ofdm_rxmer_per_subcar",
+                "us_pre_equalizer_coef"
+            ],
+            "primary_codec": "zstd",
+            "gzip_fallback": true,
+            "zstd_level": 3,
+            "gzip_level": 6
+        },
+        "cache": {
+            "tmp_root": "/tmp/pypnm",
+            "ingress_dir": "ingress",
+            "materialized_dir": "materialized",
+            "ingress_ttl_seconds": 900,
+            "materialized_ttl_seconds": 86400,
+            "cleanup_interval_seconds": 3600
+        }
+    },
     "SNMP": {
         "timeout": 2,
         "version": {

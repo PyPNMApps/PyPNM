@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -25,7 +25,13 @@ from pypnm.api.routes.docs.pnm.files.service import PnmFileService
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 from pypnm.lib.mac_address import MacAddress, MacAddressFormat
-from pypnm.lib.types import FileName, MacAddressStr, OperationId, TransactionId
+from pypnm.lib.types import (
+    FileName,
+    FileNameStr,
+    MacAddressStr,
+    OperationId,
+    TransactionId,
+)
 
 
 class PnmFileManager:
@@ -116,6 +122,25 @@ class PnmFileManager:
             return PnmFileService().get_file_by_transaction_id(transaction_id)
 
         @self.router.get(
+            "/download/filename/{filename}",
+            response_class=FileResponse,
+            summary="Download An Uncompressed PNM File By Filename",
+            responses=FAST_API_RESPONSE
+        )
+        def download_file_via_filename(
+            filename: FileNameStr = Path(description="Stored filename (raw or compressed) to download as uncompressed"),  # noqa: B008
+        ) -> FileResponse:
+            """
+            **Download A PNM File By Filename (Uncompressed)**
+
+            Resolves the filename against the transaction database, then materializes
+            the uncompressed file from any compressed artifact before returning it.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#3-download-uncompressed-file-by-filename)
+            """
+            return PnmFileService().get_uncompressed_file_by_filename(filename)
+
+        @self.router.get(
             "/download/macAddress/{mac_address}",
             response_class=FileResponse,
             summary="Download A PNM File By MAC Address",
@@ -132,7 +157,7 @@ class PnmFileManager:
             Depending on your browser and SwaggerUI behavior, the file may either download
             automatically or require clicking the returned link.
 
-            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#3-download-files-by-mac-address-zip-archive)
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#4-download-files-by-mac-address-zip-archive)
             """
             return PnmFileService().get_file_by_mac_address(mac_address)
 
@@ -153,7 +178,7 @@ class PnmFileManager:
             Depending on your browser and SwaggerUI behavior, the file may either download
             automatically or require clicking the returned link.
 
-            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#4-download-files-by-operation-id-zip-archive)
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#5-download-files-by-operation-id-zip-archive)
             """
             return PnmFileService().get_file_by_operation_id(operation_id)
 
@@ -179,7 +204,7 @@ class PnmFileManager:
 
             The response returns the generated transaction_id and echoes the stored filename.
 
-            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#5-upload-pnm-file)
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#6-upload-pnm-file)
 
             """
             content = await file.read()
@@ -209,7 +234,7 @@ class PnmFileManager:
             - Fec Summary
             - Modulation Profile
 
-            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#6-analyze-pnm-file-via-transaction-id)
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#7-analyze-pnm-file-via-transaction-id)
             """
             PnmFileService().get_analysis(request)
 
@@ -251,7 +276,7 @@ class PnmFileManager:
             This is useful for low-level inspection, debugging, or forensic analysis
             of the file structure and data.
 
-            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#7-hexdump-of-a-pnm-file-via-transaction-id)
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#8-hexdump-of-a-pnm-file-via-transaction-id)
             """
             hexdump_result = PnmFileService().get_hexdump_by_transaction_id(
                 transaction_id = transaction_id,

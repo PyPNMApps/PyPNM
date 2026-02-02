@@ -50,12 +50,14 @@ from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.types import (
     FileName,
+    FileNameStr,
     MacAddressStr,
     OperationId,
     PathLike,
     TransactionId,
 )
 from pypnm.lib.utils import Generate
+from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
 from pypnm.pnm.parser.model.parser_rtn_models import (
     CmDsConstDispMeasModel,
     CmDsHistModel,
@@ -92,6 +94,7 @@ class PnmFileService:
     def __init__(self) -> None:
         self.pnm_dir: PathLike = SystemConfigSettings.pnm_dir()
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._artifact_store = PnmArtifactStore(pnm_dir=self.pnm_dir)
 
     def search_files(self, req: FileQueryRequest) -> FileQueryResponse:
         """
@@ -144,7 +147,8 @@ class PnmFileService:
             raise HTTPException(status_code=404, detail="Transaction ID not found.")
 
         filename = txn_data.get("filename")
-        full_path = Path(self.pnm_dir) / str(filename)
+        compression = txn_data.get("compression") if isinstance(txn_data, dict) else None
+        full_path = self._artifact_store.resolve_physical_path(FileNameStr(str(filename)), compression)
 
         self.logger.info(f"Retrieving file for transaction {transaction_id}: {full_path}")
 
@@ -153,7 +157,42 @@ class PnmFileService:
 
         return FileResponse(
             path        =   full_path,
-            filename    =   filename,
+            filename    =   Path(full_path).name,
+            media_type  =   MediaType.APPLICATION_OCTET_STREAM,
+        )
+
+    def get_uncompressed_file_by_filename(self, filename: FileNameStr) -> FileResponse:
+        """
+        Retrieve an uncompressed PNM file by filename.
+
+        The filename is resolved against the transaction database, then the
+        artifact store materializes the raw file if it is stored compressed.
+        """
+        safe_name = FileNameStr(Path(str(filename)).name)
+        record_match = PnmFileTransaction().get_record_by_filename(safe_name)
+        if not record_match:
+            raise HTTPException(status_code=404, detail="Filename not found in transaction records.")
+
+        transaction_id, record = record_match
+        record_filename = record.get("filename")
+        if not record_filename:
+            raise HTTPException(status_code=404, detail="Filename not found in transaction record.")
+
+        compression = record.get("compression") if isinstance(record, dict) else None
+        materialized = self._artifact_store.materialize(
+            transaction_id,
+            FileNameStr(str(record_filename)),
+            compression,
+        )
+
+        self.logger.info("Retrieving uncompressed file for %s at %s", safe_name, materialized)
+
+        if not materialized.exists():
+            raise HTTPException(status_code=404, detail="PNM file not found on disk.")
+
+        return FileResponse(
+            path        =   materialized,
+            filename    =   materialized.name,
             media_type  =   MediaType.APPLICATION_OCTET_STREAM,
         )
 
@@ -174,7 +213,8 @@ class PnmFileService:
 
         files_to_archive: list[Path] = []
         for rec in txn_models:
-            src_path = Path(self.pnm_dir) / Path(rec.filename)
+            compression = rec.compression.model_dump() if rec.compression else None
+            src_path = self._artifact_store.resolve_physical_path(FileNameStr(str(rec.filename)), compression)
             if not src_path.is_file():
                 self.logger.warning(
                     "Skipping missing file for transaction %s at %s",
@@ -230,7 +270,8 @@ class PnmFileService:
 
         files_to_archive: list[Path] = []
         for rec in records:
-            src_path = Path(self.pnm_dir) / Path(rec.filename)
+            compression = rec.compression.model_dump() if rec.compression else None
+            src_path = self._artifact_store.resolve_physical_path(FileNameStr(str(rec.filename)), compression)
             if not src_path.is_file():
                 self.logger.warning(
                     "Skipping missing file for transaction %s: %s",
@@ -280,7 +321,8 @@ class PnmFileService:
         4. Registers the transaction and returns the transaction ID.
         """
         os.makedirs(self.pnm_dir, exist_ok=True)
-        filepath = os.path.join(self.pnm_dir, filename)
+        ingress_path = self._artifact_store.ingress_path(FileNameStr(str(filename)))
+        filepath = str(ingress_path)
 
         processor = FileProcessor(filepath)
         success = processor.write_file(data)
@@ -297,9 +339,20 @@ class PnmFileService:
             filename      = filename,
         )
 
+        commit_result = self._artifact_store.commit_ingress_file(
+            pnm_type=pnm_file_type.name.lower(),
+            ingress_path=Path(filepath),
+            original_filename=FileNameStr(str(filename)),
+        )
+        PnmFileTransaction().update_record_compression(
+            transaction_id,
+            commit_result.stored_filename,
+            commit_result.compression,
+        )
+
         return UploadFileResponse(
             mac_address     = MacAddress(mac_address).mac_address,
-            filename        = filename,
+            filename        = commit_result.stored_filename,
             transaction_id  = transaction_id,
         )
 
@@ -364,12 +417,16 @@ class PnmFileService:
 
         self.logger.info(f"Starting analysis for transaction ID {req.search.transaction_id} on file: {self.pnm_dir}/{filename}")
 
-        # Get binary file
-        file_path = f'{self.pnm_dir}/{filename}'
+        compression = txn_rec.get("compression") if isinstance(txn_rec, dict) else None
+        materialized = self._artifact_store.materialize(
+            req.search.transaction_id,
+            FileNameStr(str(filename)),
+            compression,
+        )
 
-        if not Path(file_path).is_file():
+        if not Path(materialized).is_file():
             raise HTTPException(status_code=404, detail="PNM file not found on disk for analysis.")
-        fp = FileProcessor(file_path).read_file()
+        fp = FileProcessor(str(materialized)).read_file()
 
         # Get PnmHeader to Determine PnmFileType
         from pypnm.pnm.parser.pnm_parameter import GetPnmParserAndParameters
@@ -407,23 +464,28 @@ class PnmFileService:
         if not filename:
             raise HTTPException(status_code=404, detail="Filename not found in transaction record.")
 
-        full_path = Path(self.pnm_dir) / str(filename)
+        compression = txn_data.get("compression") if isinstance(txn_data, dict) else None
+        materialized = self._artifact_store.materialize(
+            transaction_id,
+            FileNameStr(str(filename)),
+            compression,
+        )
 
         self.logger.info(
             "Resolving PNM file for transaction %s at %s",
             transaction_id,
-            full_path,
+            materialized,
         )
 
-        if not full_path.exists() or not full_path.is_file():
+        if not materialized.exists() or not materialized.is_file():
             self.logger.warning(
                 "PNM file not found on disk for transaction %s at %s",
                 transaction_id,
-                full_path,
+                materialized,
             )
             raise HTTPException(status_code=404, detail="PNM file not found on disk.")
 
-        return full_path
+        return materialized
 
     def get_hexdump_by_transaction_id(self, transaction_id: TransactionId, bytes_per_line: int) -> HexDumpResponse:
         """

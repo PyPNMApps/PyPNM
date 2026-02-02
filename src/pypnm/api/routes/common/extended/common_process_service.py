@@ -16,8 +16,9 @@ from pypnm.api.routes.common.extended.common_messaging_service import (
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.file_processor import FileProcessor
-from pypnm.lib.types import MacAddressStr, TransactionId, TransactionRecord
+from pypnm.lib.types import FileNameStr, MacAddressStr, TransactionId, TransactionRecord
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
+from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
 from pypnm.pnm.parser.CmDsConstDispMeas import CmDsConstDispMeas
 from pypnm.pnm.parser.CmDsHist import CmDsHist
 from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
@@ -37,6 +38,7 @@ class CommonProcessService(CommonMessagingService):
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pnm_file_dir = self.config_mgr = SystemConfigSettings.pnm_dir()
+        self._artifact_store = PnmArtifactStore(pnm_dir=self.pnm_file_dir)
         self._msg_rsp = message_response
         self.logger.debug(f'CommonProcessService: {self._msg_rsp}')
 
@@ -128,9 +130,34 @@ class CommonProcessService(CommonMessagingService):
             self.logger.error(f"Unsupported PNM test type: {pnm_test_type}")
             return ServiceStatusCode.UNSUPPORTED_TEST_TYPE
 
-        file_name_dst = f'{self.pnm_file_dir}/{transaction_record[PnmFileTransaction.FILE_NAME]}'
+        filename = transaction_record[PnmFileTransaction.FILE_NAME]
+        compression = transaction_record.get("compression") if isinstance(transaction_record, dict) else None
+        transaction_id = transaction_record.get("transaction_id")
+        if not transaction_id:
+            self.logger.error("Transaction ID is missing in the transaction record.")
+            return ServiceStatusCode.PNM_FILE_TRANSACTION_ID_NOT_FOUND
+
+        txn_id = TransactionId(str(transaction_id))
+        file_name_str = FileNameStr(str(filename))
+        ingress_candidate = self._artifact_store.ingress_candidate_path(file_name_str, txn_id)
+        if ingress_candidate.is_file():
+            materialized = ingress_candidate
+        else:
+            ingress_fallback = self._artifact_store.find_ingress_by_filename(file_name_str)
+            if ingress_fallback is not None and ingress_fallback.is_file():
+                materialized = ingress_fallback
+            else:
+                materialized = self._artifact_store.materialize(
+                    txn_id,
+                    file_name_str,
+                    compression,
+                )
+                if not materialized.is_file():
+                    self.logger.error("PNM file not found on disk for transaction %s at %s", transaction_id, materialized)
+                    return ServiceStatusCode.PNM_FILE_RETRIEVAL_ERROR
+
         device_details:dict[str, str] = transaction_record[PnmFileTransaction.DEVICE_DETAILS]
-        pnm_data = FileProcessor(file_name_dst).read_file()
+        pnm_data = FileProcessor(str(materialized)).read_file()
 
         if pnm_test_type == DocsPnmCmCtlTest.DS_OFDM_RXMER_PER_SUBCAR.name:
             pnm_dict = self._add_device_details(CmDsOfdmRxMer(binary_data=pnm_data).to_dict(), device_details)

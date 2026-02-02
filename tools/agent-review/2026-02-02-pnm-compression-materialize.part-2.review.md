@@ -1,3 +1,650 @@
+## Agent Review Bundle Summary
+- Goal: Lower SystemCall logging to debug level.
+- Changes: SystemCall now logs execution at debug instead of info.
+- Files: See file list below.
+- Tests: `ruff check src`, `pytest -q`.
+- Notes: None.
+# FILE: src/pypnm/api/routes/common/classes/file_capture/pnm_file_transaction.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import time
+from pathlib import Path
+
+from pypnm.api.routes.common.classes.file_capture.transaction_record_parser import (
+    TransactionRecordParser,
+)
+from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.docsis.cable_modem import CableModem
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import FileName, FileNameStr, TransactionId, TransactionRecord
+from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
+
+
+class PnmFileTransaction:
+    """
+    Manages persistent tracking of PNM file transactions across the PyPNM system.
+
+    Each transaction corresponds to a PNM test result file (e.g., RxMER, Spectrum Analysis),
+    whether generated through automated measurements or manually uploaded by a user.
+
+    A transaction includes:
+        - A unique transaction ID (16-char SHA-256 digest)
+        - Timestamp (epoch time)
+        - MAC address of the cable modem
+        - PNM test type (e.g., DS_RXMER, SPECTRUM_ANALYZER)
+        - Filename of the associated binary data file
+
+    Transactions are stored in a central JSON file defined in system config at:
+    `PnmFileRetrieval.transaction_db`.
+
+    Usage Scenarios:
+        - When a measurement test completes and produces a file.
+        - When a user uploads a file manually via the REST API.
+        - When retrieving metadata about previously captured test files.
+
+    Attributes:
+        transaction_db_path (Path): Path to the JSON file where all transactions are recorded.
+
+    Record:
+        {
+            "<transaction_id>": {
+                "timestamp": int,
+                "mac_address": "<cable modem mac address>",
+                "pnm_test_type": "<PNM Test Type>",
+                "filename": "<FileName>",
+                "compression": {
+                    "is_compressed": bool,
+                    "codec": "zstd|gzip|none",
+                    "level": int,
+                    "size_before": int,
+                    "size_after": int
+                },
+                "device_details": {
+                    "system_description": { ... }
+                }
+            }
+        }
+    """
+
+    PNM_TEST_TYPE  = "pnm_test_type"
+    FILE_NAME      = "filename"
+    DEVICE_DETAILS = "device_details"
+    MAC_ADDRESS    = "mac_address"
+    EXTENSION      = "extension"
+    COMPRESSION    = "compression"
+
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.transaction_db_path = Path(SystemConfigSettings.transaction_db())
+        self.transaction_db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.transaction_db_path.exists():
+            self.transaction_db_path.write_text(json.dumps({}))
+
+    @staticmethod
+    def _default_compression_metadata() -> dict[str, object]:
+        return {
+            "is_compressed": False,
+            "codec": "none",
+            "level": 0,
+            "size_before": 0,
+            "size_after": 0,
+        }
+
+    async def insert(self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str) -> TransactionId:
+        """
+        Record A Transaction Initiated From An Actual Cable Modem Test.
+
+        This method is invoked by measurement services once a PNM capture has
+        successfully completed and produced a result file. It pulls the current
+        system description from the cable modem, generates a new transaction
+        identifier, and appends a normalized record into the transaction
+        database.
+
+        Parameters
+        ----------
+        cable_modem:
+            Live `CableModem` instance representing the device under test. Used
+            to obtain the MAC address and system description snapshot.
+        pnm_test_type:
+            Enumeration value describing which PNM test produced the file
+            (for example, DS_RXMER, DS_OFDM_HISTOGRAM, DS_CONSTELLATION).
+        filename:
+            Relative or absolute path to the generated PNM binary file, as
+            stored by the calling measurement service.
+
+        Returns
+        -------
+        str
+            Newly generated transaction identifier (16-character SHA-256
+            digest prefix) suitable for later lookup (download and analysis).
+        """
+        sd: SystemDescriptor = await cable_modem.getSysDescr()
+        return self._insert_generic(
+            mac_address        = cable_modem.get_mac_address,
+            pnm_test_type      = pnm_test_type,
+            filename           = filename,
+            system_description = sd.to_dict(),
+        )
+
+    @staticmethod
+    def set_file_by_user(mac_address: MacAddress, pnm_test_type: DocsPnmCmCtlTest, filename: FileName) -> TransactionId:
+        """
+        Record A Transaction For A Manually Supplied File (User Upload).
+
+        This path is used when the file is not the result of an automated test
+        initiated by PyPNM, but rather provided by the user (for example, a
+        lab-captured PNM file uploaded via REST). The record is normalized into
+        the same transaction database used for automated captures.
+
+        Parameters
+        ----------
+        mac_address:
+            MAC address of the cable modem associated with the uploaded file.
+        pnm_test_type:
+            Enumeration describing the semantic PNM test type for the file,
+            allowing downstream analysis routing to behave consistently.
+        filename:
+            Filesystem path or name where the uploaded file has been stored on
+            the server.
+
+        Returns
+        -------
+        str
+            Newly generated transaction identifier bound to the uploaded file.
+        """
+        txn = PnmFileTransaction()
+        return txn._insert_generic(
+            mac_address   = mac_address,
+            pnm_test_type = pnm_test_type,
+            filename      = filename,
+        )
+
+    # ---------------------------
+    # Safe read helpers (no recursion)
+    # ---------------------------
+
+    def _load_record_dict(self, transaction_id: TransactionId) -> dict | None:
+        """
+        Load The Raw JSON Record For A Transaction Identifier.
+
+        This helper reads the on-disk transaction database and returns the
+        underlying dictionary for the requested transaction identifier, if
+        present. It does not perform any schema normalization or conversion.
+
+        Parameters
+        ----------
+        transaction_id:
+            Unique transaction identifier to resolve.
+
+        Returns
+        -------
+        dict | None
+            Raw JSON-compatible dictionary for the transaction when present,
+            or `None` if no record exists for the supplied identifier.
+        """
+        db = self._load_db()
+        return db.get(transaction_id)
+
+    def get_record(self, transaction_id: TransactionId) -> TransactionRecord | None:
+        """
+        Fetch A Plain Dictionary Representation Of A Transaction Record.
+
+        This method provides a minimal, schema-free view into the transaction
+        database. It is intended for low-level callers that need direct access
+        to the stored fields without constructing a Pydantic model.
+
+        Parameters
+        ----------
+        transaction_id:
+            Unique transaction identifier for the record to retrieve.
+
+        Returns
+        -------
+        dict | None
+            The underlying transaction record as a dictionary, or `None` when
+            the identifier does not exist in the database.
+        """
+        rec = self._load_record_dict(transaction_id)
+        return rec if rec else None
+
+    def get_record_by_filename(self, filename: FileNameStr) -> tuple[TransactionId, TransactionRecord] | None:
+        """
+        Resolve A Transaction Record By Filename.
+
+        Matches the stored physical filename (including compression extension)
+        or the raw base filename when the stored record is compressed.
+        """
+        safe_name = Path(str(filename)).name
+        base_name = safe_name
+        if base_name.endswith(".zst"):
+            base_name = base_name[:-4]
+        elif base_name.endswith(".gz"):
+            base_name = base_name[:-3]
+
+        db = self._load_db()
+        for txn_id, record in db.items():
+            rec_filename = str(record.get(self.FILE_NAME, ""))
+            if not rec_filename:
+                continue
+            rec_safe = Path(rec_filename).name
+            if rec_safe == safe_name:
+                return TransactionId(str(txn_id)), record
+
+            rec_base = rec_safe
+            if rec_base.endswith(".zst"):
+                rec_base = rec_base[:-4]
+            elif rec_base.endswith(".gz"):
+                rec_base = rec_base[:-3]
+            if rec_base == base_name:
+                return TransactionId(str(txn_id)), record
+
+        return None
+
+    def get(self, transaction_id: TransactionId) -> dict | None:
+        return self.get_record(transaction_id)
+
+    def update_record_compression(
+        self,
+        transaction_id: TransactionId,
+        filename: FileNameStr,
+        compression: dict[str, object] | None,
+    ) -> bool:
+        """
+        Update the filename and compression metadata for an existing transaction.
+
+        Parameters
+        ----------
+        transaction_id:
+            Identifier of the transaction record to update.
+        filename:
+            Physical filename stored in the PNM directory (includes compression extension when used).
+        compression:
+            Compression metadata payload or None when unavailable.
+
+        Returns
+        -------
+        bool
+            True when the record was updated, False when missing.
+        """
+        db = self._load_db()
+        record = db.get(transaction_id)
+        if record is None:
+            self.logger.error("Transaction record not found for update: %s", transaction_id)
+            return False
+
+        record[self.FILE_NAME] = str(filename)
+        record[self.COMPRESSION] = compression or self._default_compression_metadata()
+        self._save_db(db)
+        return True
+
+    def getRecordModel(self, transaction_id: TransactionId) -> TransactionRecordModel:
+        """
+        Build A Canonical TransactionRecordModel For A Transaction Identifier.
+
+        This convenience wrapper resolves the raw JSON record and delegates to
+        `TransactionRecordParser` to construct the normalized Pydantic model.
+        If the record does not exist, a `null()` sentinel model is returned.
+
+        Parameters
+        ----------
+        transaction_id:
+            Unique transaction identifier for which a model representation is
+            requested.
+
+        Returns
+        -------
+        TransactionRecordModel
+            Canonical, fully-normalized transaction model, or the sentinel
+            `TransactionRecordModel.null()` instance for missing records.
+        """
+        rec = self._load_record_dict(transaction_id)
+        if not rec:
+            return TransactionRecordModel.null()
+        return TransactionRecordParser.from_id(transaction_id)
+
+    def get_file_info_via_macaddress(self, mac_address: MacAddress) -> list[TransactionRecordModel]:
+        """
+        Retrieve All Transaction Records Associated With A Given MAC Address.
+
+        This method scans the transaction database and collects all entries
+        whose stored `mac_address` matches the supplied cable modem MAC (case-
+        insensitive). Each matching record is returned as a fully normalized
+        `TransactionRecordModel`, using the same parsing logic as individual
+        lookups.
+
+        Typical usage patterns include:
+        - Building a catalog of all PNM files available for a modem.
+        - Populating UI tables of historical captures keyed by MAC address.
+        - Providing selection lists for downstream download or analysis calls.
+
+        Parameters
+        ----------
+        mac_address:
+            Cable modem MAC address used as the primary lookup key. The value
+            is normalized to lower-case for comparison against stored records.
+
+        Returns
+        -------
+        List[TransactionRecordModel]
+            List of canonical `TransactionRecordModel` instances for all
+            transactions associated with the given MAC address. The list is
+            empty when no matching records are found.
+        """
+        db = self._load_db()
+        mac_str = str(mac_address).lower()
+        self.logger.info(f"Searching for files with MAC address: {mac_str}")
+        records: list[TransactionRecordModel] = []
+
+        for txn_id, record in db.items():
+            if record.get(self.MAC_ADDRESS, "").lower() != mac_str:
+                self.logger.info(f"Skipping file with MAC address: {record.get(self.MAC_ADDRESS, '').lower()}")
+                continue
+            records.append(TransactionRecordParser.from_id(txn_id))
+
+        return records
+
+    def get_all_record_models(self) -> list[TransactionRecordModel]:
+        """
+        Retrieve All Transaction Records As Canonical Models.
+
+        This scans the transaction database and returns each record as a fully
+        normalized `TransactionRecordModel`. Any per-record parse failures are
+        logged and skipped so callers can still operate on partial data.
+
+        Returns
+        -------
+        list[TransactionRecordModel]
+            List of all transaction models currently stored in the transaction
+            database. The list is empty when no records exist.
+        """
+        db = self._load_db()
+        if not db:
+            return []
+
+        records: list[TransactionRecordModel] = []
+        for txn_id in db:
+            record = self._safe_parse_record(txn_id)
+            if record is not None:
+                records.append(record)
+
+        return records
+
+    def _safe_parse_record(self, txn_id: str) -> TransactionRecordModel | None:
+        """
+        Safely Parse A Single Transaction Record.
+
+        Parameters
+        ----------
+        txn_id:
+            Transaction identifier to parse.
+
+        Returns
+        -------
+        TransactionRecordModel | None
+            Parsed record model or None if parsing fails.
+        """
+        try:
+            return TransactionRecordParser.from_id(TransactionId(txn_id))
+        except Exception as e:
+            self.logger.warning("Skipping transaction %s due to parse error: %s", txn_id, e)
+            return None
+
+    # ---------------------------
+    # Write helpers
+    # ---------------------------
+
+    def _insert_generic(
+        self,
+        mac_address: MacAddress,
+        pnm_test_type: DocsPnmCmCtlTest,
+        filename: str,
+        system_description: dict[str, str] | None = None,
+    ) -> TransactionId:
+        """
+        Common Logic For Creating And Persisting A Transaction Record.
+
+        This internal helper generates a new transaction identifier, assembles
+        the JSON-serializable record structure, and writes the updated
+        transaction database back to disk.
+
+        Parameters
+        ----------
+        mac_address:
+            MAC address of the cable modem associated with the transaction.
+        pnm_test_type:
+            Enumeration describing the PNM test type that produced or owns the
+            associated file.
+        filename:
+            Path or name of the PNM data file linked to this transaction.
+        system_description:
+            Optional system description snapshot dictionary, typically produced
+            via `SystemDescriptor.to_dict()`. When omitted, an empty mapping is
+            stored under `device_details.system_description`.
+
+        Returns
+        -------
+        str
+            Newly created transaction identifier associated with the record.
+        """
+        timestamp       = int(time.time())
+        hash_input      = f"{filename}{timestamp}".encode()
+        transaction_id  = TransactionId(hashlib.sha256(hash_input).hexdigest()[:16])
+
+        db = self._load_db()
+        db[transaction_id] = {
+            "timestamp":      timestamp,
+            "mac_address":    str(mac_address),
+            "pnm_test_type":  pnm_test_type.name,
+            "filename":       filename,
+            "compression":    self._default_compression_metadata(),
+            "device_details": {
+                "system_description": system_description or {},
+            },
+        }
+        self._save_db(db)
+        return transaction_id
+
+    def _load_db(self) -> dict:
+        """
+        Load The Transaction Database From JSON Storage.
+
+        This helper reads the transaction database file configured by
+        `SystemConfigSettings.transaction_db` and returns its contents as a
+        dictionary. If JSON parsing fails, an empty dictionary is returned to
+        avoid propagating the error to callers.
+
+        Returns
+        -------
+        dict
+            Dictionary of all transaction records keyed by transaction
+            identifier. An empty dictionary is returned on parse errors.
+        """
+        try:
+            with self.transaction_db_path.open("r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+    def _save_db(self, db: dict) -> None:
+        """
+        Persist The Transaction Database To Disk.
+
+        Parameters
+        ----------
+        db:
+            Fully realized transaction database dictionary to be serialized and
+            written to the configured JSON file.
+        """
+        with self.transaction_db_path.open("w") as f:
+            json.dump(db, f, indent=4)
+# FILE: src/pypnm/api/routes/common/classes/file_capture/transaction_record_parser.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+from typing import Any
+
+from pypnm.api.routes.common.classes.file_capture.types import (
+    CompressionMetadataModel,
+    DeviceDetailsModel,
+    TransactionRecordModel,
+)
+from pypnm.docsis.cable_modem import MacAddress
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.types import FileName, MacAddressStr, TimestampSec, TransactionId
+
+
+class TransactionRecordParser:
+    """
+    Wrapper class for a single PNM file transaction record.
+    Provides easy access to core attributes like MAC, timestamp, test type, etc.
+    """
+
+    def __init__(self, transaction_id: TransactionId) -> None:
+        self.transaction_id:TransactionId = transaction_id
+
+        # TODO: Refactor to use PnmFileTransaction internally, this is causing circular imports
+        from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
+            PnmFileTransaction,
+        )
+        self.record: dict[str, Any] | None = PnmFileTransaction().get_record(transaction_id)
+
+        if not self.record:
+            raise ValueError(f"No record found for transaction ID: {transaction_id}")
+
+    def get_timestamp(self) -> TimestampSec:
+        return self.record.get("timestamp")
+
+    def get_mac_address(self) -> MacAddressStr:
+        return self.record.get("mac_address")
+
+    def get_test_type(self) -> str:
+        return self.record.get("pnm_test_type")
+
+    def get_filename(self) -> FileName:
+        return self.record.get("filename")
+
+    def get_device_details(self) -> dict[str, Any] | None:
+        return self.record.get("device_details", {}).get("system_description", {}) if self.record else None
+
+    def get_device_model(self) -> str | None:
+        device_details = self.get_device_details()
+        return device_details.get("MODEL") if device_details else None
+
+    '''
+        System Descriptor
+    '''
+
+    def get_device_vendor(self) -> str | None:
+        device_details = self.get_device_details()
+        return device_details.get("VENDOR") if device_details else None
+
+    def get_software_revision(self) -> str | None:
+        device_details = self.get_device_details()
+        return device_details.get("SW_REV") if device_details else None
+
+    def get_hardware_revision(self) -> str | None:
+        device_details = self.get_device_details()
+        return device_details.get("HW_REV") if device_details else None
+
+    def get_bootrom_version(self) -> str | None:
+        device_details = self.get_device_details()
+        return device_details.get("BOOTR") if device_details else None
+
+    # ─────────────────────────────────────────────────────────────
+    # New: Pydantic models and conversion helpers
+    # ─────────────────────────────────────────────────────────────
+
+    def to_model(self) -> TransactionRecordModel:
+        """
+        Build a Pydantic model for this transaction, normalizing device_details via:
+            SystemDescriptor.load_from_dict(...).to_model()
+        """
+        sys_dict = self.get_device_details() or {}
+        sdm = SystemDescriptor.load_from_dict(sys_dict).to_model()
+
+        compression_payload = self.record.get("compression") if self.record else None
+        compression = None
+        if isinstance(compression_payload, dict):
+            try:
+                compression = CompressionMetadataModel(**compression_payload)
+            except Exception:
+                compression = None
+
+        return TransactionRecordModel(
+            transaction_id  =   self.transaction_id,
+            timestamp       =   self.get_timestamp(),
+            mac_address     =   self.get_mac_address() or MacAddressStr(MacAddress.null()),
+            pnm_test_type   =   self.get_test_type() or "",
+            filename        =   self.get_filename(),
+            device_details  =   DeviceDetailsModel(system_description=sdm),
+            compression     =   compression,
+        )
+
+    @classmethod
+    def from_id(cls, transaction_id: TransactionId) -> TransactionRecordModel:
+        """
+        Convenience constructor that returns the validated model directly.
+        """
+        return cls(transaction_id).to_model()
+# FILE: src/pypnm/api/routes/common/classes/file_capture/types.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from pypnm.docsis.cm_snmp_operation import SystemDescriptor
+from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
+from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.types import FileName, MacAddressStr, TimestampSec, TransactionId
+
+Record              = dict[str, Any]
+TransactionRecord   = dict[TransactionId, Record]
+
+class DeviceDetailsModel(BaseModel):
+    system_description: SystemDescriptorModel = Field(..., description="Parsed system descriptor")
+
+class CompressionMetadataModel(BaseModel):
+    is_compressed: bool = Field(..., description="Whether the artifact is stored in compressed form.")
+    codec: str = Field(..., description="Compression codec name (zstd, gzip, or none).")
+    level: int = Field(..., description="Compression level used for storage.")
+    size_before: int = Field(..., description="Original artifact size in bytes before compression.")
+    size_after: int = Field(..., description="Compressed artifact size in bytes.")
+
+class TransactionRecordModel(BaseModel):
+    transaction_id: TransactionId       = Field(..., description="16-char transaction ID")
+    timestamp: TimestampSec             = Field(..., description="Epoch seconds")
+    mac_address: MacAddressStr          = Field(..., description="Cable modem MAC address")
+    pnm_test_type: str                  = Field(..., description="PNM test type")
+    filename: FileName                  = Field(..., description="Capture filename")
+    device_details: DeviceDetailsModel  = Field(..., description="Device details container")
+    compression: CompressionMetadataModel | None = Field(default=None, description="Compression metadata for stored artifacts.")
+
+    @classmethod
+    def null(cls) -> TransactionRecordModel:
+        return cls(
+            transaction_id  =   TransactionId(""),
+            timestamp       =   TimestampSec(0),
+            mac_address     =   MacAddressStr(MacAddress.null()),
+            pnm_test_type   =   "",
+            filename        =   FileName(""),
+            device_details=DeviceDetailsModel(system_description=SystemDescriptor.empty().to_model()),
+            compression     =   None,
+        )
+# FILE: src/pypnm/api/routes/common/extended/common_measure_service.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 
@@ -1435,3 +2082,560 @@ class CommonMeasureService(CommonMessagingService):
 
         self.logger.debug(f"{self.log_prefix} - Ping failed for host: {host}")
         return ServiceStatusCode.PING_FAILED
+# FILE: src/pypnm/api/routes/common/extended/common_process_service.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+
+from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
+    PnmFileTransaction,
+)
+from pypnm.api.routes.common.extended.common_messaging_service import (
+    CommonMessagingService,
+    MessageResponse,
+    MessageResponseType,
+)
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.file_processor import FileProcessor
+from pypnm.lib.types import FileNameStr, MacAddressStr, TransactionId, TransactionRecord
+from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
+from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
+from pypnm.pnm.parser.CmDsConstDispMeas import CmDsConstDispMeas
+from pypnm.pnm.parser.CmDsHist import CmDsHist
+from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
+from pypnm.pnm.parser.CmDsOfdmFecSummary import CmDsOfdmFecSummary
+from pypnm.pnm.parser.CmDsOfdmModulationProfile import CmDsOfdmModulationProfile
+from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer
+from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalysis
+from pypnm.pnm.parser.CmSpectrumAnalysisSnmp import CmSpectrumAnalysisSnmp
+from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq
+
+
+class CommonProcessService(CommonMessagingService):
+
+    Message = dict
+
+    def __init__(self, message_response: MessageResponse, **extra_options: object) -> None:
+        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.pnm_file_dir = self.config_mgr = SystemConfigSettings.pnm_dir()
+        self._artifact_store = PnmArtifactStore(pnm_dir=self.pnm_file_dir)
+        self._msg_rsp = message_response
+        self.logger.debug(f'CommonProcessService: {self._msg_rsp}')
+
+    def process(self) -> MessageResponse:
+        """
+        Processes each item in the MessageResponse payload.
+
+        Expected payload format:
+            {
+                "payload": [
+                    {
+                        "status": "SUCCESS",
+                        "message_type": "PNM_FILE_TRANSACTION",
+                        "message": {
+                            "transaction_id": "275de83146e904d7",
+                            "filename": "ds_ofdm_rxmer_per_subcar_xx:xx:xx:xx:xx:xx_954000000_1746501260.bin",
+                            "extension": dict, --Special Case: Optional extension data
+                        }
+                    },
+                    ...
+                ]
+            }
+
+        Returns:
+            MessageResponse: A success message if all payloads are processed,
+                            or an error message if a transaction record is missing.
+        """
+        if not self._msg_rsp.payload:
+            self.logger.warning("Message response payload is empty.")
+            return self.send_msg()
+
+        for payload in self._msg_rsp.payload:
+            status, message_type, message = MessageResponse.get_payload_msg(payload)
+
+            self.logger.debug(f'CommonProcessService.MessageResponse: MSG-TYPE: {message_type}')
+
+            if status != ServiceStatusCode.SUCCESS.name:
+                self.logger.error(f"Status Error: {status}")
+                continue
+
+            if message_type == MessageResponseType.PNM_FILE_TRANSACTION.name:
+                transaction_id:TransactionId = message.get('transaction_id')
+                transaction_record = PnmFileTransaction().get_record(transaction_id)
+
+                if not transaction_record:
+                    self.build_msg(ServiceStatusCode.TRANSACTION_RECORD_GET_FAILED)
+                    continue
+
+                transaction_record["transaction_id"] = transaction_id
+                self._process_pnm_measure_test(transaction_record)
+
+            elif message_type == MessageResponseType.SNMP_DATA_RTN_SPEC_ANALYSIS.name:
+                transaction_id = message.get('transaction_id')
+                self.logger.debug(f'process() -> Found TransactionID: {transaction_id}')
+
+                transaction_record = PnmFileTransaction().get_record(transaction_id)
+                if not transaction_record:
+                    self.build_msg(ServiceStatusCode.TRANSACTION_RECORD_GET_FAILED)
+                    continue
+
+                transaction_record["transaction_id"] = transaction_id
+                self._process_pnm_measure_test(transaction_record)
+
+        return self.send_msg()
+
+    def _process_pnm_measure_test(self, transaction_record: TransactionRecord) -> ServiceStatusCode:
+        """
+        Processes the provided PNM transaction record based on its test type.
+
+        Args:
+            transaction_record (TransactionRecord): The transaction metadata including test type and filename.
+
+        Returns:
+            ServiceStatusCode: The result of the operation, indicating success or error type.
+        """
+        pnm_test_type = transaction_record[PnmFileTransaction().PNM_TEST_TYPE]
+
+        if not pnm_test_type:
+            self.logger.error("PNM test type is missing in the transaction record.")
+            return ServiceStatusCode.MISSING_PNM_TEST_TYPE
+
+        self.logger.debug(f"Processing PNM test type: {pnm_test_type}")
+        if not transaction_record.get(PnmFileTransaction.FILE_NAME):
+            self.logger.error("Filename is missing in the transaction record.")
+            return ServiceStatusCode.MISSING_PNM_FILENAME
+
+        # Check to make sure the pnm_test_type is in the DocsPnmCmCtlTest enum
+        if pnm_test_type not in DocsPnmCmCtlTest.__members__:
+            self.logger.error(f"Unsupported PNM test type: {pnm_test_type}")
+            return ServiceStatusCode.UNSUPPORTED_TEST_TYPE
+
+        filename = transaction_record[PnmFileTransaction.FILE_NAME]
+        compression = transaction_record.get("compression") if isinstance(transaction_record, dict) else None
+        transaction_id = transaction_record.get("transaction_id")
+        if not transaction_id:
+            self.logger.error("Transaction ID is missing in the transaction record.")
+            return ServiceStatusCode.PNM_FILE_TRANSACTION_ID_NOT_FOUND
+
+        txn_id = TransactionId(str(transaction_id))
+        file_name_str = FileNameStr(str(filename))
+        ingress_candidate = self._artifact_store.ingress_candidate_path(file_name_str, txn_id)
+        if ingress_candidate.is_file():
+            materialized = ingress_candidate
+        else:
+            ingress_fallback = self._artifact_store.find_ingress_by_filename(file_name_str)
+            if ingress_fallback is not None and ingress_fallback.is_file():
+                materialized = ingress_fallback
+            else:
+                materialized = self._artifact_store.materialize(
+                    txn_id,
+                    file_name_str,
+                    compression,
+                )
+                if not materialized.is_file():
+                    self.logger.error("PNM file not found on disk for transaction %s at %s", transaction_id, materialized)
+                    return ServiceStatusCode.PNM_FILE_RETRIEVAL_ERROR
+
+        device_details:dict[str, str] = transaction_record[PnmFileTransaction.DEVICE_DETAILS]
+        pnm_data = FileProcessor(str(materialized)).read_file()
+
+        if pnm_test_type == DocsPnmCmCtlTest.DS_OFDM_RXMER_PER_SUBCAR.name:
+            pnm_dict = self._add_device_details(CmDsOfdmRxMer(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.DS_OFDM_CODEWORD_ERROR_RATE.name:
+            pnm_dict = self._add_device_details(CmDsOfdmFecSummary(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.DS_OFDM_CHAN_EST_COEF.name:
+            pnm_dict = self._add_device_details(CmDsOfdmChanEstimateCoef(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.DS_CONSTELLATION_DISP.name:
+            pnm_dict = self._add_device_details(CmDsConstDispMeas(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.DS_HISTOGRAM.name:
+            pnm_dict = self._add_device_details(CmDsHist(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.DS_OFDM_MODULATION_PROFILE.name:
+            pnm_dict = self._add_device_details(CmDsOfdmModulationProfile(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.SPECTRUM_ANALYZER.name:
+            self.logger.debug("Processing DS_SPECTRUM_ANALYZER PNM data")
+            pnm_dict = self._add_device_details(CmSpectrumAnalysis(pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.US_PRE_EQUALIZER_COEF.name:
+            self.logger.debug(f"Processing {pnm_test_type} PNM data")
+            pnm_dict = self._add_device_details(CmUsOfdmaPreEq(binary_data=pnm_data).to_dict(), device_details)
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        elif pnm_test_type == DocsPnmCmCtlTest.SPECTRUM_ANALYZER_SNMP_AMP_DATA.name:
+            self.logger.debug(f"Processing {pnm_test_type} PNM data")
+            pnm_dict = self._add_device_details(CmSpectrumAnalysisSnmp(pnm_data).to_dict(), device_details)
+            self._update_pnm_data_from_message_response_extension(transaction_record, pnm_dict)
+            pnm_dict['mac_address'] = MacAddressStr(transaction_record[PnmFileTransaction.MAC_ADDRESS])
+            self.logger.debug(f"Spectrum Analysis SNMP Data PNM Dict: {pnm_dict}")
+            self.build_msg(ServiceStatusCode.SUCCESS, pnm_dict)
+
+        else:
+            self.logger.error(f"Unsupported PNM test type: {pnm_test_type}")
+            return ServiceStatusCode.UNSUPPORTED_TEST_TYPE
+
+        return ServiceStatusCode.SUCCESS
+
+
+    def _add_device_details(self, pnm_data: dict, device_details: dict[str, str]) -> dict:
+        """
+        Adds device details to the PNM data dictionary.
+
+        Args:
+            pnm_data (dict): The PNM data dictionary.
+            device_details (Dict[str, str]): Device details to be added.
+
+        Returns:
+            dict: Updated PNM data dictionary with device details.
+        """
+        if PnmFileTransaction.DEVICE_DETAILS not in pnm_data:
+            pnm_data[PnmFileTransaction.DEVICE_DETAILS] = {}
+        pnm_data[PnmFileTransaction.DEVICE_DETAILS].update(device_details)
+        return pnm_data
+
+    def  _update_pnm_data_from_message_response_extension(self,
+                                                          transaction_record: TransactionRecord,
+                                                          pnm_data: dict) -> dict:
+        """
+        Update extension data from the MessageResponse payload into the PNM data dictionary.
+
+        Args:
+            transaction_record (TransactionRecord): The transaction record containing the transaction ID.
+            pnm_data (dict): The PNM data dictionary to update.
+
+        Returns:
+            dict: Updated PNM data dictionary with extension data.
+        """
+        transaction_id = transaction_record.get("transaction_id")
+        if not transaction_id:
+            self.logger.warning("Transaction record missing transaction ID.")
+            return pnm_data
+
+        if self._msg_rsp.payload is None:
+            self.logger.warning("Message response payload is empty.")
+            return pnm_data
+
+        for payload in self._msg_rsp.payload:
+            _status, _message_type, message = MessageResponse.get_payload_msg(payload)
+            if not isinstance(message, dict):
+                continue
+
+            if message.get("transaction_id") != transaction_id:
+                continue
+
+            extension_data = message.get(PnmFileTransaction.EXTENSION)
+            if not isinstance(extension_data, dict):
+                self.logger.warning("No extension data found in message response.")
+                return pnm_data
+
+            self.logger.debug(f"Extension-Data: {extension_data}")
+            pnm_data.update(extension_data)
+            return pnm_data
+
+        self.logger.warning("No message found for transaction record.")
+        return pnm_data
+# FILE: src/pypnm/api/routes/docs/pnm/files/router.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+from typing import cast
+
+from fastapi import APIRouter, File, Path, Query, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+
+from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import (
+    OutputType,
+)
+from pypnm.api.routes.docs.pnm.files.schemas import (
+    AnalysisJsonResponse,
+    FileAnalysisRequest,
+    FileQueryRequest,
+    FileQueryResponse,
+    HexDumpResponse,
+    MacAddressSystemDescriptorResponse,
+    UploadFileResponse,
+)
+from pypnm.api.routes.docs.pnm.files.service import PnmFileService
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
+from pypnm.lib.mac_address import MacAddress, MacAddressFormat
+from pypnm.lib.types import (
+    FileName,
+    FileNameStr,
+    MacAddressStr,
+    OperationId,
+    TransactionId,
+)
+
+
+class PnmFileManager:
+    """
+    REST API router for managing PNM test files.
+
+    Endpoints:
+    - Search files by MAC or criteria
+    - Push/upload new test file
+    - Analyze an uploaded or retrieved file
+    """
+
+    DEFAULT_HEXDUMP_BYTES_PER_LINE = 16
+
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(f'PnmFileManager.{self.__class__.__name__}')
+        self.router = APIRouter(
+            prefix="/docs/pnm/files",
+            tags=["PNM File Manager"],
+        )
+        self._add_routes()
+
+    def _add_routes(self) -> None:
+        default_mac_address = (
+            MacAddress(SystemConfigSettings.default_mac_address())
+            .to_mac_format(fmt=MacAddressFormat.COLON).lower())
+
+        @self.router.get(
+            "/getMacAddresses/",
+            response_model=MacAddressSystemDescriptorResponse,
+            summary="Get All Registered MAC Addresses With PNM Files",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_mac_addresses() -> MacAddressSystemDescriptorResponse:  # noqa: B008
+            """
+            **Retrieve All Registered MAC Addresses With Uploaded PNM Files**
+
+            Returns a list of all DOCSIS cable modem MAC addresses that have associated
+            telemetry capture files stored in the PyPNM transaction database.
+
+            Each MAC address represents a unique cable modem that has undergone
+            telemetry data collection.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#1-get-all-registered-mac-addresses-with-pnm-files)
+            """
+            return PnmFileService().get_mac_addresses()
+
+        @self.router.get(
+            "/searchFiles/{mac_address}",
+            response_model=FileQueryResponse,
+            summary="Search For PNM Files Via Mac Address",
+            responses=FAST_API_RESPONSE,
+        )
+        def search_files(mac_address: MacAddressStr = Path(description=(f"MAC address of the cable modem, default: **{default_mac_address}**"),)) -> FileQueryResponse:  # noqa: B008
+            """
+            **Search Uploaded PNM Files By MAC Address**
+
+            Returns all registered telemetry capture files associated with a given DOCSIS cable modem.
+
+            Each file represents a measurement such as RxMER, constellation, pre-equalization taps,
+            or spectrum scan, and can be downloaded or analyzed via other endpoints.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#1-search-files-by-mac-address)
+            """
+            request = FileQueryRequest(mac_address=mac_address)
+            result = PnmFileService().search_files(request)
+            return result
+
+        @self.router.get(
+            "/download/transactionID/{transaction_id}",
+            response_class=FileResponse,
+            summary="Download A PNM File By Transaction ID",
+            responses=FAST_API_RESPONSE
+        )
+        def download_file_via_transaction_id(transaction_id: TransactionId = Path(description="Transaction ID of the file to download"),) -> FileResponse:  # noqa: B008
+            """
+            **Download PNM Measurement File By Transaction ID**
+
+            Retrieves the raw binary file generated during a telemetry capture session.
+            Used for offline inspection, reprocessing, or historical archiving.
+
+            Note:
+            Depending on your browser and SwaggerUI behavior, the file may either download
+            automatically or require clicking the returned link.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#2-download-file-by-transaction-id)
+            """
+            return PnmFileService().get_file_by_transaction_id(transaction_id)
+
+        @self.router.get(
+            "/download/filename/{filename}",
+            response_class=FileResponse,
+            summary="Download An Uncompressed PNM File By Filename",
+            responses=FAST_API_RESPONSE
+        )
+        def download_file_via_filename(
+            filename: FileNameStr = Path(description="Stored filename (raw or compressed) to download as uncompressed"),  # noqa: B008
+        ) -> FileResponse:
+            """
+            **Download A PNM File By Filename (Uncompressed)**
+
+            Resolves the filename against the transaction database, then materializes
+            the uncompressed file from any compressed artifact before returning it.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#3-download-uncompressed-file-by-filename)
+            """
+            return PnmFileService().get_uncompressed_file_by_filename(filename)
+
+        @self.router.get(
+            "/download/macAddress/{mac_address}",
+            response_class=FileResponse,
+            summary="Download A PNM File By MAC Address",
+            responses=FAST_API_RESPONSE
+        )
+        def download_file_via_mac_address(mac_address: MacAddressStr = Path(..., description="MAC address of the file to download")) -> FileResponse:  # noqa: B008
+            """
+            **Download PNM Measurement File By Transaction ID**
+
+            Retrieves the raw binary file generated during a telemetry capture session.
+            Used for offline inspection, reprocessing, or historical archiving.
+
+            Note:
+            Depending on your browser and SwaggerUI behavior, the file may either download
+            automatically or require clicking the returned link.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#4-download-files-by-mac-address-zip-archive)
+            """
+            return PnmFileService().get_file_by_mac_address(mac_address)
+
+        @self.router.get(
+            "/download/operationID/{operation_id}",
+            response_class=FileResponse,
+            summary="Download A PNM File By Operation ID",
+            responses=FAST_API_RESPONSE
+        )
+        def download_file_via_operationID(operation_id: OperationId = Path(..., description="Operation ID of the file to download")) -> FileResponse:  # noqa: B008
+            """
+            **Download PNM Measurement File By Operation ID**
+
+            Retrieves the raw binary file generated during a telemetry capture session.
+            Used for offline inspection, reprocessing, or historical archiving.
+
+            Note:
+            Depending on your browser and SwaggerUI behavior, the file may either download
+            automatically or require clicking the returned link.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#5-download-files-by-operation-id-zip-archive)
+            """
+            return PnmFileService().get_file_by_operation_id(operation_id)
+
+        @self.router.post(
+            "/upload",
+            response_model=UploadFileResponse,
+            summary="Upload A PNM File",
+            responses=FAST_API_RESPONSE,
+        )
+        async def upload_file(file: UploadFile = File(description="Raw PNM capture file (e.g., RxMER, constellation, histogram, spectrum)",),) -> JSONResponse: # noqa: B008
+            """
+            **Upload A PNM Binary File Into The PyPNM Transaction Database**
+
+            This endpoint accepts a PNM capture file as multipart/form-data and stores
+            it under a new transaction record.
+
+            The server will:
+            - Persist the file to the configured PNM directory.
+            - Inspect the PNM header to identify the file type.
+            - Map the file type to a logical PNM test (DocsPnmCmCtlTest).
+            - Register a transaction entry with a placeholder null MAC address
+              (to be backfilled later from the file contents).
+
+            The response returns the generated transaction_id and echoes the stored filename.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#6-upload-pnm-file)
+
+            """
+            content = await file.read()
+            result = PnmFileService().upload_file(filename=cast(FileName, file.filename), data=content)
+            return JSONResponse(content=result.model_dump())
+
+        @self.router.post(
+            "/getAnalysis",
+            response_model=AnalysisJsonResponse,
+            summary="Analyze a PNM File Via Transaction ID",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_analysis_via_transaction_id(request: FileAnalysisRequest) -> AnalysisJsonResponse | FileResponse | JSONResponse:
+            """
+            **Analysis Of A PNM File**
+
+            Launches an analysis routine based on the specified transactionID and requested
+            analysis type. The backend will resolve the PNM file associated with the transactionID,
+            inspect its header, and route it to the appropriate analysis pipeline.
+
+            Supported Uploaded PNM File Types:
+            - RxMER per subcarrier
+            - Channel Estimation Coefficients
+            - Constellation Diagram
+            - Downstream Histogram
+            - OFDMA Pre-equalization
+            - Fec Summary
+            - Modulation Profile
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#7-analyze-pnm-file-via-transaction-id)
+            """
+            PnmFileService().get_analysis(request)
+
+            output_type = request.analysis.output.type
+
+            if output_type == OutputType.JSON:
+                analysis_result, file_type = PnmFileService().get_analysis(request)
+                return AnalysisJsonResponse(
+                        mac_address     =   analysis_result.mac_address,
+                        pnm_file_type   =   file_type.name,
+                        status          =   "success",
+                        analysis        =   analysis_result.model_dump(),
+                    )
+
+            elif output_type == OutputType.ARCHIVE:
+                return  PnmFileService().get_archive(request)
+
+            return JSONResponse(content="Not implemented yet")
+
+        @self.router.get(
+            "/getHexdump/transactionID/{transaction_id}",
+            response_model=HexDumpResponse,
+            summary="Hexdump Of A PNM File By Transaction ID",
+            responses=FAST_API_RESPONSE,
+        )
+        def get_hexdump_via_transaction_id(
+            transaction_id: TransactionId = Path(..., description="Transaction ID of the PNM file to hexdump"),  # noqa: B008
+            bytes_per_line: int | None    = Query(
+                default=None,
+                description="Optional bytes-per-line for hexdump; if omitted, the service default is used.",
+            ),
+        ) -> HexDumpResponse:
+            """
+            **Hexdump Of A PNM File**
+
+            Generates a hexadecimal dump of the raw binary contents of a PNM file
+            associated with the specified transactionID.
+
+            This is useful for low-level inspection, debugging, or forensic analysis
+            of the file structure and data.
+
+            [API Guide](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/file-manager/file-manager-api.md#8-hexdump-of-a-pnm-file-via-transaction-id)
+            """
+            hexdump_result = PnmFileService().get_hexdump_by_transaction_id(
+                transaction_id = transaction_id,
+                bytes_per_line = bytes_per_line if bytes_per_line is not None else 0,
+            )
+            return hexdump_result
+
+# Required for auto-discovery via dynamic router loading
+router = PnmFileManager().router

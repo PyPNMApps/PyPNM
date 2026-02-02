@@ -69,9 +69,16 @@ A detailed manifest of every PNM file moved into `data/pnm/` during the capture.
       "timestamp": 1748280294,
       "mac_address": "aa:bb:cc:dd:ee:ff",
       "pnm_test_type": "DS_OFDM_RXMER_PER_SUBCAR",
-      "filename": "ds_ofdm_rxmer_per_subcar_aa:bb:cc:dd:ee:ff_34_1748280294.bin",
+      "filename": "ds_ofdm_rxmer_per_subcar_aabbccddeeff_34_1748280294.bin.zst",
+      "compression": {
+          "is_compressed": true,
+          "codec": "zstd",
+          "level": 3,
+          "size_before": 38427,
+          "size_after": 21135
+      },
       "device_details": {
-          "sys_descr": {
+          "system_description": {
               "HW_REV": "1.0",
               "VENDOR": "LANCity",
               "BOOTR": "NONE",
@@ -87,14 +94,15 @@ A detailed manifest of every PNM file moved into `data/pnm/` during the capture.
 * **timestamp**: Unix epoch when the file was staged.
 * **mac\_address**: Sanitized MAC of the target modem.
 * **pnm\_test\_type**: Identifier of the PNM capture type.
-* **filename**: Name of the `.bin` file in `data/pnm/`.
-* **device\_details.sys\_descr**: Snapshot of modem metadata at capture time.
+* **filename**: Physical filename in `data/pnm/` (includes `.zst` or `.gz` when used).
+* **compression**: Compression metadata when stored in compressed form.
+* **device\_details.system\_description**: Snapshot of modem metadata at capture time.
 
 ## Workflow Summary
 
 1. **Start Multi‑Capture**: System generates a new `operation_id` linked to a new `capture_group_id`.
 2. **Periodic Triggers**: SNMP instructs the modem to TFTP-upload the PNM blob.
-3. **File Staging**: PyPNM copies each `.bin` into `data/pnm/` and appends a JSON entry.
+3. **File Staging**: PyPNM stores each artifact in `data/pnm/` (raw or compressed) and appends a JSON entry.
 4. **Database Updates**: Timestamps and transaction lists are updated in both `operation_capture.json` and `capture_group.json`.
 5. **Completion**: After the capture ends, the three JSON tables fully describe what was captured, when, and for which operation/group.
 

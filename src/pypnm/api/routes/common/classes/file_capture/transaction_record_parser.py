@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
 from typing import Any
 
 from pypnm.api.routes.common.classes.file_capture.types import (
+    CompressionMetadataModel,
     DeviceDetailsModel,
     TransactionRecordModel,
 )
@@ -83,6 +84,14 @@ class TransactionRecordParser:
         sys_dict = self.get_device_details() or {}
         sdm = SystemDescriptor.load_from_dict(sys_dict).to_model()
 
+        compression_payload = self.record.get("compression") if self.record else None
+        compression = None
+        if isinstance(compression_payload, dict):
+            try:
+                compression = CompressionMetadataModel(**compression_payload)
+            except Exception:
+                compression = None
+
         return TransactionRecordModel(
             transaction_id  =   self.transaction_id,
             timestamp       =   self.get_timestamp(),
@@ -90,6 +99,7 @@ class TransactionRecordParser:
             pnm_test_type   =   self.get_test_type() or "",
             filename        =   self.get_filename(),
             device_details  =   DeviceDetailsModel(system_description=sdm),
+            compression     =   compression,
         )
 
     @classmethod

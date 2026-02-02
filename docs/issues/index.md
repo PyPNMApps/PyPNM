@@ -31,6 +31,9 @@ A: The multi-capture analysis endpoints accept the string enum values (`min-avg-
 Q: Why do multi US OFDMA Pre-Equalization plots only show Pre-Equalization data?  
 A: Ensure both Pre-Equalization (PNN6) and Last Pre-Equalization (PNN7) files are present; the multi-capture plots now emit both sets when available.
 
+Q: Why do PNM parsers raise a UnicodeDecodeError when reading the file header?  
+A: This usually means a compressed artifact was passed directly to the parser. Use the file manager download-by-filename endpoint or materialization utility to get the uncompressed file before parsing.
+
 ## TODO
 
 - Add or update a FAQ entry whenever an error is fixed so the resolution is documented.
@@ -38,3 +41,4 @@ A: Ensure both Pre-Equalization (PNN6) and Last Pre-Equalization (PNN7) files ar
 - Track FAQ updates for the US OFDMA Pre-Equalization plot title fix.
 - Track FAQ updates for the US OFDMA Pre-Equalization analysis request format.
 - Track FAQ updates for the US OFDMA Pre-Equalization dual plot output.
+- Track FAQ updates for UnicodeDecodeError when compressed artifacts are parsed.

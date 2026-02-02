@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import FileName, TransactionId, TransactionRecord
+from pypnm.lib.types import FileName, FileNameStr, TransactionId, TransactionRecord
 from pypnm.pnm.data_type.pnm_test_types import DocsPnmCmCtlTest
 
 
@@ -53,6 +53,13 @@ class PnmFileTransaction:
                 "mac_address": "<cable modem mac address>",
                 "pnm_test_type": "<PNM Test Type>",
                 "filename": "<FileName>",
+                "compression": {
+                    "is_compressed": bool,
+                    "codec": "zstd|gzip|none",
+                    "level": int,
+                    "size_before": int,
+                    "size_after": int
+                },
                 "device_details": {
                     "system_description": { ... }
                 }
@@ -65,6 +72,7 @@ class PnmFileTransaction:
     DEVICE_DETAILS = "device_details"
     MAC_ADDRESS    = "mac_address"
     EXTENSION      = "extension"
+    COMPRESSION    = "compression"
 
     def __init__(self) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -72,6 +80,16 @@ class PnmFileTransaction:
         self.transaction_db_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.transaction_db_path.exists():
             self.transaction_db_path.write_text(json.dumps({}))
+
+    @staticmethod
+    def _default_compression_metadata() -> dict[str, object]:
+        return {
+            "is_compressed": False,
+            "codec": "none",
+            "level": 0,
+            "size_before": 0,
+            "size_after": 0,
+        }
 
     async def insert(self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str) -> TransactionId:
         """
@@ -190,8 +208,75 @@ class PnmFileTransaction:
         rec = self._load_record_dict(transaction_id)
         return rec if rec else None
 
+    def get_record_by_filename(self, filename: FileNameStr) -> tuple[TransactionId, TransactionRecord] | None:
+        """
+        Resolve A Transaction Record By Filename.
+
+        Matches the stored physical filename (including compression extension)
+        or the raw base filename when the stored record is compressed.
+        """
+        safe_name = Path(str(filename)).name
+        base_name = safe_name
+        if base_name.endswith(".zst"):
+            base_name = base_name[:-4]
+        elif base_name.endswith(".gz"):
+            base_name = base_name[:-3]
+
+        db = self._load_db()
+        for txn_id, record in db.items():
+            rec_filename = str(record.get(self.FILE_NAME, ""))
+            if not rec_filename:
+                continue
+            rec_safe = Path(rec_filename).name
+            if rec_safe == safe_name:
+                return TransactionId(str(txn_id)), record
+
+            rec_base = rec_safe
+            if rec_base.endswith(".zst"):
+                rec_base = rec_base[:-4]
+            elif rec_base.endswith(".gz"):
+                rec_base = rec_base[:-3]
+            if rec_base == base_name:
+                return TransactionId(str(txn_id)), record
+
+        return None
+
     def get(self, transaction_id: TransactionId) -> dict | None:
         return self.get_record(transaction_id)
+
+    def update_record_compression(
+        self,
+        transaction_id: TransactionId,
+        filename: FileNameStr,
+        compression: dict[str, object] | None,
+    ) -> bool:
+        """
+        Update the filename and compression metadata for an existing transaction.
+
+        Parameters
+        ----------
+        transaction_id:
+            Identifier of the transaction record to update.
+        filename:
+            Physical filename stored in the PNM directory (includes compression extension when used).
+        compression:
+            Compression metadata payload or None when unavailable.
+
+        Returns
+        -------
+        bool
+            True when the record was updated, False when missing.
+        """
+        db = self._load_db()
+        record = db.get(transaction_id)
+        if record is None:
+            self.logger.error("Transaction record not found for update: %s", transaction_id)
+            return False
+
+        record[self.FILE_NAME] = str(filename)
+        record[self.COMPRESSION] = compression or self._default_compression_metadata()
+        self._save_db(db)
+        return True
 
     def getRecordModel(self, transaction_id: TransactionId) -> TransactionRecordModel:
         """
@@ -352,6 +437,7 @@ class PnmFileTransaction:
             "mac_address":    str(mac_address),
             "pnm_test_type":  pnm_test_type.name,
             "filename":       filename,
+            "compression":    self._default_compression_metadata(),
             "device_details": {
                 "system_description": system_description or {},
             },

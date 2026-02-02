@@ -628,6 +628,13 @@ run_pnm_alias_installer_if_available() {
   fi
 }
 
+run_tmp_cleanup_cron_installer_if_available() {
+  if [[ -x "${PROJECT_ROOT}/scripts/install-tmp-cleanup-cron.sh" ]]; then
+    echo "🧹 Installing tmp cache cleanup cron job..."
+    "${PROJECT_ROOT}/scripts/install-tmp-cleanup-cron.sh" || true
+  fi
+}
+
 if [[ "$PNM_FILE_RETRIEVAL_SETUP" == "1" ]]; then
   echo
   echo "PNM File Retrieval Configuration (requested via --pnm-file-retrieval-setup)"
@@ -640,6 +647,7 @@ else
 fi
 
 run_pnm_alias_installer_if_available
+run_tmp_cleanup_cron_installer_if_available
 
 echo "✅ Bootstrap complete."
 if [[ "$DEMO_MODE" == "1" ]]; then

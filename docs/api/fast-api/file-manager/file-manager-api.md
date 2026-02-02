@@ -102,7 +102,40 @@ If the transaction ID is not found:
 
 with HTTP 404 status.
 
-### 3) Download files by MAC address (ZIP archive)
+### 3) Download uncompressed file by filename
+
+**Endpoint**
+
+```text
+GET /docs/pnm/files/download/filename/{filename}
+```
+
+**Description**
+
+Resolve the filename against the transaction database, materialize the raw file if it is stored compressed, and return the uncompressed artifact. This is useful when you only have the filename and need a raw PNM file for parsing or offline inspection.
+
+**Path Parameter**
+
+| Name     | Type   | Description                                                                 |
+| -------- | ------ | --------------------------------------------------------------------------- |
+| filename | string | Stored filename (raw or compressed). Example: `ds_ofdm_rxmer_per_subcar_aa_bb_cc_dd_ee_ff.bin.zst` |
+
+**Successful Response (200)**
+
+- Content type: `application/octet-stream`
+- Body: Raw PNM binary file.
+
+If the filename is not found:
+
+```json
+{
+  "detail": "Filename not found in transaction records."
+}
+```
+
+with HTTP 404 status.
+
+### 4) Download files by MAC address (ZIP archive)
 
 **Endpoint**
 
@@ -143,7 +176,7 @@ or
 
 both with HTTP 404 status.
 
-### 4) Download files by operation ID (ZIP archive)
+### 5) Download files by operation ID (ZIP archive)
 
 **Endpoint**
 
@@ -184,7 +217,7 @@ or
 
 with HTTP 404 status.
 
-### 5) Upload PNM file
+### 6) Upload PNM file
 
 **Endpoint**
 
@@ -228,7 +261,7 @@ If the file type is unrecognized:
 
 with HTTP 400 status.
 
-### 6) Analyze PNM file
+### 7) Analyze PNM file
 
 **Endpoint**
 
@@ -305,7 +338,7 @@ If the transaction is not found:
 
 with HTTP 404 status.
 
-### 7) Hexdump of a PNM file via transaction ID
+### 8) Hexdump of a PNM file via transaction ID
 
 **Endpoint**
 

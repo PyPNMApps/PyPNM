@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2025 Maurice Garcia
+# Copyright (c) 2025-2026 Maurice Garcia
 
 from __future__ import annotations
 
@@ -18,6 +18,13 @@ TransactionRecord   = dict[TransactionId, Record]
 class DeviceDetailsModel(BaseModel):
     system_description: SystemDescriptorModel = Field(..., description="Parsed system descriptor")
 
+class CompressionMetadataModel(BaseModel):
+    is_compressed: bool = Field(..., description="Whether the artifact is stored in compressed form.")
+    codec: str = Field(..., description="Compression codec name (zstd, gzip, or none).")
+    level: int = Field(..., description="Compression level used for storage.")
+    size_before: int = Field(..., description="Original artifact size in bytes before compression.")
+    size_after: int = Field(..., description="Compressed artifact size in bytes.")
+
 class TransactionRecordModel(BaseModel):
     transaction_id: TransactionId       = Field(..., description="16-char transaction ID")
     timestamp: TimestampSec             = Field(..., description="Epoch seconds")
@@ -25,6 +32,7 @@ class TransactionRecordModel(BaseModel):
     pnm_test_type: str                  = Field(..., description="PNM test type")
     filename: FileName                  = Field(..., description="Capture filename")
     device_details: DeviceDetailsModel  = Field(..., description="Device details container")
+    compression: CompressionMetadataModel | None = Field(default=None, description="Compression metadata for stored artifacts.")
 
     @classmethod
     def null(cls) -> TransactionRecordModel:
@@ -35,4 +43,5 @@ class TransactionRecordModel(BaseModel):
             pnm_test_type   =   "",
             filename        =   FileName(""),
             device_details=DeviceDetailsModel(system_description=SystemDescriptor.empty().to_model()),
+            compression     =   None,
         )

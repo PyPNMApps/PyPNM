@@ -100,11 +100,11 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
         for tcm in models:
             parsed = self._parse_capture(tcm)
             if parsed is None:
-                self.logger.info(f"OFDMA Pre-EQ parse skipped: file={tcm.filename} size={len(tcm.data)}")
+                self.logger.debug(f"OFDMA Pre-EQ parse skipped: file={tcm.filename} size={len(tcm.data)}")
                 continue
 
             ch, complex_values, frequency, bandwidth, file_type = parsed
-            self.logger.info(f"OFDMA Pre-EQ parsed: file={tcm.filename} ch={ch} carriers={len(complex_values)}")
+            self.logger.debug(f"OFDMA Pre-EQ parsed: file={tcm.filename} ch={ch} carriers={len(complex_values)}")
             if complex_values:
                 channel_data.setdefault(ch, []).append(complex_values)
             freqs[ch] = frequency

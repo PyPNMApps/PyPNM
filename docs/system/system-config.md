@@ -12,8 +12,9 @@ Canonical Structure And Field Semantics For `system.json`.
 * [2. SNMP](#2-snmp)
 * [3. PnmBulkDataTransfer](#3-pnmbulkdatatransfer)
 * [4. PnmFileRetrieval](#pnmfileretrieval)
-* [5. Logging](#5-logging)
-* [6. TestMode](#6-testmode)
+* [5. PnmArtifactStorage](#pnmartifactstorage)
+* [6. Logging](#6-logging)
+* [7. TestMode](#7-testmode)
 * [Loading Configuration](#loading-configuration)
 
 ## 1. FastApiRequestDefault
@@ -216,7 +217,72 @@ Related Guide: [File Transfer Methods](pnm-file-retrieval/index.md)
 
 > The legacy key name `retrival_method` is accepted for backward compatibility.
 
-## 5. Logging
+## 5. PnmArtifactStorage {#pnmartifactstorage}
+
+Policy-Driven Compression And Cache Settings For `.data/pnm` Artifacts And `/tmp` Materialization.
+
+```json
+"PnmArtifactStorage": {
+  "compression": {
+    "enabled": true,
+    "min_bytes": 4096,
+    "conditional_max_ratio": 0.92,
+    "conditional_min_savings_bytes": 8192,
+    "deny": [
+      "ds_ofdm_chan_est_coef"
+    ],
+    "always": [
+      "ds_ofdm_codeword_error_rate",
+      "ds_ofdm_modulation_profile"
+    ],
+    "conditional": [
+      "ds_ofdm_rxmer_per_subcar",
+      "us_pre_equalizer_coef"
+    ],
+    "primary_codec": "zstd",
+    "gzip_fallback": true,
+    "zstd_level": 3,
+    "gzip_level": 6
+  },
+  "cache": {
+    "tmp_root": "/tmp/pypnm",
+    "ingress_dir": "ingress",
+    "materialized_dir": "materialized",
+    "ingress_ttl_seconds": 900,
+    "materialized_ttl_seconds": 86400,
+    "cleanup_interval_seconds": 3600
+  }
+}
+```
+
+**Compression Policy**
+
+| Field                         | Type   | Description                                          |
+| ----------------------------- | ------ | ---------------------------------------------------- |
+| enabled                       | bool   | Enables compression decisions for PNM artifacts.     |
+| min_bytes                     | int    | Skip compression below this size (bytes).            |
+| conditional_max_ratio         | float  | Max compressed/original ratio for conditional types. |
+| conditional_min_savings_bytes | int    | Minimum byte savings for conditional compression.    |
+| deny                          | array  | PNM types that never compress.                       |
+| always                        | array  | PNM types that always compress.                      |
+| conditional                   | array  | PNM types that compress if thresholds are met.       |
+| primary_codec                 | string | Primary codec (`zstd`).                              |
+| gzip_fallback                 | bool   | Allow gzip when zstd is unavailable.                 |
+| zstd_level                    | int    | Zstd compression level.                              |
+| gzip_level                    | int    | Gzip compression level.                              |
+
+**Cache Settings**
+
+| Field                    | Type   | Description                                     |
+| ------------------------ | ------ | ----------------------------------------------- |
+| tmp_root                 | string | Root directory for ingress/materialized caches. |
+| ingress_dir              | string | Ingress cache directory name under tmp_root.    |
+| materialized_dir         | string | Materialized cache directory name under tmp_root. |
+| ingress_ttl_seconds      | int    | TTL for ingress cache content.                  |
+| materialized_ttl_seconds | int    | TTL for materialized cache content.             |
+| cleanup_interval_seconds | int    | Minimum seconds between opportunistic cleanups. |
+
+## 6. Logging
 
 Application Logging Options.
 
@@ -234,7 +300,7 @@ Application Logging Options.
 | log_dir      | string | Directory for log files.                    |
 | log_filename | string | Log filename (created under `log_dir`).     |
 
-## 6. TestMode
+## 7. TestMode
 
 Global And Class-Specific Test-Mode Controls.
 
