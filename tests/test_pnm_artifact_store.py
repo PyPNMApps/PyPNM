@@ -113,13 +113,14 @@ def test_cleanup_dir_keeps_recent_empty_dirs(tmp_path: Path) -> None:
     store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
 
     recent = store.ingress_path(FileNameStr("recent.bin"), TransactionId("recent"))
-    recent_dir = recent.parent
+    recent.write_bytes(b"r")
 
-    old_dir = store.ingress_path(FileNameStr("old.bin"), TransactionId("old")).parent
+    old_file = store.ingress_path(FileNameStr("old.bin"), TransactionId("old"))
+    old_file.write_bytes(b"o")
     old_time = time.time() - 1000
-    os.utime(old_dir, (old_time, old_time))
+    os.utime(old_file, (old_time, old_time))
 
     store._cleanup_dir(store._ingress_dir, ttl_seconds=900)
 
-    assert recent_dir.exists()
-    assert not old_dir.exists()
+    assert recent.exists()
+    assert not old_file.exists()

@@ -275,6 +275,7 @@ Policy-Driven Compression And Cache Settings For `.data/pnm` Artifacts And `/tmp
 
 Tmp cache cleanup runs in a background thread at startup using `cleanup_interval_seconds`.
 The cron helper script provides a backup cleanup path when the application is not running.
+Ingress cache files are stored flat under the ingress directory (no transaction subdirectories).
 
 | Field                    | Type   | Description                                     |
 | ------------------------ | ------ | ----------------------------------------------- |

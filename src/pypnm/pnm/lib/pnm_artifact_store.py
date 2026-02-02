@@ -70,19 +70,15 @@ class PnmArtifactStore:
         filename:
             Target filename for the ingress copy (normalized to raw filename).
         transaction_id:
-            Optional transaction ID to place the file in a scoped ingress folder.
+            Optional transaction ID (ignored; ingress is a flat directory).
 
         Returns
         -------
         Path
             Filesystem path where callers can write the ingress artifact.
         """
-        if transaction_id:
-            dest_dir = self._ingress_dir / str(transaction_id)
-        else:
-            dest_dir = self._ingress_dir / "untracked"
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        return dest_dir / self._normalize_ingress_name(filename)
+        self._ingress_dir.mkdir(parents=True, exist_ok=True)
+        return self._ingress_dir / self._normalize_ingress_name(filename)
 
     def ingress_candidate_path(self, filename: FileNameStr, transaction_id: TransactionId | None = None) -> Path:
         """
@@ -93,18 +89,14 @@ class PnmArtifactStore:
         filename:
             Target filename for the ingress copy (normalized to raw filename).
         transaction_id:
-            Optional transaction ID to place the file in a scoped ingress folder.
+            Optional transaction ID (ignored; ingress is a flat directory).
 
         Returns
         -------
         Path
             Expected ingress location for the artifact.
         """
-        if transaction_id:
-            dest_dir = self._ingress_dir / str(transaction_id)
-        else:
-            dest_dir = self._ingress_dir / "untracked"
-        return dest_dir / self._normalize_ingress_name(filename)
+        return self._ingress_dir / self._normalize_ingress_name(filename)
 
     def find_ingress_by_filename(self, filename: FileNameStr) -> Path | None:
         """
@@ -121,7 +113,7 @@ class PnmArtifactStore:
             Matching ingress path when exactly one file is found; otherwise None.
         """
         target = self._normalize_ingress_name(filename)
-        matches = list(self._ingress_dir.rglob(target))
+        matches = list(self._ingress_dir.glob(target))
         if len(matches) == 1:
             return matches[0]
         return None
