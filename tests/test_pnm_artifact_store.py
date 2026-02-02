@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
 from pypnm.config.pnm_artifact_storage import (
@@ -103,3 +105,21 @@ def test_resolve_physical_path_prefers_raw_when_missing_compressed(tmp_path: Pat
     }
     resolved = store.resolve_physical_path(FileNameStr("raw.bin"), compression)
     assert resolved == raw_path
+
+
+def test_cleanup_dir_keeps_recent_empty_dirs(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    recent = store.ingress_path(FileNameStr("recent.bin"), TransactionId("recent"))
+    recent_dir = recent.parent
+
+    old_dir = store.ingress_path(FileNameStr("old.bin"), TransactionId("old")).parent
+    old_time = time.time() - 1000
+    os.utime(old_dir, (old_time, old_time))
+
+    store._cleanup_dir(store._ingress_dir, ttl_seconds=900)
+
+    assert recent_dir.exists()
+    assert not old_dir.exists()

@@ -1,3 +1,31 @@
+## Agent Review Bundle Summary
+- Goal: Add retry support for transient TFTP upload failures and refine typing for upload checks.
+- Changes: Added retry loop in _check_and_wait_for_tftp_upload with configurable attempts; typed filename as FileNameStr; added pytest for retry behavior.
+- Files: src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/pnm/lib/pnm_artifact_store.py, src/pypnm/snmp/snmp_v2c.py, src/pypnm/tools/tmp_cache_cleanup.py, tests/test_pnm_artifact_store.py, tests/test_snmp_v2c_set_with_retry.py, tests/test_tftp_upload_retry.py, tools/agent-review/2026-02-02-pnm-ingress-ttl-fix.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-2.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-3.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-4.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-5.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-6.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-7.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-8.review.md
+- Tests: ruff check src; pytest -q
+- Notes: Integration SNMP tests skipped (PNM_CM_IT=1 not set).
+# FILE: tools/agent-review/2026-02-02-snmp-set-retry.part-8.review.md
+## Agent Review Bundle Summary
+- Goal: Add retry support for transient TFTP upload failures and refine typing for upload checks.
+- Changes: Added retry loop in _check_and_wait_for_tftp_upload with configurable attempts; typed filename as FileNameStr; added pytest for retry behavior.
+- Files: src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/pnm/lib/pnm_artifact_store.py, src/pypnm/snmp/snmp_v2c.py, src/pypnm/tools/tmp_cache_cleanup.py, tests/test_pnm_artifact_store.py, tests/test_snmp_v2c_set_with_retry.py, tests/test_tftp_upload_retry.py, tools/agent-review/2026-02-02-pnm-ingress-ttl-fix.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-2.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-3.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-4.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-5.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-6.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-7.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-8.review.md
+- Tests: ruff check src; pytest -q
+- Notes: Integration SNMP tests skipped (PNM_CM_IT=1 not set).
+# FILE: tools/agent-review/2026-02-02-snmp-set-retry.part-5.review.md
+## Agent Review Bundle Summary
+- Goal: Add retry support for transient TFTP upload failures and refine typing for upload checks.
+- Changes: Added retry loop in _check_and_wait_for_tftp_upload with configurable attempts; typed filename as FileNameStr; added pytest for retry behavior.
+- Files: src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/pnm/lib/pnm_artifact_store.py, src/pypnm/snmp/snmp_v2c.py, src/pypnm/tools/tmp_cache_cleanup.py, tests/test_pnm_artifact_store.py, tests/test_snmp_v2c_set_with_retry.py, tests/test_tftp_upload_retry.py, tools/agent-review/2026-02-02-pnm-ingress-ttl-fix.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-2.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-3.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-4.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-5.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-6.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-7.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-8.review.md
+- Tests: ruff check src; pytest -q
+- Notes: Integration SNMP tests skipped (PNM_CM_IT=1 not set).
+# FILE: tools/agent-review/2026-02-02-snmp-set-retry.part-2.review.md
+## Agent Review Bundle Summary
+- Goal: Add retry support for transient TFTP upload failures and refine typing for upload checks.
+- Changes: Added retry loop in _check_and_wait_for_tftp_upload with configurable attempts; typed filename as FileNameStr; added pytest for retry behavior.
+- Files: src/pypnm/api/routes/common/extended/common_measure_service.py, src/pypnm/docsis/cm_snmp_operation.py, src/pypnm/pnm/lib/pnm_artifact_store.py, src/pypnm/snmp/snmp_v2c.py, src/pypnm/tools/tmp_cache_cleanup.py, tests/test_pnm_artifact_store.py, tests/test_snmp_v2c_set_with_retry.py, tests/test_tftp_upload_retry.py, tools/agent-review/2026-02-02-pnm-ingress-ttl-fix.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-1.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-2.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-3.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-4.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-5.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-6.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-7.review.md, tools/agent-review/2026-02-02-snmp-set-retry.part-8.review.md
+- Tests: ruff check src; pytest -q
+- Notes: Integration SNMP tests skipped (PNM_CM_IT=1 not set).
+# FILE: src/pypnm/docsis/cm_snmp_operation.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Maurice Garcia
 

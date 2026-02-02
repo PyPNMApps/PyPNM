@@ -1,3 +1,10 @@
+## Agent Review Bundle Summary
+- Goal: Fix ingress cache cleanup removing recent empty dirs and update tmp cache cleanup tool accordingly.
+- Changes: Keep recent empty ingress/materialized dirs until TTL expires; align tmp cleanup paths with config; add cleanup tests for recent vs old empty dirs.
+- Files: src/pypnm/pnm/lib/pnm_artifact_store.py, src/pypnm/tools/tmp_cache_cleanup.py, tests/test_pnm_artifact_store.py
+- Tests: pytest -q
+- Notes: Integration SNMP tests skipped (PNM_CM_IT=1 not set).
+# FILE: src/pypnm/pnm/lib/pnm_artifact_store.py
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Maurice Garcia
 
@@ -503,3 +510,187 @@ class PnmArtifactStore:
                     path.rmdir()
                 except OSError:
                     continue
+# FILE: src/pypnm/tools/tmp_cache_cleanup.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import logging
+import time
+from pathlib import Path
+
+from pypnm.config.config_manager import ConfigManager
+from pypnm.config.pnm_artifact_storage import PnmArtifactStorageConfig
+
+
+class TmpCacheCleaner:
+    def __init__(self) -> None:
+        self.logger = logging.getLogger(self.__class__.__name__)
+        config = ConfigManager().get("PnmArtifactStorage")
+        self._config = PnmArtifactStorageConfig.from_config(config if isinstance(config, dict) else None)
+        self._tmp_root = Path(self._config.cache.tmp_root)
+
+    def run(self) -> int:
+        ingress_dir = self._tmp_root / self._config.cache.ingress_dir
+        materialized_dir = self._tmp_root / self._config.cache.materialized_dir
+
+        self._cleanup_dir(ingress_dir, self._config.cache.ingress_ttl_seconds)
+        self._cleanup_dir(materialized_dir, self._config.cache.materialized_ttl_seconds)
+        return 0
+
+    def _cleanup_dir(self, root: Path, ttl_seconds: int) -> None:
+        if ttl_seconds <= 0:
+            return
+        if not root.exists():
+            return
+        now = time.time()
+        for path in root.rglob("*"):
+            if path.is_file():
+                age = now - path.stat().st_mtime
+                if age >= ttl_seconds:
+                    path.unlink(missing_ok=True)
+        for path in sorted(root.rglob("*"), reverse=True):
+            if path.is_dir():
+                age = now - path.stat().st_mtime
+                if age < ttl_seconds:
+                    continue
+                try:
+                    path.rmdir()
+                except OSError:
+                    continue
+
+
+def main() -> int:
+    logging.basicConfig(level=logging.INFO)
+    return TmpCacheCleaner().run()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+# FILE: tests/test_pnm_artifact_store.py
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Maurice Garcia
+
+from __future__ import annotations
+
+import os
+import time
+from pathlib import Path
+
+from pypnm.config.pnm_artifact_storage import (
+    ArtifactCacheConfig,
+    ArtifactCompressionPolicyConfig,
+    PnmArtifactStorageConfig,
+)
+from pypnm.lib.types import FileNameStr, TransactionId
+from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
+
+
+def _build_config(tmp_root: Path, min_bytes: int) -> PnmArtifactStorageConfig:
+    return PnmArtifactStorageConfig(
+        compression=ArtifactCompressionPolicyConfig(
+            enabled=True,
+            min_bytes=min_bytes,
+            conditional_max_ratio=0.92,
+            conditional_min_savings_bytes=8192,
+            deny=[],
+            always=["test_type"],
+            conditional=[],
+            primary_codec="gzip",
+            gzip_fallback=False,
+            zstd_level=3,
+            gzip_level=6,
+        ),
+        cache=ArtifactCacheConfig(
+            tmp_root=str(tmp_root),
+            ingress_dir="ingress",
+            materialized_dir="materialized",
+            ingress_ttl_seconds=900,
+            materialized_ttl_seconds=86400,
+            cleanup_interval_seconds=0,
+        ),
+    )
+
+
+def test_commit_ingress_file_gzip_compresses(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    txn_id = TransactionId("tx1")
+    ingress = store.ingress_path(FileNameStr("test.bin"), txn_id)
+    ingress.write_bytes(b"0" * 10000)
+
+    result = store.commit_ingress_file("test_type", ingress, FileNameStr("test.bin"))
+    assert str(result.stored_filename).endswith(".gz")
+    assert result.compression is not None
+    assert result.compression.get("is_compressed") is True
+    assert result.size_after < result.size_before
+
+
+def test_commit_ingress_file_min_bytes_skips_compression(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=20000)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    ingress = store.ingress_path(FileNameStr("test.bin"), TransactionId("tx2"))
+    ingress.write_bytes(b"1" * 10000)
+
+    result = store.commit_ingress_file("test_type", ingress, FileNameStr("test.bin"))
+    assert str(result.stored_filename).endswith("test.bin")
+    assert result.compression is not None
+    assert result.compression.get("is_compressed") is False
+
+
+def test_materialize_decompresses_gzip(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    txn_id = TransactionId("tx3")
+    ingress = store.ingress_path(FileNameStr("test.bin"), txn_id)
+    payload = b"abc" * 5000
+    ingress.write_bytes(payload)
+
+    result = store.commit_ingress_file("test_type", ingress, FileNameStr("test.bin"))
+    materialized = store.materialize(txn_id, result.stored_filename, result.compression)
+
+    assert materialized.read_bytes() == payload
+
+
+def test_resolve_physical_path_prefers_raw_when_missing_compressed(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    raw_path = pnm_dir / "raw.bin"
+    raw_path.write_bytes(b"raw")
+
+    compression = {
+        "is_compressed": True,
+        "codec": "zstd",
+        "level": 3,
+        "size_before": 3,
+        "size_after": 2,
+    }
+    resolved = store.resolve_physical_path(FileNameStr("raw.bin"), compression)
+    assert resolved == raw_path
+
+
+def test_cleanup_dir_keeps_recent_empty_dirs(tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    recent = store.ingress_path(FileNameStr("recent.bin"), TransactionId("recent"))
+    recent_dir = recent.parent
+
+    old_dir = store.ingress_path(FileNameStr("old.bin"), TransactionId("old")).parent
+    old_time = time.time() - 1000
+    os.utime(old_dir, (old_time, old_time))
+
+    store._cleanup_dir(store._ingress_dir, ttl_seconds=900)
+
+    assert recent_dir.exists()
+    assert not old_dir.exists()

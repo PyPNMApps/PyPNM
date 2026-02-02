@@ -19,8 +19,14 @@ class TmpCacheCleaner:
         self._tmp_root = Path(self._config.cache.tmp_root)
 
     def run(self) -> int:
-        ingress_dir = self._tmp_root / "ingress"
-        materialized_dir = self._tmp_root / "materialized"
+        """
+        Clean expired ingress and materialized cache entries.
+
+        Returns:
+            int: Process exit code (0 for success).
+        """
+        ingress_dir = self._tmp_root / self._config.cache.ingress_dir
+        materialized_dir = self._tmp_root / self._config.cache.materialized_dir
 
         self._cleanup_dir(ingress_dir, self._config.cache.ingress_ttl_seconds)
         self._cleanup_dir(materialized_dir, self._config.cache.materialized_ttl_seconds)
@@ -39,6 +45,9 @@ class TmpCacheCleaner:
                     path.unlink(missing_ok=True)
         for path in sorted(root.rglob("*"), reverse=True):
             if path.is_dir():
+                age = now - path.stat().st_mtime
+                if age < ttl_seconds:
+                    continue
                 try:
                     path.rmdir()
                 except OSError:

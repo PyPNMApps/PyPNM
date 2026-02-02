@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import AsyncIterable
@@ -21,7 +22,15 @@ from pysnmp.hlapi.v3arch.asyncio import (
     set_cmd,
     walk_cmd,
 )
-from pysnmp.proto.rfc1902 import Integer32, OctetString
+from pysnmp.proto.rfc1902 import (
+    Counter32,
+    Counter64,
+    Gauge32,
+    Integer,
+    Integer32,
+    IpAddress,
+    OctetString,
+)
 
 from pypnm.config.pnm_config_manager import SystemConfigSettings
 from pypnm.lib.constants import T
@@ -30,6 +39,7 @@ from pypnm.lib.inet_utils import InetGenerate
 from pypnm.lib.types import (
     InetAddressStr,
     InterfaceIndex,
+    OidStr,
     SnmpCommunity,
     SnmpIndex,
     SnmpReadCommunity,
@@ -69,6 +79,16 @@ class Snmp_v2c:
     FALSE = 2
 
     SNMP_PORT = 161
+
+    SnmpValueType = (
+        type[Integer32]
+        | type[OctetString]
+        | type[Integer]
+        | type[Counter32]
+        | type[Counter64]
+        | type[Gauge32]
+        | type[IpAddress]
+    )
 
     def __init__(
         self,
@@ -381,7 +401,12 @@ class Snmp_v2c:
 
         return await self.walk(oid)
 
-    async def set(self, oid: str, value: str | int, value_type: type)-> list[ObjectType] | None:
+    async def set(
+        self,
+        oid: OidStr,
+        value: str | int,
+        value_type: SnmpValueType,
+    ) -> list[ObjectType] | None:
         """
         Perform an SNMP SET operation with explicit value type.
 
@@ -399,6 +424,74 @@ class Snmp_v2c:
         Raises:
             ValueError: If value type instantiation fails.
             RuntimeError: On SNMP errors.
+        """
+        var_binds, _ = await self._set_once(oid=oid, value=value, value_type=value_type)
+        return var_binds
+
+    async def set_with_retry(
+        self,
+        oid: OidStr,
+        value: str | int,
+        value_type: SnmpValueType,
+        retries: int = 3,
+        base_delay_seconds: float = 0.2,
+        backoff: float = 2.0,
+    ) -> list[ObjectType] | None:
+        """
+        Perform an SNMP SET with retry behavior for resourceUnavailable errors.
+
+        Args:
+            oid (str): The OID to set.
+            value (str | int): The value to set.
+            value_type (type): pysnmp value type class.
+            retries (int): Total attempts (including the first).
+            base_delay_seconds (float): Initial delay before retrying.
+            backoff (float): Multiplicative backoff for each retry.
+
+        Returns:
+            list[ObjectType] | None: SNMP varBinds when successful, otherwise None.
+        """
+        attempts = retries if retries > 0 else 1
+        delay = base_delay_seconds
+        last_error: str | None = None
+
+        for attempt in range(1, attempts + 1):
+            var_binds, error_text = await self._set_once(oid=oid, value=value, value_type=value_type)
+            if var_binds is not None:
+                return var_binds
+
+            last_error = error_text
+
+            if error_text is None:
+                break
+
+            if not self._is_resource_unavailable_error(error_text):
+                break
+
+            if attempt < attempts:
+                self.logger.warning(
+                    "SNMP SET resourceUnavailable; retrying (%d/%d) after %.2fs. OID=%s",
+                    attempt,
+                    attempts,
+                    delay,
+                    oid,
+                )
+                await asyncio.sleep(delay)
+                delay *= backoff
+
+        if last_error:
+            self.logger.error("SNMP SET failed after retries: %s", last_error)
+
+        return None
+
+    async def _set_once(
+        self,
+        oid: OidStr,
+        value: str | int,
+        value_type: SnmpValueType,
+    ) -> tuple[list[ObjectType] | None, str | None]:
+        """
+        Perform a single SNMP SET and return varBinds and error text.
         """
         if value_type is None:
             raise ValueError("value_type must be explicitly specified")
@@ -422,14 +515,39 @@ class Snmp_v2c:
             ContextData(),
             ObjectType(ObjectIdentity(oid), snmp_value),
         )
-        try:
-            self._raise_on_snmp_error(errorIndication, errorStatus, errorIndex)
 
-        except Exception as e:
-            self.logger.error(f"Error extracting SNMP value: {e}")
-            return None
+        error_text = self._format_snmp_error(errorIndication, errorStatus, errorIndex)
+        if error_text:
+            self.logger.error("Error extracting SNMP value: %s", error_text)
+            return None, error_text
 
-        return varBinds # type: ignore
+        return varBinds, None # type: ignore
+
+    @staticmethod
+    def _format_snmp_error(
+        errorIndication: Exception | str | None,
+        errorStatus: object | None,
+        errorIndex: Integer32 | int | None,
+    ) -> str | None:
+        """
+        Build a consistent error string from SNMP errors, if any.
+        """
+        if errorIndication:
+            return f"SNMP operation failed: {errorIndication}"
+
+        if errorStatus:
+            pretty = getattr(errorStatus, "prettyPrint", None)
+            status_text = pretty() if callable(pretty) else str(errorStatus)
+            return f"SNMP error {status_text} at index {errorIndex}"
+
+        return None
+
+    @staticmethod
+    def _is_resource_unavailable_error(error_text: str) -> bool:
+        """
+        Check whether the SNMP error indicates a resourceUnavailable response.
+        """
+        return "resourceUnavailable" in error_text
 
     def close(self) -> None:
         """
