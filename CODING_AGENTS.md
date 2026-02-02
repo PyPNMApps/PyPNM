@@ -47,6 +47,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - New classes must have pytest coverage at a minimum for IPC and system calls.
 - Use `SystemCall` (`src/pypnm/lib/system_call/`) for subprocess/system calls; do not call `subprocess.run` directly in app code.
 - Avoid broad refactors unless explicitly requested.
+- Any changes to `deploy/docker/config/system.json` must also be made in `demo/settings/system.json`.
 - Keep a brief summary of user prompts after any request for a commit message and track changes since the most recent commit message request.
 - When asked for a commit message, respond with the specified format, keep it succinct, and include all changes since the last commit message request.
 - Commit messages must be returned in Markdown text format (use a code block).
