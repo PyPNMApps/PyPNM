@@ -73,6 +73,7 @@ from pypnm.lib.types import (
     FileNameStr,
     FrequencyHz,
     HostNameStr,
+    UserNameStr,
     InterfaceIndex,
     PowerdBmV,
     SnmpCommunity,
@@ -132,7 +133,7 @@ class CommonMeasureService(CommonMessagingService):
                  cable_modem: CableModem,
                  tftp_servers: tuple[Inet,Inet],
                  tftp_path: str = "",
-                 snmp_write_community: SnmpCommunity = "private",
+                 snmp_write_community: SnmpCommunity = cast(SnmpCommunity, "private"),
                  **extra_options) -> None:
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -411,9 +412,8 @@ class CommonMeasureService(CommonMessagingService):
                 if int(entry.index) in index_set:
                     filtered.append(entry)
                 continue
-            if not hasattr(entry, "channel_id"):
-                continue
-            if int(entry.channel_id) in channel_id_set:
+            channel_id = getattr(entry, "channel_id", None)
+            if channel_id is not None and int(channel_id) in channel_id_set:
                 filtered.append(entry)
         return filtered
 
@@ -874,7 +874,7 @@ class CommonMeasureService(CommonMessagingService):
             pre_eq_filename         = await self._pnm_file_generator(self.pnm_test_type, str(channel_id))
             last_pre_eq_filename    = await self._pnm_file_generator(self.pnm_test_type, f'last_pre-eq_{str(channel_id)}')
 
-            self.logger.info(f'{self.log_prefix} - Setting {self.pnm_test_type} for ChannelID: {channel_id} "'
+            self.logger.info(f'{self.log_prefix} - Setting {self.pnm_test_type} for ChannelID: {channel_id} '
                              f'@ IDX: {interface_index} -> FN(): {pre_eq_filename}, FN(last): {last_pre_eq_filename}')
 
             self.logger.info(f'{self.log_prefix} - Performing US_PRE_EQUALIZER_COEF measurement on IDX: ({interface_index})')
@@ -1095,8 +1095,8 @@ class CommonMeasureService(CommonMessagingService):
             return ServiceStatusCode.SFTP_HOST_UNREACHABLE
 
         sftp = SSHConnector(
-            hostname        =   sys_config.sftp_host(),
-            username        =   sys_config.sftp_user(),
+            hostname        =   HostNameStr(sys_config.sftp_host()),
+            username        =   UserNameStr(sys_config.sftp_user()),
             port            =   sys_config.sftp_port())
 
         password_enc     = sys_config.sftp_password()
