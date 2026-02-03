@@ -37,6 +37,12 @@ class FakeCaptureDataAggregator(CaptureDataAggregator):
         return self._collection
 
 
+def _cleanup_png_files(plots: list[object]) -> None:
+    for plot in plots:
+        for png in plot.get_png_files():
+            Path(png).unlink(missing_ok=True)
+
+
 def _build_collection(data_path: Path, filename: str) -> TransactionCollection:
     collection = TransactionCollection()
     record = TransactionRecordModel(
@@ -102,13 +108,16 @@ def test_multi_ofdma_pre_eq_matplot_title_pre_eq() -> None:
 
     plots = analyzer.create_matplot()
 
-    assert plots
-    title = plots[0].default_cfg.title
-    assert title is not None
-    assert title.startswith("US PreEqualization · Channel:")
-    png_files = plots[0].get_png_files()
-    assert png_files
-    assert "us-pre-eq" in str(png_files[0])
+    try:
+        assert plots
+        title = plots[0].default_cfg.title
+        assert title is not None
+        assert title.startswith("US PreEqualization · Channel:")
+        png_files = plots[0].get_png_files()
+        assert png_files
+        assert "us-pre-eq" in str(png_files[0])
+    finally:
+        _cleanup_png_files(plots)
 
 
 def test_multi_ofdma_pre_eq_matplot_title_last_pre_eq() -> None:
@@ -120,13 +129,16 @@ def test_multi_ofdma_pre_eq_matplot_title_last_pre_eq() -> None:
 
     plots = analyzer.create_matplot()
 
-    assert plots
-    title = plots[0].default_cfg.title
-    assert title is not None
-    assert title.startswith("US Last PreEqualization · Channel:")
-    png_files = plots[0].get_png_files()
-    assert png_files
-    assert "us-last-pre-eq" in str(png_files[0])
+    try:
+        assert plots
+        title = plots[0].default_cfg.title
+        assert title is not None
+        assert title.startswith("US Last PreEqualization · Channel:")
+        png_files = plots[0].get_png_files()
+        assert png_files
+        assert "us-last-pre-eq" in str(png_files[0])
+    finally:
+        _cleanup_png_files(plots)
 
 
 def test_multi_ofdma_pre_eq_matplot_includes_last_pre_eq() -> None:
@@ -138,7 +150,10 @@ def test_multi_ofdma_pre_eq_matplot_includes_last_pre_eq() -> None:
 
     plots = analyzer.create_matplot()
 
-    assert plots
-    png_files = [str(png) for plot in plots for png in plot.get_png_files()]
-    assert any("us-pre-eq" in name for name in png_files)
-    assert any("us-last-pre-eq" in name for name in png_files)
+    try:
+        assert plots
+        png_files = [str(png) for plot in plots for png in plot.get_png_files()]
+        assert any("us-pre-eq" in name for name in png_files)
+        assert any("us-last-pre-eq" in name for name in png_files)
+    finally:
+        _cleanup_png_files(plots)
