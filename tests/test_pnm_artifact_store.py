@@ -86,6 +86,8 @@ def test_materialize_decompresses_gzip(tmp_path: Path) -> None:
     materialized = store.materialize(txn_id, result.stored_filename, result.compression)
 
     assert materialized.read_bytes() == payload
+    assert materialized.parent.name == str(txn_id)
+    assert materialized.parent.parent.name == "materialized"
 
 
 def test_resolve_physical_path_prefers_raw_when_missing_compressed(tmp_path: Path) -> None:

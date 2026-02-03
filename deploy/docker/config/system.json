@@ -101,11 +101,11 @@
             ],
             "always": [
                 "ds_ofdm_codeword_error_rate",
-                "ds_ofdm_modulation_profile"
+                "ds_ofdm_modulation_profile",
+                "us_pre_equalizer_coef"
             ],
             "conditional": [
-                "ds_ofdm_rxmer_per_subcar",
-                "us_pre_equalizer_coef"
+                "ds_ofdm_rxmer_per_subcar"
             ],
             "primary_codec": "zstd",
             "gzip_fallback": true,

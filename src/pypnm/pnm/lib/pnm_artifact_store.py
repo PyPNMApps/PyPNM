@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -424,13 +423,12 @@ class PnmArtifactStore:
         """
         Build the cache path for a materialized artifact copy.
         """
-        digest = hashlib.sha256(str(source_path).encode()).hexdigest()[:12]
         name = source_path.name
         if name.endswith(".zst"):
             name = name[:-4]
         elif name.endswith(".gz"):
             name = name[:-3]
-        return self._materialized_dir / str(transaction_id) / digest / name
+        return self._materialized_dir / str(transaction_id) / name
 
     def _write_stamp(self, stamp_path: Path, source_path: Path, codec: str) -> None:
         """

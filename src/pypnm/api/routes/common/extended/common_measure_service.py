@@ -829,7 +829,8 @@ class CommonMeasureService(CommonMessagingService):
                     f"{self.log_prefix} - TFTP upload retry {attempt} of {attempts} "
                     f"for '{filename}' after failure."
                 )
-                await asyncio.sleep(1)
+                retry_delay = min(1 + (attempt - 1), 2)
+                await asyncio.sleep(retry_delay)
                 continue
 
         self.logger.error(
