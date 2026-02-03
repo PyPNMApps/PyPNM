@@ -300,14 +300,14 @@ class CommonMeasureService(CommonMessagingService):
         # where both IPv4 and IPv6 may be valid simultaneously.
         #########################################################################
 
-        self.logger.info(f'{self.log_prefix} - TFTP-SERVERS: ({self.tftp_servers[0]} | {self.tftp_servers[1].inet})')
-
         # Default to using the IPv4 TFTP server
         tftp_server: Inet = self.tftp_servers[0]
 
         # Switch to IPv6 TFTP server if CM uses IPv6
         if self.cm.same_inet_version(self.tftp_servers[1]):
             tftp_server = self.tftp_servers[1]
+
+        self.logger.info(f'{self.log_prefix} - TFTP-SERVER: {tftp_server.inet}')
 
         # Attempt to configure the CM with the selected TFTP server and path
         if not await self.cm.setDocsPnmBulk(tftp_server.inet, self.tftp_path):
