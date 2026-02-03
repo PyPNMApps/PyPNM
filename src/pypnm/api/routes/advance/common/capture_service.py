@@ -133,7 +133,8 @@ class AbstractCaptureService(ABC):
                     samples = self._process_captures(msg_rsp)
                     for sample in samples:
                         self._ops[operation_id]["samples"].append(sample)
-                        self._cap_group.add_transaction(sample.transaction_id)
+                        if sample.transaction_id:
+                            self._cap_group.add_transaction(sample.transaction_id)
                         self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
 
                 except Exception as exc:
@@ -166,7 +167,8 @@ class AbstractCaptureService(ABC):
                         samples = self._process_captures(msg_rsp)
                         for sample in samples:
                             self._ops[operation_id]["samples"].append(sample)
-                            self._cap_group.add_transaction(sample.transaction_id)
+                            if sample.transaction_id:
+                                self._cap_group.add_transaction(sample.transaction_id)
                             self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
 
                 except Exception as exc:

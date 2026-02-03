@@ -34,6 +34,9 @@ A: Ensure both Pre-Equalization (PNN6) and Last Pre-Equalization (PNN7) files ar
 Q: Why do PNM parsers raise a UnicodeDecodeError when reading the file header?  
 A: This usually means a compressed artifact was passed directly to the parser. Use the file manager download-by-filename endpoint or materialization utility to get the uncompressed file before parsing.
 
+Q: Why did capture_group.json contain an empty transaction ID?  
+A: This can happen when a capture payload entry is missing the transaction ID or filename. Update to a build that only persists non-empty transaction IDs, and ensure the payload includes both fields.
+
 ## TODO
 
 - Add or update a FAQ entry whenever an error is fixed so the resolution is documented.
@@ -42,3 +45,4 @@ A: This usually means a compressed artifact was passed directly to the parser. U
 - Track FAQ updates for the US OFDMA Pre-Equalization analysis request format.
 - Track FAQ updates for the US OFDMA Pre-Equalization dual plot output.
 - Track FAQ updates for UnicodeDecodeError when compressed artifacts are parsed.
+- Track FAQ updates for empty transaction IDs in capture_group.json.
