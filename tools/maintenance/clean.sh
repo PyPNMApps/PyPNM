@@ -200,13 +200,15 @@ clean_settings_backups() {
 }
 
 clean_docker_unused() {
+  local docker_cleanup_script="$ROOT_DIR/tools/maintenance/docker-cleanup.sh"
+
   echo "Cleaning unused Docker artifacts..."
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker not found; skipping."
-    return 0
+  if [[ ! -x "$docker_cleanup_script" ]]; then
+    echo "Docker cleanup script missing or not executable: $docker_cleanup_script"
+    return 1
   fi
 
-  if docker system prune -a --volumes -f; then
+  if "$docker_cleanup_script" --aggressive --yes; then
     echo "Docker cleanup complete."
   else
     echo "Docker cleanup failed."
@@ -236,6 +238,7 @@ for action in "${ACTIONS[@]}"; do
       clean_msg_rsp
       clean_issues
       clean_settings_backups
+      clean_docker_unused
       ;;
 
     --archive)
