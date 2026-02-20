@@ -48,10 +48,10 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import (
     OfdmSpecAnaAnalysisResponse,
     ScQamSpecAnaAnalysisRequest,
     ScQamSpecAnaAnalysisResponse,
-    SpecAnCaptureParaFriendly,
-    SingleCaptureSpectrumAnalyzerFullBandRequest,
     SingleCaptureSpectrumAnalyzerFriendlyRequest,
+    SingleCaptureSpectrumAnalyzerFullBandRequest,
     SingleCaptureSpectrumAnalyzerRequest,
+    SpecAnCaptureParaFriendly,
 )
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.service import (
     CmSpectrumAnalysisService,
@@ -60,11 +60,13 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.service import (
     SpectrumAnalyzerFriendlyCaptureBuilder,
 )
 from pypnm.docsis.cable_modem import CableModem
+from pypnm.docsis.data_type.DocsFddCmFddSystemCfgState import DocsFddCmFddSystemCfgState
 from pypnm.docsis.data_type.DocsIf31CmDsOfdmChanEntry import (
     DocsIf31CmDsOfdmChanChannelEntry,
 )
-from pypnm.docsis.data_type.DocsFddCmFddSystemCfgState import DocsFddCmFddSystemCfgState
-from pypnm.docsis.data_type.DocsIf31CmSystemCfgState import DocsIf31CmSystemCfgDiplexState
+from pypnm.docsis.data_type.DocsIf31CmSystemCfgState import (
+    DocsIf31CmSystemCfgDiplexState,
+)
 from pypnm.docsis.data_type.DocsIfDownstreamChannel import DocsIfDownstreamChannelEntry
 from pypnm.docsis.data_type.pnm.DocsIf3CmSpectrumAnalysisEntry import (
     DocsIf3CmSpectrumAnalysisEntry,
