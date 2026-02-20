@@ -5,10 +5,11 @@ Downstream Spectrum Capture And Per-Channel Analysis For DOCSIS 3.x/4.0 Cable Mo
 ## Overview
 
 [`SpectrumAnalyzerRouter`](http://github.com/PyPNMApps/PyPNM/blob/main/src/pypnm/api/routes/docs/pnm/spectrumAnalyzer/router.py)
-exposes four related endpoints that drive downstream spectrum capture and analysis:
+exposes five related endpoints that drive downstream spectrum capture and analysis:
 
 * A single spectrum capture endpoint (`/getCapture`) for free-form frequency sweeps.
 * A single spectrum capture endpoint with friendly RBW inputs (`/getCapture/friendly`).
+* A single full-band capture endpoint (`/getCapture/fullBandCapture`) that derives DS band edges from diplexer configuration.
 * An OFDM-focused endpoint (`/getCapture/ofdm`) that walks all downstream OFDM channels.
 * An SC-QAM-focused endpoint (`/getCapture/scqam`) that walks all downstream SC-QAM channels.
 
@@ -36,6 +37,7 @@ All endpoints share the same base prefix: `/docs/pnm/ds`.
 | ------------------------------ | ------ | ------------------------------------------------ |
 | Single spectrum capture        | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture`       |
 | Single spectrum capture (RBW)  | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/friendly` |
+| Single full-band capture       | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/fullBandCapture` |
 | All OFDM downstream channels   | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/ofdm`  |
 | All SC-QAM downstream channels | POST   | `/docs/pnm/ds/spectrumAnalyzer/getCapture/scqam` |
 
@@ -350,6 +352,71 @@ Top-level envelope:
 | entry.docsIf3CmSpectrumAnalysisCtrlCmdFileEnable                    | boolean | Whether capture-to-file was enabled.             |
 | entry.docsIf3CmSpectrumAnalysisCtrlCmdMeasStatus                    | string  | Measurement status (e.g., `"sample_ready"`).     |
 | entry.docsIf3CmSpectrumAnalysisCtrlCmdFileName                      | string  | Device-side filename of the captured spectrum.   |
+
+## Single Capture (Full Band) - `/spectrumAnalyzer/getCapture/fullBandCapture`
+
+This endpoint performs full-band capture by deriving the capture window from active
+diplexer band edges (DOCSIS 3.1 IF31 first, DOCSIS 4.0 FDD fallback), then generating
+concrete segment settings via the friendly RBW builder.
+
+### Full-Band Capture Example Request
+
+```json
+{
+  "cable_modem": {
+    "mac_address": "aa:bb:cc:dd:ee:ff",
+    "ip_address": "192.168.0.100",
+    "pnm_parameters": {
+      "tftp": {
+        "ipv4": "192.168.0.10",
+        "ipv6": "2001:db8::10"
+      }
+    },
+    "snmp": {
+      "snmpV2C": {
+        "community": "private"
+      }
+    }
+  },
+  "analysis": {
+    "type": "basic",
+    "output": { "type": "json" },
+    "plot": { "ui": { "theme": "dark" } },
+    "spectrum_analysis": {
+      "moving_average": { "points": 10 }
+    }
+  },
+  "capture_parameters": {
+    "inactivity_timeout": 60,
+    "direction": "downstream",
+    "resolution_bw": 300000,
+    "noise_bw": 150,
+    "window_function": 1,
+    "num_averages": 1,
+    "spectrum_retrieval_type": 1
+  }
+}
+```
+
+### Full-Band Capture Parameters
+
+| JSON path                                    | Type   | Description                                                                                |
+| -------------------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `capture_parameters.inactivity_timeout`      | int    | Timeout (seconds) before aborting idle spectrum acquisition.                               |
+| `capture_parameters.direction`               | string | Capture direction selector: `"downstream"` or `"upstream"`.                                |
+| `capture_parameters.resolution_bw`           | int    | Resolution bandwidth (Hz) used to derive segment span and bin count. Default: `300000`.   |
+| `capture_parameters.noise_bw`                | int    | Equivalent noise bandwidth in kHz.                                                         |
+| `capture_parameters.window_function`         | int    | Window function enum value.                                                                |
+| `capture_parameters.num_averages`            | int    | Number of averages per segment.                                                            |
+| `capture_parameters.spectrum_retrieval_type` | int    | Retrieval mode enum value (FILE = 1, SNMP = 2).                                            |
+
+### Full-Band Notes
+
+* `direction: "downstream"` uses configured downstream diplexer edges.
+* `direction: "upstream"` uses the configured upstream diplexer upper edge and captures from the upstream band floor.
+* The endpoint returns the same envelope format as single capture (`mac_address`, `status`, `message`, `data`).
+* Computed `first_segment_center_freq`, `last_segment_center_freq`, `segment_freq_span`, and `num_bins_per_segment`
+  are visible in the response capture metadata.
 
 ## OFDM Downstream Capture - `/spectrumAnalyzer/getCapture/ofdm`
 

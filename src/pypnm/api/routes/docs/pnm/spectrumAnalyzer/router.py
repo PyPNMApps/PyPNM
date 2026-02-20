@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter
 from starlette.responses import FileResponse
@@ -78,6 +78,7 @@ from pypnm.lib.types import ChannelId, FrequencyHz, InetAddressStr, MacAddressSt
 
 class SpectrumAnalyzerRouter:
     MHZ_TO_HZ: int = 1_000_000
+    UPSTREAM_LOWER_EDGE_HZ: FrequencyHz = FrequencyHz(5_000_000)
 
     def __init__(self) -> None:
         prefix = "/docs/pnm/ds"
@@ -152,7 +153,18 @@ class SpectrumAnalyzerRouter:
     def _resolve_if31_band(
         cls,
         state: DocsIf31CmSystemCfgDiplexState,
+        direction: Literal["downstream", "upstream"] = "downstream",
     ) -> tuple[FrequencyHz, FrequencyHz] | None:
+        if direction == "upstream":
+            lower_hz = cls.UPSTREAM_LOWER_EDGE_HZ
+            upper_mhz = state.docsIf31CmSystemCfgStateDiplexerCfgBandEdge
+            if upper_mhz is None:
+                return None
+            upper_hz = cls._to_hz(upper_mhz)
+            if cls._is_valid_band(lower_hz, upper_hz):
+                return (lower_hz, upper_hz)
+            return None
+
         lower_mhz = state.docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge
         upper_mhz = state.docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge
         if lower_mhz is None or upper_mhz is None:
@@ -167,9 +179,20 @@ class SpectrumAnalyzerRouter:
     def _resolve_fdd_band(
         cls,
         state: DocsFddCmFddSystemCfgState | None,
+        direction: Literal["downstream", "upstream"] = "downstream",
     ) -> tuple[FrequencyHz, FrequencyHz] | None:
         if state is None:
             return None
+        if direction == "upstream":
+            lower_hz = cls.UPSTREAM_LOWER_EDGE_HZ
+            upper_mhz = state.docsFddCmFddSystemCfgStateDiplexerUsUpperBandEdgeCfg
+            if upper_mhz is None:
+                return None
+            upper_hz = cls._to_hz(upper_mhz)
+            if cls._is_valid_band(lower_hz, upper_hz):
+                return (lower_hz, upper_hz)
+            return None
+
         lower_mhz = state.docsFddCmFddSystemCfgStateDiplexerDsLowerBandEdgeCfg
         upper_mhz = state.docsFddCmFddSystemCfgStateDiplexerDsUpperBandEdgeCfg
         if lower_mhz is None or upper_mhz is None:
@@ -184,14 +207,15 @@ class SpectrumAnalyzerRouter:
     async def _resolve_full_band_capture_edges(
         cls,
         cable_modem: CableModem,
+        direction: Literal["downstream", "upstream"] = "downstream",
     ) -> tuple[FrequencyHz, FrequencyHz] | None:
         if31_state = await cable_modem.getDocsIf31CmSystemCfgDiplexState()
-        if31_band = cls._resolve_if31_band(if31_state)
+        if31_band = cls._resolve_if31_band(if31_state, direction=direction)
         if if31_band is not None:
             return if31_band
 
         fdd_state = await cable_modem.getDocsFddCmFddSystemCfgState()
-        return cls._resolve_fdd_band(fdd_state)
+        return cls._resolve_fdd_band(fdd_state, direction=direction)
 
     def __routes(self) -> None:
         @self.router.post(
@@ -445,18 +469,15 @@ class SpectrumAnalyzerRouter:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac, status=status, message=msg)
 
-            if request.capture_parameters.direction == "upstream":
-                err = "Unsupported direction 'upstream' for /docs/pnm/ds full-band capture."
-                self.logger.error(err)
-                return SnmpResponse(
-                    mac_address=mac,
-                    status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS,
-                    message=err,
-                )
-
-            full_band = await self._resolve_full_band_capture_edges(cm)
+            full_band = await self._resolve_full_band_capture_edges(
+                cm,
+                direction=request.capture_parameters.direction,
+            )
             if full_band is None:
-                err = "Unable to determine downstream diplexer band edges for full-band capture."
+                err = (
+                    "Unable to determine diplexer band edges for full-band capture "
+                    f"direction '{request.capture_parameters.direction}'."
+                )
                 self.logger.error(err)
                 return SnmpResponse(
                     mac_address=mac,

@@ -108,7 +108,7 @@ class SpecAnCaptureParaFullBand(BaseModel):
         default="downstream",
         description="Capture direction selector: downstream or upstream.",
     )
-    resolution_bw            : ResolutionBw             = Field(default=ResolutionBw(30_000), description="Resolution bandwidth in Hz used to derive segment span and bins.")
+    resolution_bw            : ResolutionBw             = Field(default=ResolutionBw(300_000), description="Resolution bandwidth in Hz used to derive segment span and bins.")
     noise_bw                 : int                      = Field(default=150, description="Equivalent noise bandwidth in kHz.")
     window_function          : WindowFunction           = Field(default=WindowFunction.HANN, description="FFT window function to apply. See WindowFunction enum for options.")
     num_averages             : int                      = Field(default=1, description="Number of averages per segment.")

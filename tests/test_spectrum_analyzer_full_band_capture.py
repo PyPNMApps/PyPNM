@@ -54,6 +54,19 @@ def test_resolve_if31_band_returns_hz_edges() -> None:
     assert band == (FrequencyHz(258_000_000), FrequencyHz(1_218_000_000))
 
 
+def test_resolve_if31_upstream_band_returns_hz_edges() -> None:
+    state = SimpleNamespace(
+        docsIf31CmSystemCfgStateDiplexerCfgBandEdge=204,
+    )
+
+    band = SpectrumAnalyzerRouter._resolve_if31_band(
+        cast(DocsIf31CmSystemCfgDiplexState, state),
+        direction="upstream",
+    )
+
+    assert band == (FrequencyHz(5_000_000), FrequencyHz(204_000_000))
+
+
 @pytest.mark.asyncio
 async def test_full_band_prefers_if31_band_when_valid() -> None:
     if31_state = SimpleNamespace(
@@ -74,6 +87,24 @@ async def test_full_band_prefers_if31_band_when_valid() -> None:
 
 
 @pytest.mark.asyncio
+async def test_full_band_prefers_if31_upstream_band_when_valid() -> None:
+    if31_state = SimpleNamespace(
+        docsIf31CmSystemCfgStateDiplexerCfgBandEdge=204,
+    )
+    fdd_state = SimpleNamespace(
+        docsFddCmFddSystemCfgStateDiplexerUsUpperBandEdgeCfg=396,
+    )
+    cm = _FakeCableModem(if31_state=if31_state, fdd_state=fdd_state)
+
+    band = await SpectrumAnalyzerRouter._resolve_full_band_capture_edges(
+        cast(CableModem, cm),
+        direction="upstream",
+    )
+
+    assert band == (FrequencyHz(5_000_000), FrequencyHz(204_000_000))
+
+
+@pytest.mark.asyncio
 async def test_full_band_falls_back_to_fdd_when_if31_invalid() -> None:
     if31_state = SimpleNamespace(
         docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge=0,
@@ -90,6 +121,24 @@ async def test_full_band_falls_back_to_fdd_when_if31_invalid() -> None:
     )
 
     assert band == (FrequencyHz(684_000_000), FrequencyHz(1_794_000_000))
+
+
+@pytest.mark.asyncio
+async def test_full_band_falls_back_to_fdd_upstream_when_if31_invalid() -> None:
+    if31_state = SimpleNamespace(
+        docsIf31CmSystemCfgStateDiplexerCfgBandEdge=0,
+    )
+    fdd_state = SimpleNamespace(
+        docsFddCmFddSystemCfgStateDiplexerUsUpperBandEdgeCfg=396,
+    )
+    cm = _FakeCableModem(if31_state=if31_state, fdd_state=fdd_state)
+
+    band = await SpectrumAnalyzerRouter._resolve_full_band_capture_edges(
+        cast(CableModem, cm),
+        direction="upstream",
+    )
+
+    assert band == (FrequencyHz(5_000_000), FrequencyHz(396_000_000))
 
 
 @pytest.mark.asyncio
