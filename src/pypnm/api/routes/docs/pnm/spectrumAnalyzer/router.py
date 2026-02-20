@@ -48,6 +48,8 @@ from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import (
     OfdmSpecAnaAnalysisResponse,
     ScQamSpecAnaAnalysisRequest,
     ScQamSpecAnaAnalysisResponse,
+    SpecAnCaptureParaFriendly,
+    SingleCaptureSpectrumAnalyzerFullBandRequest,
     SingleCaptureSpectrumAnalyzerFriendlyRequest,
     SingleCaptureSpectrumAnalyzerRequest,
 )
@@ -61,6 +63,8 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.data_type.DocsIf31CmDsOfdmChanEntry import (
     DocsIf31CmDsOfdmChanChannelEntry,
 )
+from pypnm.docsis.data_type.DocsFddCmFddSystemCfgState import DocsFddCmFddSystemCfgState
+from pypnm.docsis.data_type.DocsIf31CmSystemCfgState import DocsIf31CmSystemCfgDiplexState
 from pypnm.docsis.data_type.DocsIfDownstreamChannel import DocsIfDownstreamChannelEntry
 from pypnm.docsis.data_type.pnm.DocsIf3CmSpectrumAnalysisEntry import (
     DocsIf3CmSpectrumAnalysisEntry,
@@ -73,6 +77,8 @@ from pypnm.lib.types import ChannelId, FrequencyHz, InetAddressStr, MacAddressSt
 
 
 class SpectrumAnalyzerRouter:
+    MHZ_TO_HZ: int = 1_000_000
+
     def __init__(self) -> None:
         prefix = "/docs/pnm/ds"
         self.base_endpoint = "/spectrumAnalyzer"
@@ -133,6 +139,59 @@ class SpectrumAnalyzerRouter:
                 return [dict(entry) for entry in value if isinstance(entry, dict)]
 
         return None
+
+    @classmethod
+    def _to_hz(cls, value_mhz: int) -> FrequencyHz:
+        return FrequencyHz(value_mhz * cls.MHZ_TO_HZ)
+
+    @staticmethod
+    def _is_valid_band(lower: FrequencyHz, upper: FrequencyHz) -> bool:
+        return lower > 0 and upper > lower
+
+    @classmethod
+    def _resolve_if31_band(
+        cls,
+        state: DocsIf31CmSystemCfgDiplexState,
+    ) -> tuple[FrequencyHz, FrequencyHz] | None:
+        lower_mhz = state.docsIf31CmSystemCfgStateDiplexerCfgDsLowerBandEdge
+        upper_mhz = state.docsIf31CmSystemCfgStateDiplexerCfgDsUpperBandEdge
+        if lower_mhz is None or upper_mhz is None:
+            return None
+        lower_hz = cls._to_hz(lower_mhz)
+        upper_hz = cls._to_hz(upper_mhz)
+        if cls._is_valid_band(lower_hz, upper_hz):
+            return (lower_hz, upper_hz)
+        return None
+
+    @classmethod
+    def _resolve_fdd_band(
+        cls,
+        state: DocsFddCmFddSystemCfgState | None,
+    ) -> tuple[FrequencyHz, FrequencyHz] | None:
+        if state is None:
+            return None
+        lower_mhz = state.docsFddCmFddSystemCfgStateDiplexerDsLowerBandEdgeCfg
+        upper_mhz = state.docsFddCmFddSystemCfgStateDiplexerDsUpperBandEdgeCfg
+        if lower_mhz is None or upper_mhz is None:
+            return None
+        lower_hz = cls._to_hz(lower_mhz)
+        upper_hz = cls._to_hz(upper_mhz)
+        if cls._is_valid_band(lower_hz, upper_hz):
+            return (lower_hz, upper_hz)
+        return None
+
+    @classmethod
+    async def _resolve_full_band_capture_edges(
+        cls,
+        cable_modem: CableModem,
+    ) -> tuple[FrequencyHz, FrequencyHz] | None:
+        if31_state = await cable_modem.getDocsIf31CmSystemCfgDiplexState()
+        if31_band = cls._resolve_if31_band(if31_state)
+        if if31_band is not None:
+            return if31_band
+
+        fdd_state = await cable_modem.getDocsFddCmFddSystemCfgState()
+        return cls._resolve_fdd_band(fdd_state)
 
     def __routes(self) -> None:
         @self.router.post(
@@ -283,6 +342,137 @@ class SpectrumAnalyzerRouter:
             try:
                 capture_parameters = SpectrumAnalyzerFriendlyCaptureBuilder.build(
                     request.capture_parameters,
+                )
+            except ValueError as e:
+                err = f"Invalid capture parameters: {e}"
+                self.logger.error(err)
+                return SnmpResponse(mac_address=mac, status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS, message=err)
+
+            service = CmSpectrumAnalysisService(
+                cable_modem=cm,
+                tftp_servers=tftp_servers,
+                capture_parameters=capture_parameters,)
+
+            msg_rsp: MessageResponse = await service.set_and_go()
+
+            if msg_rsp.status != ServiceStatusCode.SUCCESS:
+                err = "Unable to complete Spectrum Analyzer capture."
+                self.logger.error("%s Status: %s", err, msg_rsp.status.name)
+                return SnmpResponse(mac_address=mac, status=msg_rsp.status, message=err)
+
+            channel_ids = None
+            measurement_stats: list[DocsIf3CmSpectrumAnalysisEntry] = cast(
+                list[DocsIf3CmSpectrumAnalysisEntry],
+                await service.getPnmMeasurementStatistics(channel_ids=channel_ids),)
+
+            cps = CommonProcessService(msg_rsp)
+            msg_rsp = cps.process()
+
+            analysis = Analysis(AnalysisType.BASIC, msg_rsp, skip_automatic_process=True)
+            analysis.process(cast(AnalysisProcessParameters, request.analysis.spectrum_analysis))
+
+            if request.analysis.output.type == OutputType.JSON:
+                payload: dict[str, Any] = cast(dict[str, Any], analysis.get_results())
+                DictGenerate.pop_keys_recursive(payload, ["pnm_header", "mac_address", "channel_id"])
+
+                primative = msg_rsp.payload_to_dict("primative")
+                DictGenerate.pop_keys_recursive(
+                    primative,
+                    ["device_details", "channel_id", "amplitude_bin_segments_float"],
+                )
+                payload.update(cast(dict[str, Any], primative))
+                payload.update(
+                    DictGenerate.models_to_nested_dict(
+                        measurement_stats,
+                        "measurement_stats",
+                    )
+                )
+
+                return PnmAnalysisResponse(
+                    mac_address=mac,
+                    status=ServiceStatusCode.SUCCESS,
+                    data=payload,
+                )
+
+            if request.analysis.output.type == OutputType.ARCHIVE:
+                theme = request.analysis.plot.ui.theme
+                plot_config = AnalysisRptMatplotConfig(theme=theme)
+                analysis_rpt = SpectrumAnalyzerReport(analysis, plot_config)
+                rpt: Path = cast(Path, analysis_rpt.build_report())
+                return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
+
+            return PnmAnalysisResponse(
+                mac_address=mac,
+                status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                data={},
+            )
+
+        @self.router.post(
+            f"{self.base_endpoint}/getCapture/fullBandCapture",
+            summary="Get Spectrum Analyzer Full Band Capture",
+            response_model=None,
+            responses=FAST_API_RESPONSE,
+        )
+        async def get_capture_full_band(
+            request: SingleCaptureSpectrumAnalyzerFullBandRequest,
+        ) -> SnmpResponse | PnmAnalysisResponse | FileResponse:
+            """
+            Perform Full-Band Spectrum Analyzer Capture Using Diplexer DS Band Edges.
+
+            This endpoint derives first/last capture frequencies from active DS diplexer
+            band edges and then applies the friendly RBW capture builder to produce
+            the concrete analyzer command.
+            """
+            mac: MacAddressStr = request.cable_modem.mac_address
+            ip: InetAddressStr = request.cable_modem.ip_address
+            community = RequestDefaultsResolver.resolve_snmp_community(request.cable_modem.snmp)
+            tftp_servers = RequestDefaultsResolver.resolve_tftp_servers(request.cable_modem.pnm_parameters.tftp)
+
+            self.logger.info("Starting Spectrum Analyzer full-band capture for MAC: %s, IP: %s, Output Type: %s",
+                mac, ip, request.analysis.output.type,)
+
+            cm = CableModem(mac_address=MacAddress(mac),
+                            inet=Inet(ip),
+                            write_community=community,)
+
+            status, msg = await CableModemServicePreCheck(
+                cable_modem=cm,
+                tftp_config=request.cable_modem.pnm_parameters.tftp,
+                validate_pnm_ready_status=True,
+            ).run_precheck()
+
+            if status != ServiceStatusCode.SUCCESS:
+                self.logger.error(msg)
+                return SnmpResponse(mac_address=mac, status=status, message=msg)
+
+            if request.capture_parameters.direction == "upstream":
+                err = "Unsupported direction 'upstream' for /docs/pnm/ds full-band capture."
+                self.logger.error(err)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS,
+                    message=err,
+                )
+
+            full_band = await self._resolve_full_band_capture_edges(cm)
+            if full_band is None:
+                err = "Unable to determine downstream diplexer band edges for full-band capture."
+                self.logger.error(err)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS,
+                    message=err,
+                )
+
+            first_segment_center_freq, last_segment_center_freq = full_band
+            friendly_capture_parameters = request.capture_parameters.model_dump()
+            friendly_capture_parameters["first_segment_center_freq"] = first_segment_center_freq
+            friendly_capture_parameters["last_segment_center_freq"] = last_segment_center_freq
+            try:
+                capture_parameters = SpectrumAnalyzerFriendlyCaptureBuilder.build(
+                    SpecAnCaptureParaFriendly(
+                        **friendly_capture_parameters,
+                    ),
                 )
             except ValueError as e:
                 err = f"Invalid capture parameters: {e}"

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
@@ -99,6 +101,26 @@ class SingleCaptureSpectrumAnalyzerFriendlyRequest(BaseModel):
     cable_modem: SpectrumAnalyzerCableModemConfig       = Field(description="Cable modem configuration")
     analysis: ExtendCommonSingleCaptureAnalysisType     = Field(description="Analysis type to perform")
     capture_parameters: SpecAnCaptureParaFriendly       = Field(description="Spectrum capture Parameters.")
+
+class SpecAnCaptureParaFullBand(BaseModel):
+    inactivity_timeout       : int                      = Field(default=60, description="Timeout in seconds for inactivity during spectrum analysis.")
+    direction                : Literal["downstream", "upstream"] = Field(
+        default="downstream",
+        description="Capture direction selector: downstream or upstream.",
+    )
+    resolution_bw            : ResolutionBw             = Field(default=ResolutionBw(30_000), description="Resolution bandwidth in Hz used to derive segment span and bins.")
+    noise_bw                 : int                      = Field(default=150, description="Equivalent noise bandwidth in kHz.")
+    window_function          : WindowFunction           = Field(default=WindowFunction.HANN, description="FFT window function to apply. See WindowFunction enum for options.")
+    num_averages             : int                      = Field(default=1, description="Number of averages per segment.")
+    spectrum_retrieval_type  : SpectrumRetrievalType    = Field(default=SpectrumRetrievalType.FILE,
+                                                                description=f"Method of spectrum data retrieval: "
+                                                                            f"PNM ({SpectrumRetrievalType.FILE}) | "
+                                                                            f"SNMP({SpectrumRetrievalType.SNMP}).")
+
+class SingleCaptureSpectrumAnalyzerFullBandRequest(BaseModel):
+    cable_modem: SpectrumAnalyzerCableModemConfig       = Field(description="Cable modem configuration")
+    analysis: ExtendCommonSingleCaptureAnalysisType     = Field(description="Analysis type to perform")
+    capture_parameters: SpecAnCaptureParaFullBand       = Field(description="Full-band capture parameters.")
 
 class SingleCaptureSpectrumAnalyzer(ExtendSingleCaptureSpecAnaRequest):
     capture_parameters: SpecAnCapturePara       = Field(..., description="Spectrum capture Parameters.")
