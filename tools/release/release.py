@@ -247,6 +247,17 @@ def _get_current_branch() -> str:
     return result.stdout.strip()
 
 
+def _ensure_release_branch_allowed() -> None:
+    """Fail fast unless running on an allowed release branch."""
+    current_branch = _get_current_branch()
+    if current_branch not in ("main", "hot-fix"):
+        print(
+            "ERROR: Release can only be performed on 'main' or 'hot-fix' branch.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _get_upstream_ref() -> str | None:
     result = _run(
         ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
@@ -861,6 +872,8 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    _ensure_release_branch_allowed()
+
     explicit_version: str | None = args.version
     next_mode: str | None        = args.next
     branch: str                  = args.branch
