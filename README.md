@@ -219,10 +219,9 @@ Installed services and docs are available at the following URLs:
 | [FastAPI ReDoc](http://localhost:8000/redoc)      | [FastAPI ReDoc](http://localhost:8080/redoc)      |
 | [MkDocs docs](http://localhost:8001)              | [MkDocs docs](http://localhost:8081)              |
 
-## Recommendations
+## Recommendations - [Postman-PyPNMApps-API](https://github.com/PyPNMApps/Postman-PyPNMApps-API)
 
-Postman is a great tool for testing the FastAPI endpoints:
-- [Download Postman](https://www.postman.com/downloads/)
+The companion `Postman-PyPNMApps-API` repo provides a maintained Postman collection, environments, and Postman visualizers for PyPNM FastAPI endpoints. It is intended for quick endpoint testing, capture/analysis workflow validation, and operator-friendly response visualization (tables/graphs) without writing custom client code.
 
 ## Documentation
 
