@@ -470,6 +470,7 @@ class MultiRxMerRouter(AbstractService):
                 data = multi_analysis.model_dump().get("data", {})
                 return MultiRxMerAnalysisResponse(
                     mac_address =   mac_address,
+                    system_description = multi_analysis.system_description,
                     status      =   ServiceStatusCode.SUCCESS,
                     message     =   message,
                     data        =   data,)
