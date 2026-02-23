@@ -3,13 +3,10 @@
 
 from __future__ import annotations
 
-import io
 import logging
-import os
-import zipfile
 from typing import cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import FileResponse, StreamingResponse
 
 from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analysis import (
@@ -17,11 +14,12 @@ from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analys
     MultiRxMerAnalysisType,
     MultiRxMerSignalAnalysis,
 )
-from pypnm.api.routes.advance.common.abstract.service import AbstractService
+from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
+    AbstractMultiCaptureRouter,
+)
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
-from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.multi_rxmer.schemas import (
     MultiRxMerAnalysisRequest,
@@ -57,15 +55,14 @@ from pypnm.api.routes.common.extended.common_measure_schema import (
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.docs.pnm.files.service import FileType, PnmFileService
-from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 from pypnm.lib.inet import Inet, InetAddressStr
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import ChannelId, GroupId, MacAddressStr, OperationId
+from pypnm.lib.types import ChannelId, MacAddressStr, OperationId
 
 
-class MultiRxMerRouter(AbstractService):
+class MultiRxMerRouter(AbstractMultiCaptureRouter):
     """
     Router For Multi-RxMER Capture And Analysis
 
@@ -228,11 +225,7 @@ class MultiRxMerRouter(AbstractService):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
-            try:
-                service:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
-
-            except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+            service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
 
             status = service.status(operation_id)
 
@@ -279,28 +272,7 @@ class MultiRxMerRouter(AbstractService):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
-            svc:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
-            samples = svc.results(operation_id)
-
-            pnm_dir = str(SystemConfigSettings.pnm_dir())
-            mac = svc.cm.get_mac_address.mac_address
-
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zipf:
-                for sample in samples:
-                    file_path = os.path.join(pnm_dir, sample.filename)
-                    arcname = os.path.basename(sample.filename)
-                    try:
-                        zipf.write(file_path, arcname=arcname)
-                    except FileNotFoundError:
-                        self.logger.warning(f"File not found, skipping: {file_path}")
-                    except Exception as e:
-                        self.logger.warning(f"Skipping {file_path}: {e}")
-
-            buf.seek(0)
-
-            headers = {"Content-Disposition": f"attachment; filename=multiRxMer_{mac}_{operation_id}.zip"}
-            return StreamingResponse(buf, media_type="application/zip", headers=headers)
+            return self._build_results_zip_response(operation_id, "multiRxMer")
 
         @self.router.delete("/stop/{operation_id}",
             response_model=MultiRxMerStatusResponse,
@@ -330,10 +302,7 @@ class MultiRxMerRouter(AbstractService):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
-            try:
-                service:MultiRxMerService = cast(MultiRxMerService, self.getService(operation_id))
-            except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+            service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
 
             service.stop(operation_id)
             status = service.status(operation_id)
@@ -389,16 +358,14 @@ class MultiRxMerRouter(AbstractService):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
-            try:
-                capture_group_id:GroupId = OperationManager.get_capture_group(request.operation_id)
-                self.logger.info(f'[analysis] - OperationID: {request.operation_id} -> CaptureGroup: {capture_group_id}')
-
-            except KeyError:
+            capture_group_id = self._get_capture_group_or_none(request.operation_id)
+            if capture_group_id is None:
                 return MultiRxMerAnalysisResponse(
                     mac_address =   MacAddress.null(),
                     status      =   ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
                     message     =   f"No capture group found for operation {request.operation_id}",
                     data        =   {})
+            self.logger.info(f'[analysis] - OperationID: {request.operation_id} -> CaptureGroup: {capture_group_id}')
 
             cda = CaptureDataAggregator(capture_group_id)
 

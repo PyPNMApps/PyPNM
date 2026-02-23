@@ -5,7 +5,19 @@ from __future__ import annotations
 
 from pypnm.api.routes.advance.analysis.report.multi_analysis_rpt import MultiAnalysisRpt
 from pypnm.api.routes.advance.common.transactionsCollection import TransactionCollection
+from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
+    AnalysisDataModel as DsAnalysisDataModel,
+)
+from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
+    MultiChanEstimationAnalysisResponse,
+)
 from pypnm.api.routes.advance.multi_rxmer.schemas import MultiRxMerAnalysisResponse
+from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.schemas import (
+    AnalysisDataModel as UsAnalysisDataModel,
+)
+from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.schemas import (
+    MultiUsOfdmaPreEqAnalysisResponse,
+)
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.lib.types import TransactionId
@@ -82,5 +94,49 @@ def test_multi_rxmer_analysis_response_allows_optional_system_description() -> N
         status="success",
         message="ok",
         data={},
+    )
+    assert resp_none.system_description is None
+
+
+def test_multi_ds_chan_est_analysis_response_allows_optional_system_description() -> None:
+    resp = MultiChanEstimationAnalysisResponse(
+        mac_address="aa:bb:cc:dd:ee:ff",
+        status="success",
+        message="ok",
+        system_description=SystemDescriptor.parse(
+            "<<HW_REV: 1.0; VENDOR: LANCity; BOOTR: NONE; SW_REV: 1.0.0; MODEL: LCPET-3>>"
+        ).to_model(),
+        data=DsAnalysisDataModel(analysis_type="MIN_AVG_MAX", results=[]),
+    )
+    assert resp.system_description is not None
+    assert resp.system_description.MODEL == "LCPET-3"
+
+    resp_none = MultiChanEstimationAnalysisResponse(
+        mac_address="aa:bb:cc:dd:ee:ff",
+        status="success",
+        message="ok",
+        data=DsAnalysisDataModel(analysis_type="MIN_AVG_MAX", results=[]),
+    )
+    assert resp_none.system_description is None
+
+
+def test_multi_us_ofdma_preeq_analysis_response_allows_optional_system_description() -> None:
+    resp = MultiUsOfdmaPreEqAnalysisResponse(
+        mac_address="aa:bb:cc:dd:ee:ff",
+        status="success",
+        message="ok",
+        system_description=SystemDescriptor.parse(
+            "<<HW_REV: 1.0; VENDOR: LANCity; BOOTR: NONE; SW_REV: 1.0.0; MODEL: LCPET-3>>"
+        ).to_model(),
+        data=UsAnalysisDataModel(analysis_type="MIN_AVG_MAX", results=[]),
+    )
+    assert resp.system_description is not None
+    assert resp.system_description.MODEL == "LCPET-3"
+
+    resp_none = MultiUsOfdmaPreEqAnalysisResponse(
+        mac_address="aa:bb:cc:dd:ee:ff",
+        status="success",
+        message="ok",
+        data=UsAnalysisDataModel(analysis_type="MIN_AVG_MAX", results=[]),
     )
     assert resp_none.system_description is None

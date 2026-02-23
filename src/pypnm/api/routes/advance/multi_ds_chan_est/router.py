@@ -3,25 +3,23 @@
 
 from __future__ import annotations
 
-import io
 import logging
-import os
-import zipfile
 from collections.abc import Callable
 from typing import cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import FileResponse, StreamingResponse
 
 from pypnm.api.routes.advance.analysis.signal_analysis.multi_chan_est_singnal_analysis import (
     MultiChanEstAnalysisType,
     MultiChanEstimationSignalAnalysis,
 )
-from pypnm.api.routes.advance.common.abstract.service import AbstractService
+from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
+    AbstractMultiCaptureRouter,
+)
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
-from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
     AnalysisDataModel,
@@ -53,14 +51,13 @@ from pypnm.api.routes.common.extended.common_measure_schema import (
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.docs.pnm.files.service import PnmFileService
-from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.docsis.cable_modem import CableModem
 from pypnm.lib.inet import Inet, InetAddressStr
 from pypnm.lib.mac_address import MacAddress
-from pypnm.lib.types import ChannelId, GroupId, MacAddressStr, OperationId
+from pypnm.lib.types import ChannelId, MacAddressStr, OperationId
 
 
-class MultiDsChanEstRouter(AbstractService):
+class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
     """Router for handling Multi-DS-Channel-Estimation operations."""
 
     def __init__(self) -> None:
@@ -121,11 +118,10 @@ class MultiDsChanEstRouter(AbstractService):
             response_model=MultiChanEstStatusResponse,
             summary="Get status of a multi-sample ChannelEstimation capture")
         def get_status(operation_id: OperationId) -> MultiChanEstStatusResponse:
-            try:
-                service: MultiChannelEstimationService = cast(MultiChannelEstimationService, self.getService(operation_id))
-
-            except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+            service: MultiChannelEstimationService = cast(
+                MultiChannelEstimationService,
+                self._get_service_or_404(operation_id),
+            )
 
             status = service.status(operation_id)
             return MultiChanEstStatusResponse(
@@ -145,27 +141,7 @@ class MultiDsChanEstRouter(AbstractService):
                              "description": "ZIP archive of capture files"}})
         def download_results_zip(operation_id: OperationId) -> StreamingResponse:
 
-            svc: MultiChannelEstimationService = cast(MultiChannelEstimationService, self.getService(operation_id))
-            samples = svc.results(operation_id)
-            pnm_dir, mac = str(SystemConfigSettings.pnm_dir()), svc.cm.get_mac_address.mac_address
-            buf = io.BytesIO()
-
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for s in samples:
-                    path = os.path.join(pnm_dir, s.filename)
-
-                    try:
-                        zf.write(path, arcname=os.path.basename(s.filename))
-
-                    except FileNotFoundError:
-                        self.logger.warning(f"[zip] Missing: {path}")
-
-                    except Exception as e:
-                        self.logger.warning(f"[zip] Skip {path}: {e}")
-
-            buf.seek(0)
-            headers = {"Content-Disposition": f"attachment; filename=multiChannelEstimation_{mac}_{operation_id}.zip"}
-            return StreamingResponse(buf, media_type="application/zip", headers=headers)
+            return self._build_results_zip_response(operation_id, "multiChannelEstimation")
 
 
         @self.router.delete("/stop/{operation_id}",
@@ -176,11 +152,10 @@ class MultiDsChanEstRouter(AbstractService):
 
 
             """
-            try:
-                service: MultiChannelEstimationService = cast(MultiChannelEstimationService, self.getService(operation_id))
-
-            except KeyError as err:
-                raise HTTPException(status_code=404, detail="Operation not found") from err
+            service: MultiChannelEstimationService = cast(
+                MultiChannelEstimationService,
+                self._get_service_or_404(operation_id),
+            )
 
             service.stop(operation_id)
             status = service.status(operation_id)
@@ -211,10 +186,8 @@ class MultiDsChanEstRouter(AbstractService):
             - ECHO_DETECTION_PHASE_SLOPE
             - ECHO_DETECTION_IFFT
             """
-            try:
-                capture_group_id: GroupId = OperationManager.get_capture_group(request.operation_id)
-                self.logger.info(f"[analysis] operation_id={request.operation_id} capture_group={capture_group_id}")
-            except KeyError:
+            capture_group_id = self._get_capture_group_or_none(request.operation_id)
+            if capture_group_id is None:
                 msg = f"No capture group found for operation {request.operation_id}"
                 self.logger.error(msg)
                 return MultiChanEstimationAnalysisResponse(
@@ -222,6 +195,7 @@ class MultiDsChanEstRouter(AbstractService):
                     status          =   ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
                     message         =   msg,
                     data            =   AnalysisDataModel(analysis_type="UNKNOWN", results=[]))
+            self.logger.info(f"[analysis] operation_id={request.operation_id} capture_group={capture_group_id}")
 
             # Prepare data aggregator
             cda = CaptureDataAggregator(capture_group_id)
@@ -276,6 +250,7 @@ class MultiDsChanEstRouter(AbstractService):
 
                 return MultiChanEstimationAnalysisResponse(
                     mac_address =   mac,
+                    system_description = analysis_result.system_description,
                     status      =   status,
                     message     =   message,
                     data        =   data_model)
