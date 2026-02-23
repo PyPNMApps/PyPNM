@@ -26,6 +26,7 @@ from pypnm.api.routes.common.classes.collection.fec_summary_aggregator import (
     FecSummaryAggregator,
     FecSummaryTotalsModel,
 )
+from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
 from pypnm.lib.constants import INVALID_CAPTURE_TIME
 from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.matplot.manager import MatplotManager, PlotConfig
@@ -91,6 +92,7 @@ MultiRxMerAnalysisMap       = MinAvgMaxMap | OfdmProfilePerf01Map | HeatMapMap
 
 class MultiRxMerAnalysisResult(BaseModel):
     mac_address:   MacAddressStr            = Field(..., description="Cable modem MAC address associated with this analysis.")
+    system_description: SystemDescriptorModel | None = Field(default=None, description="Parsed sysDescr captured with the multi-capture transaction set, if available.")
     analysis_type: MultiRxMerAnalysisType   = Field(..., description="Type of multi-RxMER analysis performed.")
     data:          MultiRxMerAnalysisMap    = Field(..., description="Analysis results mapping (per-channel model).")
     error:         str | None               = Field(default="", description="Optional error message if analysis failed.")
@@ -137,6 +139,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             data = self._dispatch_build()
             self._model = MultiRxMerAnalysisResult(
                 mac_address     =   mac,
+                system_description = self.get_system_description_model(),
                 analysis_type   =   self.analysis_type,
                 data            =   data,
             )
@@ -145,6 +148,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             self.logger.error(f'Unable to create MultiRxMerAnalysisResult, reason: {e}')
             self._model = MultiRxMerAnalysisResult(
                 mac_address     =   mac,
+                system_description = self.get_system_description_model(),
                 analysis_type   =   self.analysis_type,
                 data            =   None,
                 error           =   str(e),
@@ -728,4 +732,3 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
 
         freqs: FrequencySeriesHz = cast(FrequencySeriesHz,[start_freq + (i * spacing) for i in range(num_idx)])
         return freqs
-

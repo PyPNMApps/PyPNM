@@ -38,7 +38,6 @@ class MultiAnalysisRpt(ABC):
 
         self._capt_data_agg = capt_data_agg
         self._trans_collect:TransactionCollection = capt_data_agg.collect()
-        tcm:TransactionCollectionModel = self._trans_collect.getTransactionCollectionModel()[0]
 
         self._png_dir: PathLike       = cast(PathLike, SystemConfigSettings.png_dir())
         self._csv_dir: PathLike       = cast(PathLike, SystemConfigSettings.csv_dir())
@@ -51,22 +50,29 @@ class MultiAnalysisRpt(ABC):
 
         self._mac_addresses: set[MacAddress]  = set()
         self._cmts_mac_address: MacAddress = MacAddress(MacAddress.null())
-        self._sys_descr_model: SystemDescriptorModel  = tcm.device_details.system_description
+        self._sys_descr_model: SystemDescriptorModel | None = self._pluck_system_description_model()
 
         self.csv_files: list[PathLike]  = []
         self.plot_files: list[PathLike] = []
         self.json_files: list[PathLike] = []
 
+        sys_descr_log = self._sys_descr_model.model_dump() if self._sys_descr_model is not None else None
         self.logger.info(f"MultiAnalysisRpt: MAC: {self._mac_addresses}, "
-                         f"Model: {self._sys_descr_model.model_dump()}, "
+                         f"Model: {sys_descr_log}, "
                          f"GroupTime: {self._group_time}")
 
     def getMacAddresses(self) -> list[MacAddress]:
         """Return the cable-modem MAC address associated with this report session."""
         return self._trans_collect.getMacAddresses()
 
+    def get_system_description_model(self) -> SystemDescriptorModel | None:
+        """Return the parsed sysDescr model extracted from the capture transaction set, if available."""
+        return self._sys_descr_model
+
     def get_system_description(self) -> SystemDescriptor:
         """Return the device SystemDescriptor used for filenames and labeling."""
+        if self._sys_descr_model is None:
+            return SystemDescriptor.empty()
         return SystemDescriptor.load_from_dict(self._sys_descr_model.model_dump())
 
     def get_group_time(self) -> int:
@@ -247,6 +253,41 @@ class MultiAnalysisRpt(ABC):
         """Return the `TransactionCollection` instance used to collect capture files."""
         return self._trans_collect
 
+    def _pluck_system_description_model(self) -> SystemDescriptorModel | None:
+        """
+        Scan collected transactions and return the first non-empty sysDescr model.
+
+        Falls back to None when no capture records exist or no record carries a usable
+        system description. This can happen when analysis is requested before the first
+        successful capture is persisted.
+        """
+        tcms: list[TransactionCollectionModel] = self._trans_collect.getTransactionCollectionModel()
+        if not tcms:
+            self.logger.warning("No transaction records available; system_description is unavailable.")
+            return None
+
+        first_seen: SystemDescriptorModel | None = None
+        for tcm in tcms:
+            try:
+                sdm = tcm.device_details.system_description
+            except Exception:
+                continue
+
+            if sdm is None:
+                continue
+
+            if first_seen is None:
+                first_seen = sdm
+
+            if not sdm.is_empty:
+                return sdm
+
+            if any(str(v).strip() for k, v in sdm.model_dump().items() if k != "is_empty"):
+                return sdm
+
+        self.logger.warning("No populated system_description found in transaction records.")
+        return None if first_seen is None else first_seen
+
     def register_models_for_json_archive_files(self, model:BaseModel, filename_tags: list[str], append_timestamp: bool = True) -> None:
         """Register a Pydantic model to be serialized as JSON and included in the report archive."""
 
@@ -312,4 +353,3 @@ class MultiAnalysisRpt(ABC):
             List of configured `MatplotManager` instances used to generate plots.
         """
         return []
-

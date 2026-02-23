@@ -20,6 +20,7 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp imp
     CommonOutput,
     CommonResponse,
 )
+from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
 from pypnm.lib.types import OperationId
 
 
@@ -164,6 +165,10 @@ class MultiRxMerAnalysisResponse(CommonAnalysisResponse):
     """
     Response schema for Multi-RxMER signal analysis, keyed by channel ID.
     """
+    system_description: SystemDescriptorModel | None = Field(
+        default=None,
+        description="Parsed sysDescr for the cable modem from collected transaction metadata, if available.",
+    )
     data: dict[int, dict[str, Any]] = Field(
         ...,
         description=(

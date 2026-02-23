@@ -21,6 +21,7 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp imp
     CommonOutput,
     CommonResponse,
 )
+from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
 from pypnm.lib.types import GroupId, OperationId
 
 
@@ -68,4 +69,8 @@ class MultiChanEstStatusResponse(CommonResponse):
 
 class MultiChanEstimationAnalysisResponse(CommonAnalysisResponse):
     """Response schema for Multi-ChannelEstimation signal analysis."""
+    system_description: SystemDescriptorModel | None = Field(
+        default=None,
+        description="Parsed sysDescr for the cable modem from collected transaction metadata, if available.",
+    )
     data: AnalysisDataModel = Field(..., description="Structured analysis result container including the analysis_type and its corresponding per-channel results.")

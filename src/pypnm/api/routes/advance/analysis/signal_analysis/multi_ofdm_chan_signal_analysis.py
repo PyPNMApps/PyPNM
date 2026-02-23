@@ -25,6 +25,7 @@ from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analys
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
 from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.matplot.manager import MatplotManager, PlotConfig
 from pypnm.lib.types import (
@@ -133,6 +134,7 @@ class MultiChanEstimationResult(BaseModel):
     analysis, and an optional error string when processing fails.
     """
     analysis_type: str                          = Field(..., description="Name of executed analysis type")
+    system_description: SystemDescriptorModel | None = Field(default=None, description="Parsed sysDescr captured with the multi-capture transaction set, if available.")
     results: list[ChannelEstimationAnalysisRpt] = Field(default_factory=list, description="List of per-channel analysis results")
     error: str | None                           = Field(default=None, description="Error message if analysis failed")
 
@@ -259,7 +261,11 @@ class MultiOfdmChanSignalAnalysis(MultiAnalysisRpt, ABC):
             case _:
                 raise ValueError(f"Unsupported analysis type: {self._analysis_type}")
 
-        return MultiChanEstimationResult(analysis_type=self._analysis_type.name, results=data)
+        return MultiChanEstimationResult(
+            analysis_type=self._analysis_type.name,
+            system_description=self.get_system_description_model(),
+            results=data,
+        )
 
     def to_model(self) -> MultiChanEstimationResult:
         """
@@ -283,6 +289,7 @@ class MultiOfdmChanSignalAnalysis(MultiAnalysisRpt, ABC):
             except Exception as e:
                 return MultiChanEstimationResult(
                     analysis_type   =   self._analysis_type.name,
+                    system_description = self.get_system_description_model(),
                     results         =   [],
                     error           =   str(e),
                 )
