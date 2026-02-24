@@ -21,6 +21,7 @@ from pypnm.docsis.cable_modem import CableModem
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlStatus
 from pypnm.docsis.data_type.ClabsDocsisVersion import ClabsDocsisVersion
 from pypnm.docsis.data_type.InterfaceStats import DocsisIfType
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor, SystemDescriptorModel
 from pypnm.lib.inet import Inet
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.types import ChannelId, InetAddressStr, MacAddressStr
@@ -87,6 +88,7 @@ class CableModemServicePreCheck:
         self._inet_format_error: str | None = None
         self._mac_address_raw: MacAddressStr | None = None
         self._inet_address_raw: InetAddressStr | None = None
+        self._system_description: SystemDescriptorModel = SystemDescriptor.empty().to_model()
 
         if cable_modem:
             self.cm = cable_modem
@@ -229,7 +231,7 @@ class CableModemServicePreCheck:
             if status != ServiceStatusCode.SUCCESS:
                 return status, msg
 
-        msg = "Pre-check successful: CableModem reachable via ping and SNMP"
+        msg = "Pre-check successful"
         self.logger.debug(msg)
         return ServiceStatusCode.SUCCESS, msg
 
@@ -258,7 +260,9 @@ class CableModemServicePreCheck:
             SUCCESS if SNMP response received, else UNREACHABLE_SNMP.
         """
         try:
-            if await self.cm.is_snmp_reachable():
+            sys_descr = await self.cm.getSysDescr(timeout=1, retries=1)
+            self._system_description = sys_descr.to_model()
+            if not sys_descr.is_empty():
                 self.logger.debug("SNMP check passed")
                 return ServiceStatusCode.SUCCESS
             self.logger.debug("SNMP check failed")
@@ -266,7 +270,17 @@ class CableModemServicePreCheck:
 
         except Exception as e:
             self.logger.error(f"SNMP check exception: {e}", exc_info=True)
+            self._system_description = SystemDescriptor.empty().to_model()
             return ServiceStatusCode.UNREACHABLE_SNMP
+
+    def get_system_description_model(self) -> SystemDescriptorModel:
+        """
+        Return the parsed sysDescr model captured during pre-check SNMP validation.
+
+        The returned model is always present; when sysDescr is unavailable, an empty
+        model is returned.
+        """
+        return self._system_description
 
     async def isMacCorrect(self) -> ServiceStatusCode:
         """

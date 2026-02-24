@@ -63,14 +63,23 @@ class SystemRouter:
             self.logger.info(f"Retrieving sysDescr for MAC: {mac}, IP: {ip}")
 
             try:
-                status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                              ip_address=ip,
-                                                              snmp_config=request.cable_modem.snmp).run_precheck()
+                precheck = CableModemServicePreCheck(mac_address=mac,
+                                                     ip_address=ip,
+                                                     snmp_config=request.cable_modem.snmp)
+                status, msg = await precheck.run_precheck()
                 if status != ServiceStatusCode.SUCCESS:
                     self.logger.error(msg)
-                    return SnmpResponse(mac_address=mac, status=status, message=msg)
+                    return SnmpResponse(
+                        mac_address=mac,
+                        status=status,
+                        message=msg,
+                        system_description=precheck.get_system_description_model(),
+                    )
 
-                return await SystemSnmpService.get_sysdescr(request)
+                response = await SystemSnmpService.get_sysdescr(request)
+                response.device.mac_address = mac
+                response.device.system_description = precheck.get_system_description_model()
+                return response
 
             except Exception as exc:
                 self.logger.error(f"sysDescr error for {request.cable_modem.mac_address}@{request.cable_modem.ip_address}: {exc}")
@@ -95,14 +104,23 @@ class SystemRouter:
             self.logger.info(f"Retrieving sysUpTime for MAC: {mac}, IP: {ip}")
 
             try:
-                status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                              ip_address=ip,
-                                                              snmp_config=request.cable_modem.snmp).run_precheck()
+                precheck = CableModemServicePreCheck(mac_address=mac,
+                                                     ip_address=ip,
+                                                     snmp_config=request.cable_modem.snmp)
+                status, msg = await precheck.run_precheck()
                 if status != ServiceStatusCode.SUCCESS:
                     self.logger.error(msg)
-                    return SnmpResponse(mac_address=mac, status=status, message=msg)
+                    return SnmpResponse(
+                        mac_address=mac,
+                        status=status,
+                        message=msg,
+                        system_description=precheck.get_system_description_model(),
+                    )
 
-                return await SystemSnmpService.get_sys_up_time(request)
+                response = await SystemSnmpService.get_sys_up_time(request)
+                response.device.mac_address = mac
+                response.device.system_description = precheck.get_system_description_model()
+                return response
 
             except Exception as exc:
                 self.logger.error(f"sysUpTime error for {mac}@{ip}: {exc}")

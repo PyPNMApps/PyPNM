@@ -8,22 +8,35 @@ Status Lookup: [Status Codes](../status/fast-api-status-codes.md)
 
 ```json
 {
-  "mac_address": "aa:bb:cc:dd:ee:ff",
   "status": 0,
   "message": null,
+  "device": {
+    "mac_address": "aa:bb:cc:dd:ee:ff",
+    "system_description": {
+      "HW_REV": "",
+      "VENDOR": "",
+      "BOOTR": "",
+      "SW_REV": "",
+      "MODEL": "",
+      "is_empty": true
+    }
+  },
   "data": []
 }
 ```
 
 > Some endpoints use `"results"` (object or array) instead of `"data"`. The chosen key is documented per-endpoint Guide.
+> `device` is the top-level device identity block.
 
 ## Fields
 
 | Field              | Type            | Description                                                             |
 | ------------------ | --------------- | ----------------------------------------------------------------------- |
-| `mac_address`      | string          | Target CM MAC (any supported format; normalized internally).            |
 | `status`           | integer         | Numeric result from `ServiceStatusCode` (see Status Codes link above).  |
 | `message`          | string or null  | Optional human-readable message (`null` if not set).                    |
+| `device`           | object          | Canonical device identity block containing `mac_address` and `system_description`. |
+| `device.mac_address` | string        | Target CM MAC (normalized internally).                                  |
+| `device.system_description` | object | Parsed sysDescr model; empty model when sysDescr is unavailable.        |
 | `data` / `results` | object or array | Endpoint-specific payload (may be an object or an array; may be empty). |
 
 ## PNM Header

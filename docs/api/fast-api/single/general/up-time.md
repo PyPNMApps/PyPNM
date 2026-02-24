@@ -13,7 +13,9 @@ TFTP parameters are not required.
 
 ## Response
 
-This endpoint returns the standard envelope described in [Common → Response](../../common/response.md) (`mac_address`, `status`, `message`, `results`).
+This endpoint returns the standard envelope described in [Common → Response](../../common/response.md) (`status`, `message`, `device`, `results`).
+
+`device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
 
 ### Abbreviated Example
 

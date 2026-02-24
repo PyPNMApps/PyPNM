@@ -13,7 +13,9 @@ TFTP parameters are not required.
 
 ## Response
 
-This endpoint returns the standard envelope described in [Common → Response](../../common/response.md) (`mac_address`, `status`, `message`, `data`).
+This endpoint returns the standard envelope described in [Common → Response](../../common/response.md) (`status`, `message`, `device`, `data`).
+
+`device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
 
 `data` is an **array** of capability sets. Each item contains a capability `index` and an `entry` with the upstream upper, downstream lower, and downstream upper diplexer band-edge frequencies (in MHz).
 

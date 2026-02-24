@@ -47,33 +47,52 @@ Retrieves statistics and configuration parameters for upstream OFDMA channels fr
 
 ## Response Body (JSON)
 
+This endpoint returns the standard envelope described in [Common → Response](../../../common/response.md) (`status`, `message`, `device`, `data`).
+
+`device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
+
 ```json
-[
-  {
-    "index": <SNMP_INDEX>,
-    "channel_id": <CHANNEL_ID>,
-    "entry": {
-      "docsIf31CmUsOfdmaChanChannelId": 42,
-      "docsIf31CmUsOfdmaChanConfigChangeCt": 1,
-      "docsIf31CmUsOfdmaChanSubcarrierZeroFreq": 104800000,
-      "docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum": 74,
-      "docsIf31CmUsOfdmaChanLastActiveSubcarrierNum": 1969,
-      "docsIf31CmUsOfdmaChanNumActiveSubcarriers": 1896,
-      "docsIf31CmUsOfdmaChanSubcarrierSpacing": 50,
-      "docsIf31CmUsOfdmaChanCyclicPrefix": 192,
-      "docsIf31CmUsOfdmaChanRollOffPeriod": 128,
-      "docsIf31CmUsOfdmaChanNumSymbolsPerFrame": 10,
-      "docsIf31CmUsOfdmaChanTxPower": 17.1,
-      "docsIf31CmUsOfdmaChanPreEqEnabled": true,
-      "docsIf31CmStatusOfdmaUsT3Timeouts": 0,
-      "docsIf31CmStatusOfdmaUsT4Timeouts": 0,
-      "docsIf31CmStatusOfdmaUsRangingAborteds": 0,
-      "docsIf31CmStatusOfdmaUsT3Exceededs": 0,
-      "docsIf31CmStatusOfdmaUsIsMuted": false,
-      "docsIf31CmStatusOfdmaUsRangingStatus": "success"
+{
+  "status": 0,
+  "message": null,
+  "device": {
+    "mac_address": "aa:bb:cc:dd:ee:ff",
+    "system_description": {
+      "HW_REV": "1A",
+      "VENDOR": "Hitron Technologies",
+      "BOOTR": "2022.01-MXL-v-4.0.357",
+      "SW_REV": "8.4.0.0.1b2",
+      "MODEL": "CODA60",
+      "is_empty": false
     }
-  }
-]
+  },
+  "data": [
+    {
+      "index": "<SNMP_INDEX>",
+      "channel_id": "<CHANNEL_ID>",
+      "entry": {
+        "docsIf31CmUsOfdmaChanChannelId": 42,
+        "docsIf31CmUsOfdmaChanConfigChangeCt": 1,
+        "docsIf31CmUsOfdmaChanSubcarrierZeroFreq": 104800000,
+        "docsIf31CmUsOfdmaChanFirstActiveSubcarrierNum": 74,
+        "docsIf31CmUsOfdmaChanLastActiveSubcarrierNum": 1969,
+        "docsIf31CmUsOfdmaChanNumActiveSubcarriers": 1896,
+        "docsIf31CmUsOfdmaChanSubcarrierSpacing": 50,
+        "docsIf31CmUsOfdmaChanCyclicPrefix": 192,
+        "docsIf31CmUsOfdmaChanRollOffPeriod": 128,
+        "docsIf31CmUsOfdmaChanNumSymbolsPerFrame": 10,
+        "docsIf31CmUsOfdmaChanTxPower": 17.1,
+        "docsIf31CmUsOfdmaChanPreEqEnabled": true,
+        "docsIf31CmStatusOfdmaUsT3Timeouts": 0,
+        "docsIf31CmStatusOfdmaUsT4Timeouts": 0,
+        "docsIf31CmStatusOfdmaUsRangingAborteds": 0,
+        "docsIf31CmStatusOfdmaUsT3Exceededs": 0,
+        "docsIf31CmStatusOfdmaUsIsMuted": false,
+        "docsIf31CmStatusOfdmaUsRangingStatus": "success"
+      }
+    }
+  ]
+}
 ```
 
 

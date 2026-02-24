@@ -47,13 +47,19 @@ class InterfaceStatsRouter:
             community: SnmpCommunity = request.cable_modem.snmp.snmp_v2c.community
             self.logger.info(f"Retrieving interface statistics for MAC: {mac}, IP: {ip}")
 
-            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
-                                                          ip_address    =   ip,
-                                                          snmp_config   =   request.cable_modem.snmp).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address   =   mac,
+                                                 ip_address    =   ip,
+                                                 snmp_config   =   request.cable_modem.snmp)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse( mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             service = InterfaceStatsService(mac_address=mac, ip_address=ip, write_community=community)
             data: dict[str, list[dict]] = await service.get_interface_stat_entries()
@@ -61,6 +67,7 @@ class InterfaceStatsRouter:
             return SnmpResponse(mac_address=mac,
                                 status=ServiceStatusCode.SUCCESS,
                                 message="Interface statistics retrieved successfully",
+                                system_description=precheck.get_system_description_model(),
                                 results=data)
 
 # Required for dynamic auto-registration

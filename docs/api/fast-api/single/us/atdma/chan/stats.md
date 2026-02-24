@@ -13,7 +13,9 @@ TFTP parameters are not required.
 
 ## Response
 
-This endpoint returns the standard envelope described in [Common → Response](../../../../common/response.md) (`mac_address`, `status`, `message`, `data`).
+This endpoint returns the standard envelope described in [Common → Response](../../../../common/response.md) (`status`, `message`, `device`, `data`).
+
+`device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
 
 `data` is an **object** with the upstream channel entries plus an optional DWR window evaluation summary. Each entry contains the SNMP table `index`, the upstream `channel_id`, and an `entry` with configuration, status, and (where available) raw pre-EQ data (`docsIf3CmStatusUsEqData`).
 
@@ -181,7 +183,9 @@ TFTP parameters are not required.
 
 ## Response
 
-This endpoint returns the standard envelope described in [Common → Response](../../../../common/response.md) (`mac_address`, `status`, `message`, `data`).
+This endpoint returns the standard envelope described in [Common → Response](../../../../common/response.md) (`status`, `message`, `device`, `data`).
+
+`device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
 
 `data` is an **object** keyed by the **SNMP table index** of each upstream channel.  
 Each value contains decoded tap configuration and coefficient arrays.

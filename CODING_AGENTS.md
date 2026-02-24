@@ -69,6 +69,8 @@ Before introducing new types, validators, formats, or storage conventions:
   - Strict typing everywhere; avoid `Dict`/`List`/`Tuple`/`Union` and avoid `Any`.
   - Prefer built-in generics (`dict[str, int]`, `list[str]`) and `A | B` rather than `Union`.
   - Prefer Pydantic `BaseModel` over dict returns for public interfaces.
+  - Device-scoped API responses (top-level responses that include `mac_address`) must include a top-level `system_description` field using the parsed sysDescr model.
+  - Do not omit `system_description` on device-scoped responses; when unavailable, return an empty sysDescr model rather than `null`.
   - `BaseModel` fields must be one-line `Field(...)` declarations with descriptions.
   - Avoid generic returns; every method must have an explicit return type annotation.
   - Every method argument must have an explicit type annotation.

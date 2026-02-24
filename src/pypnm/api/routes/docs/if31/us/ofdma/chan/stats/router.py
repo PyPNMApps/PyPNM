@@ -54,13 +54,19 @@ class UsOfdmaChannelRouter:
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving Upstream OFDMA Channel Statistics for MAC: {mac}, IP: {ip}")
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_ofdma_exist=True).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp,
+                                                 validate_ofdma_exist=True)
+            status, msg = await precheck.run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             service = UsOfdmChannelService(mac, ip, request.cable_modem.snmp)
             data = await service.get_ofdma_chan_entries()
@@ -68,6 +74,7 @@ class UsOfdmaChannelRouter:
             return SnmpResponse(mac_address =   mac,
                                 status      =   status,
                                 message     =   msg,
+                                system_description=precheck.get_system_description_model(),
                                 results     =   data)
 
 # Required for dynamic auto-registration
