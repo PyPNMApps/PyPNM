@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import (
@@ -12,6 +12,9 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.common.enum import 
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.request_validation import (
     RequestListNormalizer,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_response import (
+    DeviceIdentity,
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp import (
     SNMPConfig,
@@ -122,18 +125,27 @@ class CommonSingleCaptureAnalysisRequest(BaseModel):
 
 
 class CommonResponse(BaseModel):
-    mac_address: MacAddressStr                                      = Field(default=default_mac, description="MAC address of the cable modem")
     status: ServiceStatusCode | OperationState | str | None = Field(default="success", description="Operation status code or state")
-    message: str | None                                          = Field(default=None, description="Additional information or error details")
+    message: str | None = Field(default=None, description="Additional information or error details")
+    device: DeviceIdentity = Field(
+        default_factory=DeviceIdentity,
+        description="Canonical device identity block for the target cable modem.",
+    )
 
-    @field_validator("mac_address", mode="before")
-    def validate_mac(cls, v: object) -> MacAddressStr:
-        if v is None:
-            return default_mac
-        try:
-            return MacAddress(str(v)).mac_address
-        except Exception:
-            return MacAddressStr(str(v))
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_identity_inputs(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        payload = dict(data)
+        device = dict(payload.get("device") or {})
+        if "mac_address" in payload and "mac_address" not in device:
+            device["mac_address"] = payload.get("mac_address")
+        if "system_description" in payload and "system_description" not in device:
+            device["system_description"] = payload.get("system_description")
+        if device:
+            payload["device"] = device
+        return payload
 
 
 class CommonAnalysisResponse(CommonResponse):

@@ -56,13 +56,19 @@ class DsOfdmChannelStatsRouter:
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving Downstream OFDM Modulation Profile Statistics for MAC: {mac}, IP: {ip}")
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_ofdm_exist=True).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp,
+                                                 validate_ofdm_exist=True)
+            status, msg = await precheck.run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             service = DsOfdmChannelService(mac, ip, snmp_config=request.cable_modem.snmp)
             data = await service.get_ofdm_chan_entries()
@@ -70,6 +76,7 @@ class DsOfdmChannelStatsRouter:
             return SnmpResponse(mac_address =   mac,
                                 status      =   ServiceStatusCode.SUCCESS,
                                 message     =   "Successfully retrieved downstream OFDM channel statistics",
+                                system_description=precheck.get_system_description_model(),
                                 results     =   data)
 
 # Required for dynamic auto-registration

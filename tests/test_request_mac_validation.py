@@ -51,4 +51,4 @@ def test_snmp_response_allows_invalid_mac() -> None:
         message="Invalid MAC address format: 00:50:F1:12:03:60a",
     )
 
-    assert response.mac_address == "00:50:F1:12:03:60a"
+    assert response.device.mac_address == "00:50:F1:12:03:60a"

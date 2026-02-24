@@ -69,14 +69,20 @@ class FddDiplexerBandEdgeCapability:
             self.logger.info(f"Retrieving FDD diplexer band edge capabilities for MAC: {mac}, IP: {ip}")
 
             # Ensure modem is reachable and SNMP is operational
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          check_docsis_version=[ClabsDocsisVersion.DOCSIS_40]).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp,
+                                                 check_docsis_version=[ClabsDocsisVersion.DOCSIS_40])
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             # Fetch capability data from the cable modem
             service = FddDiplexerBandEdgeCapabilityService(mac_address=mac,
@@ -88,6 +94,7 @@ class FddDiplexerBandEdgeCapability:
             return SnmpResponse(mac_address =   mac,
                                 status      =   ServiceStatusCode.SUCCESS,
                                 message     =   "Successfully retrieved FDD diplexer band edge capabilities",
+                                system_description=precheck.get_system_description_model(),
                                 results     =   entry)
 
 # Required for dynamic auto-registration

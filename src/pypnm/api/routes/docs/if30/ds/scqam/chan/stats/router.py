@@ -57,13 +57,19 @@ class DsScQamChannelRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving DOCSIS 3.0 SC-QAM downstream channel stats for MAC: {mac}, IP: {ip}")
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             service = DsScQamChannelService(mac_address=mac,
                                             ip_address=ip,
@@ -74,6 +80,7 @@ class DsScQamChannelRouter:
                 mac_address =   mac,
                 status      =   ServiceStatusCode.SUCCESS,
                 message     =   "Successfully retrieved downstream SC-QAM channel stats",
+                system_description=precheck.get_system_description_model(),
                 results     =   data)
 
         @self.router.post("/codewordErrorRate",
@@ -90,14 +97,20 @@ class DsScQamChannelRouter:
 
             self.logger.info(f"Retrieving DOCSIS 3.0 SC-QAM downstream channel codeword error rate for MAC: {mac}, IP: {ip}")
 
-            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
-                                                          ip_address    =   ip,
-                                                          snmp_config   =   request.cable_modem.snmp,
-                                                          validate_scqam_exist=True).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address   =   mac,
+                                                 ip_address    =   ip,
+                                                 snmp_config   =   request.cable_modem.snmp,
+                                                 validate_scqam_exist=True)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             service = DsScQamChannelService(mac_address=mac,
                                             ip_address=ip,
@@ -106,7 +119,12 @@ class DsScQamChannelRouter:
             if sample_time_elapsed <= 0:
                 error_msg = "Sample time elapsed must be a positive number."
                 self.logger.error(error_msg)
-                return SnmpResponse(mac_address=mac, status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS, message=error_msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=ServiceStatusCode.INVALID_CAPTURE_PARAMETERS,
+                    message=error_msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             cw_error_rate = await service.get_scqam_chan_codeword_error_rate(float(request.capture_parameters.sample_time_elapsed))
 
@@ -114,6 +132,7 @@ class DsScQamChannelRouter:
                 mac_address =   mac,
                 status      =   ServiceStatusCode.SUCCESS,
                 message     =   "Successfully retrieved codeword error rate",
+                system_description=precheck.get_system_description_model(),
                 results     =   cw_error_rate)
 
 # Required for dynamic auto-registration

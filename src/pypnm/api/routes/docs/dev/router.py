@@ -53,15 +53,18 @@ class DocsDevRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving event log for MAC: {mac}, IP: {ip}")
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 logger.error(msg)
                 return EventLogResponse(mac_address =   mac,
                                         status = status,
-                                        message = msg, logs=[])
+                                        message = msg,
+                                        system_description=precheck.get_system_description_model(),
+                                        logs=[])
 
             try:
                 service = CmDocsDevService(mac_address=mac,
@@ -70,6 +73,7 @@ class DocsDevRouter:
                 log_entries = await service.fetch_event_log()
                 return EventLogResponse(mac_address =   service.get_mac_address(),
                                         status      =   ServiceStatusCode.SUCCESS,
+                                        system_description=precheck.get_system_description_model(),
                                         logs        =   log_entries)
 
             except HTTPException:
@@ -97,15 +101,17 @@ class DocsDevRouter:
             mac = request.cable_modem.mac_address
             ip = request.cable_modem.ip_address
             self.logger.info(f"Resetting cable modem for MAC: {mac}, IP: {ip}")
-            status, msg = await CableModemServicePreCheck(mac_address   =   mac,
-                                                          ip_address    =   ip,
-                                                          snmp_config   =   request.cable_modem.snmp).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address   =   mac,
+                                                 ip_address    =   ip,
+                                                 snmp_config   =   request.cable_modem.snmp)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac,
                                     status=status,
-                                    message=msg)
+                                    message=msg,
+                                    system_description=precheck.get_system_description_model())
 
             try:
                 service = CmDocsDevService(mac_address=mac,

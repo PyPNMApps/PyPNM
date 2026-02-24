@@ -50,14 +50,20 @@ class DiplexerConfigResult:
             ip = request.cable_modem.ip_address
             self.logger.info(f"Retrieving diplexer configuration for MAC: {mac}, IP: {ip}")
 
-            status, msg = await CableModemServicePreCheck(mac_address=mac,
-                                                          ip_address=ip,
-                                                          snmp_config=request.cable_modem.snmp,
-                                                          validate_ofdm_exist=True).run_precheck()
+            precheck = CableModemServicePreCheck(mac_address=mac,
+                                                 ip_address=ip,
+                                                 snmp_config=request.cable_modem.snmp,
+                                                 validate_ofdm_exist=True)
+            status, msg = await precheck.run_precheck()
 
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
-                return SnmpResponse(mac_address=mac, status=status, message=msg)
+                return SnmpResponse(
+                    mac_address=mac,
+                    status=status,
+                    message=msg,
+                    system_description=precheck.get_system_description_model(),
+                )
 
             try:
 
@@ -67,6 +73,7 @@ class DiplexerConfigResult:
 
                 response = SnmpResponse(mac_address =   mac,
                                         status      =   ServiceStatusCode.SUCCESS,
+                                        system_description=precheck.get_system_description_model(),
                                         results     =   config)
                 return response
 

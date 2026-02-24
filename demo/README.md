@@ -128,6 +128,10 @@ This will:
     - `mac_address` → `aa:bb:cc:dd:ee:ff`
     - `filename` → updated filename
     - `device_details.system_description` → generic demo values:
+    - If canonical API response JSON is present, sanitize:
+      - `device.mac_address` → `aa:bb:cc:dd:ee:ff`
+      - `device.system_description` → generic demo values
+    - Legacy top-level `system_description` is also sanitized when present
 
       ```json
       {

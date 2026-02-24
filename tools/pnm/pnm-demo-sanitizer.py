@@ -36,6 +36,7 @@ class DemoSanitizer:
     - Rewrite the binary MAC using pnm-mac-updater.py --mac-address NEW.
     - Rename the file so the MAC chunk in the filename uses the new MAC.
     - Update the JSON entry's mac_address, filename, and system_description.
+    - Sanitize canonical API response identity blocks under `device` when present.
 
     Modes:
     - Targeted: --old-mac + --new-mac updates only entries whose mac_address
@@ -69,6 +70,43 @@ class DemoSanitizer:
     def _vprint(self, message: str) -> None:
         if self.verbose:
             print(message)
+
+    def _sanitize_sysdesc_dict(self, container: dict, key: str = "system_description") -> bool:
+        """Sanitize a parsed sysDescr model dict in-place if present."""
+        if key not in container or not isinstance(container[key], dict):
+            return False
+
+        changed = False
+        sysdesc = container[key]
+        for sys_key, value in SYSTEM_DESCRIPTION.items():
+            if sysdesc.get(sys_key) != value:
+                sysdesc[sys_key] = value
+                changed = True
+        container[key] = sysdesc
+        return changed
+
+    def _sanitize_device_block(self, container: dict) -> bool:
+        """
+        Sanitize canonical top-level device identity blocks in API JSON.
+
+        Expected shape:
+          {"device": {"mac_address": "...", "system_description": {...}}}
+        """
+        if "device" not in container or not isinstance(container["device"], dict):
+            return False
+
+        changed = False
+        device = container["device"]
+
+        if device.get("mac_address") != self.new_mac_variants[0]:
+            device["mac_address"] = self.new_mac_variants[0]
+            changed = True
+
+        if self._sanitize_sysdesc_dict(device):
+            changed = True
+
+        container["device"] = device
+        return changed
 
     @staticmethod
     def _build_mac_variants(mac: str) -> Tuple[str, str, str, str]:
@@ -245,22 +283,21 @@ class DemoSanitizer:
 
             if "device_details" in entry and isinstance(entry["device_details"], dict):
                 dev = entry["device_details"]
-                if "system_description" in dev and isinstance(dev["system_description"], dict):
-                    sysdesc = dev["system_description"]
-                    for key, value in SYSTEM_DESCRIPTION.items():
-                        if sysdesc.get(key) != value:
-                            sysdesc[key] = value
-                            changed = True
-                    dev["system_description"] = sysdesc
-                    entry["device_details"]   = dev
-
-        if "system_description" in data and isinstance(data["system_description"], dict):
-            sysdesc = data["system_description"]
-            for key, value in SYSTEM_DESCRIPTION.items():
-                if sysdesc.get(key) != value:
-                    sysdesc[key] = value
+                if self._sanitize_sysdesc_dict(dev):
                     changed = True
-            data["system_description"] = sysdesc
+                    entry["device_details"] = dev
+
+            # Canonical API response shape support (new identity location)
+            if self._sanitize_device_block(entry):
+                changed = True
+
+        # Legacy top-level response shape support (older JSON exports)
+        if self._sanitize_sysdesc_dict(data):
+            changed = True
+
+        # Canonical top-level response shape support
+        if self._sanitize_device_block(data):
+            changed = True
 
         if changed:
             json_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
