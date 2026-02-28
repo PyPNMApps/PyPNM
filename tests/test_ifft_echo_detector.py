@@ -13,7 +13,7 @@ from pypnm.lib.constants import SPEED_OF_LIGHT as C0
 
 
 @pytest.mark.pnm
-def test_to_model_detects_single_echo_basic():
+def test_to_model_detects_single_echo_basic() -> None:
     # Build a simple time response: impulse at 0 and smaller echo at bin d
     N = 256
     d = 10                       # echo at 10 samples
@@ -56,7 +56,7 @@ def test_to_model_detects_single_echo_basic():
 
 
 @pytest.mark.pnm
-def test_detect_multiple_reflections_with_spacing_and_padding():
+def test_detect_multiple_reflections_with_spacing_and_padding() -> None:
     N = 512
     fs = 2_000_000.0
     vf = 0.82
@@ -98,7 +98,7 @@ def test_detect_multiple_reflections_with_spacing_and_padding():
 
 
 @pytest.mark.pnm
-def test_accepts_real_imag_pair_inputs_shapes():
+def test_accepts_real_imag_pair_inputs_shapes() -> None:
     N = 128
     fs = 500_000.0
 
@@ -124,7 +124,7 @@ def test_accepts_real_imag_pair_inputs_shapes():
 
 
 @pytest.mark.pnm
-def test_compute_time_response_raises_when_nfft_too_small():
+def test_compute_time_response_raises_when_nfft_too_small() -> None:
     N = 64
     fs = 1e6
     h = np.zeros(N, dtype=np.complex128)
@@ -137,7 +137,7 @@ def test_compute_time_response_raises_when_nfft_too_small():
 
 
 @pytest.mark.pnm
-def test_no_echo_found_when_threshold_too_high():
+def test_no_echo_found_when_threshold_too_high() -> None:
     N = 128
     fs = 1e6
     h = np.zeros(N, dtype=np.complex128)

@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMPOSE_DIR="${SCRIPT_DIR}/compose"
 CONFIG_DIR="${SCRIPT_DIR}/config"
+PYPNM_SHARED_GROUP="${PYPNM_SHARED_GROUP:-pypnm}"
 
 create_file_if_missing() {
   local src="$1"
@@ -20,6 +21,12 @@ create_file_if_missing() {
 
 create_file_if_missing "${COMPOSE_DIR}/.env.example" "${COMPOSE_DIR}/.env" "compose/.env"
 create_file_if_missing "${CONFIG_DIR}/system.json.template" "${CONFIG_DIR}/system.json" "config/system.json"
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  mkdir -p /tmp/pypnm >/dev/null 2>&1 || true
+  chgrp "${PYPNM_SHARED_GROUP}" /tmp/pypnm >/dev/null 2>&1 || true
+  chmod 2775 /tmp/pypnm >/dev/null 2>&1 || true
+fi
 
 cat <<'MSG'
 Next steps:

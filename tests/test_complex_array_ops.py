@@ -16,7 +16,7 @@ def pairs(*vals: float) -> list[tuple[float, float]]:
     """Build (re, im) pairs from flat numbers: r1,i1,r2,i2,..."""
     assert len(vals) % 2 == 0
     it = iter(vals)
-    return [(float(r), float(i)) for r, i in zip(it, it)]
+    return [(float(r), float(i)) for r, i in zip(it, it, strict=False)]
 
 
 def test_init_and_len_and_repr() -> None:

@@ -14,7 +14,7 @@ from pypnm.snmp.snmp_v2c import Snmp_v2c
 
 
 class _FakeSnmp:
-    def __init__(self, idx: int, table: dict[str, object]):
+    def __init__(self, idx: int, table: dict[str, object]) -> None:
         self._idx, self._t = idx, table
 
     async def get(self, oq: str):

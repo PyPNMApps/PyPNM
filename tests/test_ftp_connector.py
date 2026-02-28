@@ -128,7 +128,7 @@ def test_upload_file_missing_local_returns_false() -> None:
 def test_download_file_to_dir_and_to_file(tmp_path: Path) -> None:
     ftp = MagicMock(spec=ftplib.FTP)
 
-    def retr_side_effect(cmd: str, writer_cb):
+    def retr_side_effect(cmd: str, writer_cb) -> None:
         writer_cb(b"abc123")
 
     ftp.retrbinary.side_effect = retr_side_effect

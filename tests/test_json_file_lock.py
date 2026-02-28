@@ -27,9 +27,8 @@ def test_json_file_lock_timeout(tmp_path: Path) -> None:
     thread.start()
 
     assert ready.wait(1.0)
-    with pytest.raises(TimeoutError):
-        with JsonFileLock(target, timeout=0.1, poll_interval=0.01):
-            pass
+    with pytest.raises(TimeoutError), JsonFileLock(target, timeout=0.1, poll_interval=0.01):
+        pass
 
     release.set()
     thread.join()

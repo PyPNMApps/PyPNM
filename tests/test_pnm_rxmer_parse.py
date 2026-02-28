@@ -19,7 +19,7 @@ def rxmer_bytes() -> bytes:
     return RXMER_PATH.read_bytes()
 
 @pytest.mark.pnm
-def test_rxmer_file_loads_and_models_ok(rxmer_bytes):
+def test_rxmer_file_loads_and_models_ok(rxmer_bytes) -> None:
     rx = CmDsOfdmRxMer(rxmer_bytes).to_model()
 
     # basic shape
@@ -50,7 +50,7 @@ def test_rxmer_file_loads_and_models_ok(rxmer_bytes):
     assert isinstance(mod, dict) and mod
 
 @pytest.mark.pnm
-def test_rxmer_values_in_range_and_cached():
+def test_rxmer_values_in_range_and_cached() -> None:
     raw = RXMER_PATH.read_bytes()
     rxmer = CmDsOfdmRxMer(raw)
 
@@ -63,7 +63,7 @@ def test_rxmer_values_in_range_and_cached():
     assert vals1 is vals2 or vals1 == vals2  # either same object or same content
 
 @pytest.mark.pnm
-def test_rxmer_frequencies_monotonic_and_sized():
+def test_rxmer_frequencies_monotonic_and_sized() -> None:
     raw = RXMER_PATH.read_bytes()
     rxmer = CmDsOfdmRxMer(raw)
     model = rxmer.to_model()
@@ -78,7 +78,7 @@ def test_rxmer_frequencies_monotonic_and_sized():
         assert all(freqs[i] < freqs[i + 1] for i in range(len(freqs) - 1))
 
 @pytest.mark.pnm
-def test_rxmer_serialization_roundtrip():
+def test_rxmer_serialization_roundtrip() -> None:
     raw = RXMER_PATH.read_bytes()
     rxmer = CmDsOfdmRxMer(raw)
 
@@ -90,7 +90,7 @@ def test_rxmer_serialization_roundtrip():
     assert set(parsed.keys()) == set(d.keys())
 
 @pytest.mark.pnm
-def test_non_rxmer_file_rejected():
+def test_non_rxmer_file_rejected() -> None:
     raw = NON_RXMER_PATH.read_bytes()
     with pytest.raises(ValueError):
         _ = CmDsOfdmRxMer(raw)

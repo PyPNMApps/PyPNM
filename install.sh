@@ -15,6 +15,8 @@ CLEAN_MODE="0"
 PURGE_CACHE="0"
 UNINSTALL_MODE="0"
 GITLEAKS_VERSION="8.18.1"
+PYPNM_SHARED_GROUP="pypnm"
+GROUP_MEMBERSHIP_CHANGED="0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}"
@@ -658,6 +660,72 @@ run_pnm_alias_installer_if_available() {
   fi
 }
 
+run_with_privilege_if_needed() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return $?
+  fi
+  return 1
+}
+
+ensure_pypnm_shared_group() {
+  local target_user
+  target_user="${SUDO_USER:-${USER:-$(id -un)}}"
+
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    echo "ℹ️  Skipping '${PYPNM_SHARED_GROUP}' group setup on non-Linux host."
+    return
+  fi
+
+  if getent group "${PYPNM_SHARED_GROUP}" >/dev/null 2>&1; then
+    echo "👥 Group '${PYPNM_SHARED_GROUP}' already exists."
+  else
+    if run_with_privilege_if_needed groupadd "${PYPNM_SHARED_GROUP}"; then
+      echo "👥 Created group '${PYPNM_SHARED_GROUP}'."
+    else
+      echo "⚠️  Unable to create group '${PYPNM_SHARED_GROUP}'."
+      return
+    fi
+  fi
+
+  if id -nG "${target_user}" 2>/dev/null | tr ' ' '\n' | grep -qx "${PYPNM_SHARED_GROUP}"; then
+    echo "👤 User '${target_user}' is already in group '${PYPNM_SHARED_GROUP}'."
+    return
+  fi
+
+  if run_with_privilege_if_needed usermod -aG "${PYPNM_SHARED_GROUP}" "${target_user}"; then
+    echo "👤 Added user '${target_user}' to group '${PYPNM_SHARED_GROUP}'."
+    GROUP_MEMBERSHIP_CHANGED="1"
+  else
+    echo "⚠️  Unable to add user '${target_user}' to group '${PYPNM_SHARED_GROUP}'."
+  fi
+}
+
+ensure_tmp_pypnm_permissions() {
+  local tmp_root="/tmp/pypnm"
+
+  mkdir -p "${tmp_root}" || {
+    echo "⚠️  Unable to create ${tmp_root}."
+    return
+  }
+
+  if chgrp "${PYPNM_SHARED_GROUP}" "${tmp_root}" >/dev/null 2>&1 || run_with_privilege_if_needed chgrp "${PYPNM_SHARED_GROUP}" "${tmp_root}" >/dev/null 2>&1; then
+    :
+  else
+    echo "⚠️  Unable to set group '${PYPNM_SHARED_GROUP}' on ${tmp_root}."
+  fi
+
+  if chmod 2775 "${tmp_root}" >/dev/null 2>&1 || run_with_privilege_if_needed chmod 2775 "${tmp_root}" >/dev/null 2>&1; then
+    echo "📁 Ensured ${tmp_root} exists with group '${PYPNM_SHARED_GROUP}' and permissions 2775."
+  else
+    echo "⚠️  Unable to set permissions 2775 on ${tmp_root}."
+  fi
+}
+
 run_tmp_cleanup_cron_installer_if_available() {
   if [[ -x "${PROJECT_ROOT}/scripts/install-tmp-cleanup-cron.sh" ]]; then
     echo "🧹 Installing tmp cache cleanup cron job..."
@@ -676,6 +744,8 @@ else
   echo "      ./tools/pnm/pnm_file_retrieval_setup.py"
 fi
 
+ensure_pypnm_shared_group
+ensure_tmp_pypnm_permissions
 run_pnm_alias_installer_if_available
 run_tmp_cleanup_cron_installer_if_available
 
@@ -685,6 +755,9 @@ if [[ "$DEMO_MODE" == "1" ]]; then
 fi
 if [[ "$PRODUCTION_MODE" == "1" ]]; then
   echo "👉 Production mode is restored: system settings have been reverted from backup."
+fi
+if [[ "${GROUP_MEMBERSHIP_CHANGED}" == "1" ]]; then
+  echo "👉 Group membership changed for '${SUDO_USER:-${USER:-$(id -un)}}'. Start a new login session for group changes to take effect."
 fi
 echo "👉 Next steps:"
 echo "   1) source '$VENV_DIR/bin/activate'"

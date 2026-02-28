@@ -32,20 +32,17 @@ DATA_DIR = Path(__file__).parent / "files"
         ("spectrum_analyzer.bin", CmSpectrumAnalysis),
     ],
 )
-def test_factory_returns_correct_parser(filename, expected_cls):
+def test_factory_returns_correct_parser(filename, expected_cls) -> None:
     blob = (DATA_DIR / filename).read_bytes()
     parser = PnmFileTypeObjectFetcher(blob).get_parser()
     assert isinstance(parser, expected_cls)
     # Smoketest that the parser can materialize a model/dict without exceptions
     assert hasattr(parser, "to_model") or hasattr(parser, "to_dict")
-    if hasattr(parser, "to_model"):
-        _ = parser.to_model()
-    else:
-        _ = parser.to_dict()
+    _ = parser.to_model() if hasattr(parser, "to_model") else parser.to_dict()
 
 
 @pytest.mark.pnm
-def test_factory_unknown_type_raises_value_error():
+def test_factory_unknown_type_raises_value_error() -> None:
     """
     Build a minimal, valid-looking PNM header with an unknown 3-char type ("PNX")
     so the factory cannot map it to a known parser.

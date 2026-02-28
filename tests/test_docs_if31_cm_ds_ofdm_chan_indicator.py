@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from pypnm.docsis.data_type.DocsIf31CmDsOfdmChanEntry import DocsIf31CmDsOfdmChanChannelEntry
+from pypnm.docsis.data_type.DocsIf31CmDsOfdmChanEntry import (
+    DocsIf31CmDsOfdmChanChannelEntry,
+)
 from pypnm.lib.constants import DocsIf31CmDsOfdmChanIndicator
 from pypnm.snmp.snmp_v2c import Snmp_v2c
 

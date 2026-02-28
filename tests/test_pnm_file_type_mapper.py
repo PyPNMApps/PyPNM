@@ -23,7 +23,7 @@ def test_all_mapped_tests_are_known_enums() -> None:
     """
     Ensure that all keys in the mapping are valid DocsPnmCmCtlTest members.
     """
-    for test_type in PnmFileTypeMapper._test_to_file_type.keys():
+    for test_type in PnmFileTypeMapper._test_to_file_type:
         assert isinstance(test_type, DocsPnmCmCtlTest)
 
 

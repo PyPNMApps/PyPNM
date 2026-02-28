@@ -45,7 +45,7 @@ def _make_freq_response_from_impulses(pulses: list[tuple[int, float]], nfft: int
     return H.astype(np.complex128)
 
 
-def test_direct_plus_known_echo_bin_and_distance():
+def test_direct_plus_known_echo_bin_and_distance() -> None:
     """
     Create a direct path at bin 0 and a single echo at ~20 ft.
     Validate that the detector finds the echo near the expected bin and that
@@ -100,7 +100,7 @@ def test_direct_plus_known_echo_bin_and_distance():
     assert dists == sorted(dists), "Echo distances should be non-decreasing."
 
 
-def test_snapshot_average_with_guard_and_min_separation():
+def test_snapshot_average_with_guard_and_min_separation() -> None:
     """
     Two-snapshot average case:
       - A strong artifact at 2 bins (inside the 10-ft guard → should be ignored)

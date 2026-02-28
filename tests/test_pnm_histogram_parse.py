@@ -25,7 +25,7 @@ def hist_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_hist_parses_and_model_shape(hist_bytes):
+def test_hist_parses_and_model_shape(hist_bytes) -> None:
     m = CmDsHist(hist_bytes).to_model()
 
     # Header present
@@ -52,7 +52,7 @@ def test_hist_parses_and_model_shape(hist_bytes):
 
 
 @pytest.mark.pnm
-def test_hist_serialization_roundtrip(hist_bytes):
+def test_hist_serialization_roundtrip(hist_bytes) -> None:
     h = CmDsHist(hist_bytes)
     d = h.to_dict()
     j = h.to_json()
@@ -75,6 +75,6 @@ def test_hist_serialization_roundtrip(hist_bytes):
 
 
 @pytest.mark.pnm
-def test_non_hist_file_rejected():
+def test_non_hist_file_rejected() -> None:
     with pytest.raises(ValueError):
         _ = CmDsHist(NON_HIST_PATH.read_bytes())

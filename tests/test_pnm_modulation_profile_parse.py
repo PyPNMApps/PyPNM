@@ -22,7 +22,7 @@ def modprof_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_modprof_parses_and_model_shape(modprof_bytes):
+def test_modprof_parses_and_model_shape(modprof_bytes) -> None:
     mp = CmDsOfdmModulationProfile(modprof_bytes).to_model()
     assert isinstance(mp, CmDsOfdmModulationProfileModel)
 
@@ -39,7 +39,7 @@ def test_modprof_parses_and_model_shape(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_profile_schemes_valid_and_decoded(modprof_bytes):
+def test_profile_schemes_valid_and_decoded(modprof_bytes) -> None:
     mp = CmDsOfdmModulationProfile(modprof_bytes).to_model()
 
     for profile in mp.profiles:
@@ -66,7 +66,7 @@ def test_profile_schemes_valid_and_decoded(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_serialization_roundtrip(modprof_bytes):
+def test_serialization_roundtrip(modprof_bytes) -> None:
     obj = CmDsOfdmModulationProfile(modprof_bytes)
 
     d = obj.to_dict()
@@ -78,7 +78,7 @@ def test_serialization_roundtrip(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_get_frequencies_current_behavior_is_empty(modprof_bytes):
+def test_get_frequencies_current_behavior_is_empty(modprof_bytes) -> None:
     """
     get_frequencies currently returns [] (TODO noted in implementation).
     Keep this as a behavioral check until the TODO is implemented.
@@ -90,7 +90,7 @@ def test_get_frequencies_current_behavior_is_empty(modprof_bytes):
 
 
 @pytest.mark.pnm
-def test_wrong_type_rejected():
+def test_wrong_type_rejected() -> None:
     """Feeding a non-modulation-profile file should raise ValueError."""
     raw = NON_MODPROF_PATH.read_bytes()
     with pytest.raises(ValueError):

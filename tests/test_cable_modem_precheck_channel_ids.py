@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import pytest
 
-from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
-    CableModemServicePreCheck,
-)
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
     TftpConfig,
+)
+from pypnm.api.routes.common.classes.operation.cable_modem_precheck import (
+    CableModemServicePreCheck,
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.lib.types import ChannelId, InterfaceIndex

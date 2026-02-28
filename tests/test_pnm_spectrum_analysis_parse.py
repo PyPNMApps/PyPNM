@@ -20,7 +20,7 @@ def spectrum_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes):
+def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
     m = sa.to_model()
 
@@ -50,7 +50,7 @@ def test_spectrum_analyzer_parses_and_model_shape(spectrum_bytes):
 
 
 @pytest.mark.pnm
-def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes):
+def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
 
     d = sa.to_dict()
@@ -67,7 +67,7 @@ def test_spectrum_analyzer_json_and_dict_roundtrip(spectrum_bytes):
 
 
 @pytest.mark.pnm
-def test_bin_frequency_spacing_consistency(spectrum_bytes):
+def test_bin_frequency_spacing_consistency(spectrum_bytes) -> None:
     sa = CmSpectrumAnalysis(spectrum_bytes)
     m = sa.to_model()
 
