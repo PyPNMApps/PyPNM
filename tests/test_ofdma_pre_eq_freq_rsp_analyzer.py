@@ -14,9 +14,8 @@ from pypnm.lib.signal_processing.ofdma_pre_eq_freq_rsp_analyzer import (
     OfdmaPreEqFrequencyResponseAnalysisResult,
     OfdmaPreEqFrequencyResponseAnalyzer,
 )
-from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq
 from pypnm.lib.types import FrequencyHz
-
+from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq
 
 DATA_DIR: Path = Path(__file__).parent / "files"
 US_PREEQ_PATH: Path = DATA_DIR / "us_pre_equalizer_coef.bin"

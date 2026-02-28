@@ -108,6 +108,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - Testing expectations:
   - Run at least: `python3 -m compileall src`, `ruff check src`, `ruff format --check .`, `pytest -q`.
   - After any code change, run `ruff check src` and `pytest -q`. If only Markdown changes are made, run `mkdocs build -s` instead.
+  - This is mandatory for every code update in this repo: do not finalize work without reporting `ruff check` and `pytest` results (or a clear blocker).
   - If an integration test is optional/gated (for example Postgres DSN), note skips explicitly in the summary.
 - Troubleshooting:
   - When debugging endpoint behavior, include `tail -n 25 /home/dev01/Projects/PyPNM/logs/pypnm.log` in the troubleshooting steps.
