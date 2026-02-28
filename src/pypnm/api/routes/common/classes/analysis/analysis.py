@@ -83,6 +83,9 @@ from pypnm.lib.signal_processing.butterworth import (
 from pypnm.lib.signal_processing.complex_array_ops import ComplexArrayOps
 from pypnm.lib.signal_processing.group_delay import GroupDelay
 from pypnm.lib.signal_processing.linear_regression import LinearRegression1D
+from pypnm.lib.signal_processing.ofdma_pre_eq_freq_rsp_analyzer import (
+    OfdmaPreEqFrequencyResponseAnalyzer,
+)
 from pypnm.lib.signal_processing.shan.series import Shannon, ShannonSeries
 from pypnm.lib.types import (
     ArrayLike,
@@ -142,6 +145,7 @@ RXMER_CLIPPED_HIGH = 63.5
 
 # Constants for Signal Processing
 CHAN_EST_BW_CUTOFF_FRACTION: float = 0.25
+PRE_EQ_ANALYZER_FLOOR_DB: float = -120.0
 
 class AnalysisType(Enum):
     """
@@ -1005,8 +1009,6 @@ class Analysis:
         UsOfdmaUsPreEqAnalysisModel
             Typed model with carrier values, signal statistics, and echo results.
         """
-        log = logging.getLogger(f"{cls.__name__}")
-
         channel_id: ChannelId                   = measurement.get("channel_id",                    INVALID_CHANNEL_ID)
         subcarrier_spacing: FrequencyHz         = measurement.get("subcarrier_spacing",            INVALID_START_VALUE)
         first_active_subcarrier_index: int      = measurement.get("first_active_subcarrier_index", INVALID_START_VALUE)
@@ -1024,15 +1026,38 @@ class Analysis:
         if not values:
             raise ValueError("No complex pre-equalization values provided in measurement.")
 
-        start_freq: FrequencyHz  = cast(FrequencyHz, (subcarrier_spacing * first_active_subcarrier_index) + subcarrier_zero_frequency)
-        freqs: FrequencySeriesHz = cast(FrequencySeriesHz, [start_freq + (i * subcarrier_spacing) for i in range(len(values))])
+        return cls._build_us_ofdma_pre_eq_analysis_result(
+            channel_id                     = ChannelId(channel_id),
+            subcarrier_spacing             = subcarrier_spacing,
+            first_active_subcarrier_index  = first_active_subcarrier_index,
+            subcarrier_zero_frequency      = subcarrier_zero_frequency,
+            occupied_channel_bandwidth     = occupied_channel_bandwidth,
+            values                         = values,
+            device_details                 = measurement.get("device_details", {}),
+            pnm_header                     = measurement.get("pnm_header", {}),
+            mac_address                    = MacAddressStr(measurement.get("mac_address", "")),
+            log_message_prefix             = "US OFDMA Pre-Eq",
+        )
 
-        gd = GroupDelay.from_channel_estimate(Hhat=values, df_hz=subcarrier_spacing, f0_hz=start_freq)
-        gd_results = gd.to_result()
+    @classmethod
+    def _build_us_ofdma_pre_eq_analysis_result(
+        cls,
+        *,
+        channel_id: ChannelId,
+        subcarrier_spacing: FrequencyHz,
+        first_active_subcarrier_index: int,
+        subcarrier_zero_frequency: FrequencyHz,
+        occupied_channel_bandwidth: FrequencyHz,
+        values: ComplexArray,
+        device_details: Mapping[str, Any],
+        pnm_header: Mapping[str, Any],
+        mac_address: MacAddressStr,
+        log_message_prefix: str,
+    ) -> UsOfdmaUsPreEqAnalysisModel:
+        """Shared OFDMA pre-equalization analysis implementation for dict/model inputs."""
+        log = logging.getLogger(f"{cls.__name__}")
 
-        cao = ComplexArrayOps(values)
-        magnitudes_db_raw: FloatSeries = cao.to_list(cao.power_db())
-
+        start_freq: FrequencyHz = FrequencyHz((subcarrier_spacing * first_active_subcarrier_index) + subcarrier_zero_frequency)
         complex_arr = np.asarray(
             [
                 complex(v[0], v[1])
@@ -1043,13 +1068,28 @@ class Analysis:
             dtype=np.complex128,
         )
 
+        preeq_analyzer = OfdmaPreEqFrequencyResponseAnalyzer(iq=complex_arr)
+        preeq_analysis = preeq_analyzer.analyze(
+            start_hz   = FrequencyHz(int(start_freq)),
+            spacing_hz = FrequencyHz(int(subcarrier_spacing)),
+            floor_db   = PRE_EQ_ANALYZER_FLOOR_DB,
+        )
+
+        freqs: FrequencySeriesHz = cast(
+            FrequencySeriesHz,
+            [FrequencyHz(int(round(freq))) for freq in preeq_analysis.frequency_hz.tolist()],
+        )
+
+        gd = GroupDelay.from_channel_estimate(Hhat=values, df_hz=subcarrier_spacing, f0_hz=start_freq)
+        gd_results = gd.to_result()
+
+        magnitudes_db_raw: FloatSeries = np.asarray(preeq_analysis.magnitude_db, dtype=np.float64).tolist()
+
         try:
-            cutoff_hz: FrequencyHz = FrequencyHz(
-                int(float(subcarrier_spacing) * CHAN_EST_BW_CUTOFF_FRACTION)
-            )
+            cutoff_hz: FrequencyHz = FrequencyHz(int(float(subcarrier_spacing) * CHAN_EST_BW_CUTOFF_FRACTION))
 
             mag_filter = MagnitudeButterworthFilter.from_subcarrier_spacing(
-                subcarrier_spacing_hz = FrequencyHz(subcarrier_spacing),
+                subcarrier_spacing_hz = FrequencyHz(int(subcarrier_spacing)),
                 cutoff_hz             = cutoff_hz,
                 order                 = DEFAULT_BUTTERWORTH_ORDER,
                 zero_phase            = True,
@@ -1068,33 +1108,37 @@ class Analysis:
         )
 
         magn_linear = np.power(10.0, np.asarray(magnitudes_db, dtype=np.float64) / 20.0)
-        phases      = np.angle(complex_arr)
-        H_smooth    = magn_linear * np.exp(1j * phases)
+        phases = np.angle(complex_arr)
+        H_smooth = magn_linear * np.exp(1j * phases)
 
-        N      = len(values)
-        n_fft  = 1 << (N - 1).bit_length()
+        n_samples = len(values)
+        n_fft = 1 << (n_samples - 1).bit_length()
         if n_fft < 1024:
             n_fft = 1024
 
-        fs = float(N) * float(subcarrier_spacing)
+        fs = float(n_samples) * float(subcarrier_spacing)
         max_delay_s_used = 3.5e-6
 
         cable_type_name = "RG6"
-        v               = SPEED_OF_LIGHT * CABLE_VF.get(cable_type_name, 0.87)
-        max_dist_m      = 0.5 * v * max_delay_s_used
-        i_stop          = int(max_delay_s_used * fs)
+        velocity = SPEED_OF_LIGHT * CABLE_VF.get(cable_type_name, 0.87)
+        max_dist_m = 0.5 * velocity * max_delay_s_used
+        i_stop = int(max_delay_s_used * fs)
         log.debug(
-            "US OFDMA Pre-Eq EchoDetector window: fs=%.3f Hz, n_fft=%d, i_stop=%d bins, "
-            "max_delay=%.2fus, max_dist≈%.1f m",
-            fs, n_fft, i_stop, max_delay_s_used * 1e6, max_dist_m
+            "%s EchoDetector window: fs=%.3f Hz, n_fft=%d, i_stop=%d bins, max_delay=%.2fus, max_dist≈%.1f m",
+            log_message_prefix,
+            fs,
+            n_fft,
+            i_stop,
+            max_delay_s_used * 1e6,
+            max_dist_m,
         )
 
         det = EchoDetector(
-            freq_data               = H_smooth.tolist(),
-            subcarrier_spacing_hz   = float(subcarrier_spacing),
-            n_fft                   = 4096,
-            cable_type              = cable_type_name,
-            channel_id              = channel_id,
+            freq_data             = H_smooth.tolist(),
+            subcarrier_spacing_hz = float(subcarrier_spacing),
+            n_fft                 = 4096,
+            cable_type            = cable_type_name,
+            channel_id            = ChannelId(channel_id),
         )
 
         echo_report: EchoDetectorReport = det.multi_echo(
@@ -1110,7 +1154,7 @@ class Analysis:
             window                = "hann",
         )
 
-        i_stop     = int(np.ceil(max_delay_s_used * det.fs))
+        i_stop = int(np.ceil(max_delay_s_used * det.fs))
         edge_guard = 8
         if echo_report.echoes:
             echo_report.echoes = [
@@ -1119,8 +1163,8 @@ class Analysis:
             ]
 
         echo_rpt = EchoDatasetModel(
-            type    = EchoDetectorType.IFFT,
-            report  = echo_report,
+            type   = EchoDetectorType.IFFT,
+            report = echo_report,
         )
 
         carrier_values: OfdmaUsPreEqCarrierModel = OfdmaUsPreEqCarrierModel(
@@ -1135,21 +1179,21 @@ class Analysis:
         )
 
         result_model: UsOfdmaUsPreEqAnalysisModel = UsOfdmaUsPreEqAnalysisModel(
-            device_details                  = measurement.get("device_details", {}),
-            pnm_header                      = measurement.get("pnm_header", {}),
-            mac_address                     = MacAddressStr(measurement.get("mac_address", "")),
-            channel_id                      = ChannelId(channel_id),
-            subcarrier_spacing              = subcarrier_spacing,
-            first_active_subcarrier_index   = first_active_subcarrier_index,
-            subcarrier_zero_frequency       = subcarrier_zero_frequency,
-            carrier_values                  = carrier_values,
-            signal_statistics               = signal_stats_model,
-            echo                            = echo_rpt,
+            device_details                 = device_details,
+            pnm_header                     = pnm_header,
+            mac_address                    = mac_address,
+            channel_id                     = ChannelId(channel_id),
+            subcarrier_spacing             = subcarrier_spacing,
+            first_active_subcarrier_index  = first_active_subcarrier_index,
+            subcarrier_zero_frequency      = subcarrier_zero_frequency,
+            carrier_values                 = carrier_values,
+            signal_statistics              = signal_stats_model,
+            echo                           = echo_rpt,
         )
 
         if log.isEnabledFor(logging.DEBUG):
             LogFile.write(
-                f'UsOfdmaUsPreEqAnalysisModel_{result_model.mac_address}_{result_model.channel_id}.log',
+                f"UsOfdmaUsPreEqAnalysisModel_{result_model.mac_address}_{result_model.channel_id}.log",
                 result_model,
             )
 
@@ -2114,8 +2158,6 @@ class Analysis:
         - Complex samples passthrough
         - Signal statistics over the (smoothed) magnitude sequence
         """
-        log = logging.getLogger(f"{cls.__name__}")
-
         subcarrier_spacing: FrequencyHz         = FrequencyHz(int(getattr(model, "subcarrier_spacing",       INVALID_START_VALUE)))
         first_active_subcarrier_index: int      = int(getattr(model, "first_active_subcarrier_index",        INVALID_START_VALUE))
         subcarrier_zero_frequency: FrequencyHz  = FrequencyHz(int(getattr(model, "subcarrier_zero_frequency", INVALID_START_VALUE)))
@@ -2132,136 +2174,18 @@ class Analysis:
         if not values:
             raise ValueError("No complex pre-equalization values provided in model.")
 
-        start_freq: FrequencyHz  = FrequencyHz((subcarrier_spacing * first_active_subcarrier_index) + subcarrier_zero_frequency)
-        freqs: FrequencySeriesHz = cast(FrequencySeriesHz, [start_freq + (i * subcarrier_spacing) for i in range(len(values))])
-
-        gd = GroupDelay.from_channel_estimate(Hhat=values, df_hz=subcarrier_spacing, f0_hz=start_freq)
-        gd_results = gd.to_result()
-
-        cao = ComplexArrayOps(values)
-        magnitudes_db_raw: FloatSeries = cao.to_list(cao.power_db())
-
-        complex_arr = np.asarray(
-            [
-                complex(v[0], v[1])
-                if (not isinstance(v, complex)) and isinstance(v, (list, tuple)) and len(v) == 2
-                else complex(v)
-                for v in values
-            ],
-            dtype=np.complex128,
+        return cls._build_us_ofdma_pre_eq_analysis_result(
+            channel_id                     = ChannelId(getattr(model, "channel_id", INVALID_CHANNEL_ID)),
+            subcarrier_spacing             = subcarrier_spacing,
+            first_active_subcarrier_index  = first_active_subcarrier_index,
+            subcarrier_zero_frequency      = subcarrier_zero_frequency,
+            occupied_channel_bandwidth     = occupied_channel_bandwidth,
+            values                         = values,
+            device_details                 = getattr(model, "device_details", {}),
+            pnm_header                     = model.pnm_header.model_dump() if hasattr(model.pnm_header, "model_dump") else getattr(model, "pnm_header", {}),
+            mac_address                    = MacAddressStr(getattr(model, "mac_address", MacAddress.null())),
+            log_message_prefix             = "US OFDMA Pre-Eq model",
         )
-
-        try:
-            cutoff_hz: FrequencyHz = FrequencyHz(
-                int(float(subcarrier_spacing) * CHAN_EST_BW_CUTOFF_FRACTION)
-            )
-
-            mag_filter = MagnitudeButterworthFilter.from_subcarrier_spacing(
-                subcarrier_spacing_hz = FrequencyHz(int(subcarrier_spacing)),
-                cutoff_hz             = cutoff_hz,
-                order                 = DEFAULT_BUTTERWORTH_ORDER,
-                zero_phase            = True,
-            )
-
-            mag_result = mag_filter.apply(np.asarray(magnitudes_db_raw, dtype=np.float64))
-            magnitudes_db: FloatSeries = mag_result.filtered_values.tolist()
-        except Exception:
-            magnitudes_db = magnitudes_db_raw
-
-        signal_stats_model: SignalStatisticsModel = SignalStatistics(magnitudes_db).compute()
-
-        group_delay_stats: GrpDelayStatsModel = GrpDelayStatsModel(
-            group_delay_unit = "microsecond",
-            magnitude        = ComplexArrayOps.to_list(gd_results.group_delay_us),
-        )
-
-        magn_linear = np.power(10.0, np.asarray(magnitudes_db, dtype=np.float64) / 20.0)
-        phases      = np.angle(complex_arr)
-        H_smooth    = magn_linear * np.exp(1j * phases)
-
-        N      = len(values)
-        n_fft  = 1 << (N - 1).bit_length()
-        if n_fft < 1024:
-            n_fft = 1024
-
-        fs = float(N) * float(subcarrier_spacing)
-        max_delay_s_used = 3.5e-6
-
-        cable_type_name = "RG6"
-        v               = SPEED_OF_LIGHT * CABLE_VF.get(cable_type_name, 0.87)
-        max_dist_m      = 0.5 * v * max_delay_s_used
-        i_stop          = int(max_delay_s_used * fs)
-        log.debug(
-            "US OFDMA Pre-Eq (model) EchoDetector window: fs=%.3f Hz, n_fft=%d, i_stop=%d bins, "
-            "max_delay=%.2fus, max_dist≈%.1f m",
-            fs, n_fft, i_stop, max_delay_s_used * 1e6, max_dist_m
-        )
-
-        det = EchoDetector(
-            freq_data               = H_smooth.tolist(),
-            subcarrier_spacing_hz   = float(subcarrier_spacing),
-            n_fft                   = 4096,
-            cable_type              = cable_type_name,
-            channel_id              = ChannelId(getattr(model, "channel_id", INVALID_CHANNEL_ID)),
-        )
-
-        echo_report: EchoDetectorReport = det.multi_echo(
-            threshold_mode        = "db_down",
-            threshold_db_down     = 60.0,
-            normalize_power       = True,
-            guard_bins            = 16,
-            min_separation_s      = 8.0 / det.fs,
-            max_delay_s           = max_delay_s_used,
-            max_peaks             = 3,
-            include_time_response = False,
-            direct_at_zero        = True,
-            window                = "hann",
-        )
-
-        i_stop     = int(np.ceil(max_delay_s_used * det.fs))
-        edge_guard = 8
-        if echo_report.echoes:
-            echo_report.echoes = [
-                e for e in echo_report.echoes
-                if (e.bin_index < (i_stop - edge_guard))
-            ]
-
-        echo_rpt = EchoDatasetModel(
-            type    = EchoDetectorType.IFFT,
-            report  = echo_report,
-        )
-
-        carrier_values: OfdmaUsPreEqCarrierModel = OfdmaUsPreEqCarrierModel(
-            carrier_count               = len(freqs),
-            frequency_unit              = "Hz",
-            frequency                   = freqs,
-            complex                     = values,
-            complex_dimension           = int(complex_arr.ndim),
-            magnitudes                  = magnitudes_db,
-            group_delay                 = group_delay_stats,
-            occupied_channel_bandwidth  = occupied_channel_bandwidth,
-        )
-
-        result_model: UsOfdmaUsPreEqAnalysisModel = UsOfdmaUsPreEqAnalysisModel(
-            device_details                  = getattr(model, "device_details", {}),
-            pnm_header                      = model.pnm_header.model_dump() if hasattr(model.pnm_header, "model_dump") else getattr(model, "pnm_header", {}),
-            mac_address                     = MacAddressStr(getattr(model, "mac_address", MacAddress.null())),
-            channel_id                      = ChannelId(getattr(model, "channel_id", INVALID_CHANNEL_ID)),
-            subcarrier_spacing              = subcarrier_spacing,
-            first_active_subcarrier_index   = first_active_subcarrier_index,
-            subcarrier_zero_frequency       = subcarrier_zero_frequency,
-            carrier_values                  = carrier_values,
-            signal_statistics               = signal_stats_model,
-            echo                            = echo_rpt,
-        )
-
-        if log.isEnabledFor(logging.DEBUG):
-            LogFile.write(
-                f'UsOfdmaUsPreEqAnalysisModel_{result_model.mac_address}_{result_model.channel_id}.log',
-                result_model,
-            )
-
-        return result_model
 
     @classmethod
     def basic_analysis_echo_detection_ifft(cls, model: CmDsOfdmChanEstimateCoefModel, cable_type: CableType = CableType.RG6, ) -> EchoDetectorReport:
