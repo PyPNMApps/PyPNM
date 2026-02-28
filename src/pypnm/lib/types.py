@@ -54,6 +54,7 @@ ArrayLikeF64 = Sequence[float] | NDArray[np.float64]
 NDArrayF64: TypeAlias   = NDArray[np.float64]
 NDArrayI64: TypeAlias   = NDArray[np.int64]
 NDArrayC128: TypeAlias  = NDArray[np.complex128]
+BoolArray: TypeAlias    = NDArray[np.bool_]
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Simple series / containers  — use TypeAlias (recommended)
@@ -208,7 +209,7 @@ __all__ = [
     "String", "StringArray",
     "ByteArray",
     # numerics
-    "Number", "Float64", "ArrayLike", "ArrayLikeF64", "NDArrayF64", "NDArrayI64",
+    "Number", "Float64", "ArrayLike", "ArrayLikeF64", "NDArrayF64", "NDArrayI64", "BoolArray",
     "FloatSeries", "TwoDFloatSeries", "FloatSequence", "IntSeries",
     # complex
     "Complex", "ComplexArray", "ComplexSeries",

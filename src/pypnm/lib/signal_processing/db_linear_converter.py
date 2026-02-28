@@ -7,7 +7,7 @@ from typing import Literal
 
 import numpy as np
 
-from pypnm.lib.types import ComplexArray, FloatSeries
+from pypnm.lib.types import ArrayLikeF64, ComplexArray, FloatSeries
 
 
 class DbLinearConverter:
@@ -19,7 +19,7 @@ class DbLinearConverter:
     - Power convention: dB = 10 * log10(P).
     - `linear_to_db(values, ref=...)` supports absolute (ref=None) or relative dB.
     - For complex samples, power per sample is (re**2 + im**2).
-    - All methods accept Python lists (or NumPy arrays) and always return lists.
+    - Methods accept Python lists (or NumPy arrays) and return lists.
     """
 
     @staticmethod
@@ -72,6 +72,37 @@ class DbLinearConverter:
             out[pos_mask] = 10.0 * np.log10(arr[pos_mask] / denom)
 
         return out.tolist()
+
+    @staticmethod
+    def magnitude_to_db(
+        values: ArrayLikeF64,
+        floor_db: float = -120.0,
+    ) -> FloatSeries:
+        """
+        Convert linear magnitudes to dB using amplitude convention.
+
+        Uses:
+            dB = 20*log10(max(magnitude, floor_linear))
+
+        where:
+            floor_linear = 10**(floor_db/20)
+        """
+        arr = np.asarray(values, dtype=float)
+        floor_linear = 10.0 ** (float(floor_db) / 20.0)
+        clipped = np.maximum(arr, floor_linear)
+        return (20.0 * np.log10(clipped)).tolist()
+
+    @staticmethod
+    def db_to_magnitude(values: ArrayLikeF64) -> FloatSeries:
+        """
+        Convert amplitude dB values to linear magnitude.
+
+        Uses:
+            magnitude = 10**(dB/20)
+        """
+        arr = np.asarray(values, dtype=float)
+        return (10.0 ** (arr / 20.0)).tolist()
+
     @staticmethod
     def complex_to_Linear(values: ComplexArray) -> FloatSeries:
         """
