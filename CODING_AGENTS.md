@@ -69,8 +69,8 @@ Before introducing new types, validators, formats, or storage conventions:
   - Strict typing everywhere; avoid `Dict`/`List`/`Tuple`/`Union` and avoid `Any`.
   - Prefer built-in generics (`dict[str, int]`, `list[str]`) and `A | B` rather than `Union`.
   - Prefer Pydantic `BaseModel` over dict returns for public interfaces.
-  - Device-scoped API responses (top-level responses that include `mac_address`) must include a top-level `system_description` field using the parsed sysDescr model.
-  - Do not omit `system_description` on device-scoped responses; when unavailable, return an empty sysDescr model rather than `null`.
+  - Device-scoped API responses must follow the canonical top-level `device` block contract (`device.mac_address`, `device.system_description`).
+  - Do not omit `device.system_description` on device-scoped responses; when unavailable, return an empty sysDescr model rather than `null`.
   - `BaseModel` fields must be one-line `Field(...)` declarations with descriptions.
   - Avoid generic returns; every method must have an explicit return type annotation.
   - Every method argument must have an explicit type annotation.
@@ -111,6 +111,15 @@ Before introducing new types, validators, formats, or storage conventions:
   - If an integration test is optional/gated (for example Postgres DSN), note skips explicitly in the summary.
 - Troubleshooting:
   - When debugging endpoint behavior, include `tail -n 25 /home/dev01/Projects/PyPNM/logs/pypnm.log` in the troubleshooting steps.
+
+## Endpoint Requirements
+
+- Device-scoped API responses must use the canonical top-level `device` block.
+- Canonical device fields are `device.mac_address` and `device.system_description`.
+- Do not introduce new top-level `mac_address` or top-level `system_description` fields for device-scoped responses.
+- `device.system_description` must always be present for device-scoped responses; return an empty sysDescr model when unavailable (never `null`).
+- Shared response models (for example `BaseDeviceResponse` / `CommonResponse`) must preserve the canonical `device` shape for endpoint outputs.
+- If legacy constructor/input shims are used internally for compatibility, endpoint JSON output must still use the canonical `device` block.
 
 ## Pytest Guidance (PyPNM Pattern)
 

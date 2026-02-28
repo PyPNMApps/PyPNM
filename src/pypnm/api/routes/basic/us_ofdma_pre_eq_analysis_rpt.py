@@ -23,6 +23,7 @@ from pypnm.api.routes.common.classes.analysis.model.schema import (
 )
 from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.matplot.manager import MatplotManager, PlotConfig
+from pypnm.lib.signal_processing.db_linear_converter import DbLinearConverter
 from pypnm.lib.signal_processing.linear_regression import LinearRegression1D
 from pypnm.lib.types import (
     ArrayLike,
@@ -262,9 +263,7 @@ class CmUsOfdmaPreEqReport(AnalysisReport):
                 time_axis_us = (t_win_s * 1e6).tolist()
 
                 # Exaggerate small echoes by plotting in dB instead of linear
-                eps      = 1e-12
-                mag_db   = 20.0 * np.log10(np.maximum(mag_win, eps))
-                mag_list = mag_db.tolist()
+                mag_list = DbLinearConverter.magnitude_to_db(mag_win, floor_db=-240.0)
 
                 cfg = PlotConfig(
                     title           = f"{prefix_title} · IFFT Time Response |h(t)| (First 5 µs)",
