@@ -167,10 +167,10 @@ class DsModulationProfileAnalysisModel(BaseAnalysisModel):
     profiles: list[ProfileAnalysisEntryModel] = Field(default_factory=list, description="Per-profile results")
 
 class OfdmaUsPreEqCarrierModel(ComplexDataCarrierModel):
-    """"""
+    channel_estimate_magnitude_db: FloatSeries = Field(..., description="Per-subcarrier channel-estimate magnitude in dB from inverse pre-equalization coefficients.")
 
 class UsOfdmaUsPreEqAnalysisModel(ComplexDataAnalysisModel):
-    """"""
+    carrier_values: OfdmaUsPreEqCarrierModel = Field(..., description="Detailed per-subcarrier OFDMA US pre-equalization results.")
 
 ParserAnalysisModelReturn = (
     ConstellationDisplayAnalysisModel
@@ -181,5 +181,3 @@ ParserAnalysisModelReturn = (
     | DsModulationProfileAnalysisModel
     | UsOfdmaUsPreEqAnalysisModel
 )
-
-

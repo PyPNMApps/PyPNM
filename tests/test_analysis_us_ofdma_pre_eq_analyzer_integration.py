@@ -53,12 +53,22 @@ def test_us_ofdma_pre_eq_dict_and_model_paths_are_parity() -> None:
 
     assert len(from_dict.carrier_values.frequency) == len(from_model.carrier_values.frequency)
     assert len(from_dict.carrier_values.magnitudes) == len(from_model.carrier_values.magnitudes)
+    assert len(from_dict.carrier_values.channel_estimate_magnitude_db) == len(from_model.carrier_values.channel_estimate_magnitude_db)
 
     assert np.allclose(
         np.asarray(from_dict.carrier_values.magnitudes, dtype=np.float64),
         np.asarray(from_model.carrier_values.magnitudes, dtype=np.float64),
         atol=1e-12,
     )
+    assert np.allclose(
+        np.asarray(from_dict.carrier_values.channel_estimate_magnitude_db, dtype=np.float64),
+        np.asarray(from_model.carrier_values.channel_estimate_magnitude_db, dtype=np.float64),
+        atol=1e-12,
+    )
+
+    dumped = from_dict.model_dump()
+    assert "carrier_values" in dumped
+    assert "channel_estimate_magnitude_db" in dumped["carrier_values"]
 
 
 @pytest.mark.pnm

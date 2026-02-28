@@ -1174,6 +1174,10 @@ class Analysis:
             complex                     = values,
             complex_dimension           = int(complex_arr.ndim),
             magnitudes                  = magnitudes_db,
+            channel_estimate_magnitude_db = np.asarray(
+                preeq_analysis.channel_estimate_magnitude_db,
+                dtype=np.float64,
+            ).tolist(),
             group_delay                 = group_delay_stats,
             occupied_channel_bandwidth  = occupied_channel_bandwidth,
         )
