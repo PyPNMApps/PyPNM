@@ -126,7 +126,7 @@ class PnmArtifactStore:
         """Ensure /tmp/pypnm uses shared-group permissions when configured as cache root."""
         expected = Path("/tmp/pypnm")
         try:
-            if self._tmp_root.resolve() != expected:
+            if self._tmp_root.resolve() != expected.resolve():
                 return
         except OSError:
             if self._tmp_root != expected:
