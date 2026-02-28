@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 from pypnm.api.routes.common.classes.analysis.analysis import Analysis
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.pnm.data_type.DocsIf3CmSpectrumAnalysisCtrlCmd import WindowFunction

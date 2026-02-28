@@ -6,6 +6,10 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
+from typing import NoReturn
+
+from pytest import MonkeyPatch
 
 from pypnm.config.pnm_artifact_storage import (
     ArtifactCacheConfig,
@@ -126,3 +130,71 @@ def test_cleanup_dir_keeps_recent_empty_dirs(tmp_path: Path) -> None:
 
     assert recent.exists()
     assert not old_file.exists()
+
+
+def test_tmp_shared_root_permissions_apply_group_and_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+    store._tmp_root = Path("/tmp/pypnm")
+
+    calls: dict[str, list[tuple[object, ...]]] = {"chown": [], "chmod": []}
+
+    monkeypatch.setattr("grp.getgrnam", lambda name: SimpleNamespace(gr_gid=4321))
+    monkeypatch.setattr(
+        "os.chown",
+        lambda path, uid, gid: calls["chown"].append((Path(path), uid, gid)),
+    )
+    monkeypatch.setattr(
+        "os.chmod",
+        lambda path, mode: calls["chmod"].append((Path(path), mode)),
+    )
+
+    store._ensure_tmp_pypnm_permissions()
+
+    assert calls["chown"] == [(Path("/tmp/pypnm"), -1, 4321)]
+    assert calls["chmod"] == [(Path("/tmp/pypnm"), 0o2775)]
+
+
+def test_tmp_shared_root_permissions_without_group_still_sets_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+    store._tmp_root = Path("/tmp/pypnm")
+
+    calls: dict[str, list[tuple[object, ...]]] = {"chown": [], "chmod": []}
+
+    def _raise_missing_group(_name: str) -> NoReturn:
+        raise KeyError("pypnm")
+
+    monkeypatch.setattr("grp.getgrnam", _raise_missing_group)
+    monkeypatch.setattr(
+        "os.chown",
+        lambda path, uid, gid: calls["chown"].append((Path(path), uid, gid)),
+    )
+    monkeypatch.setattr(
+        "os.chmod",
+        lambda path, mode: calls["chmod"].append((Path(path), mode)),
+    )
+
+    store._ensure_tmp_pypnm_permissions()
+
+    assert calls["chown"] == []
+    assert calls["chmod"] == [(Path("/tmp/pypnm"), 0o2775)]
+
+
+def test_tmp_permissions_skip_non_shared_root(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    calls: dict[str, int] = {"chown": 0, "chmod": 0}
+
+    monkeypatch.setattr("grp.getgrnam", lambda name: SimpleNamespace(gr_gid=9999))
+    monkeypatch.setattr("os.chown", lambda *args, **kwargs: calls.__setitem__("chown", calls["chown"] + 1))
+    monkeypatch.setattr("os.chmod", lambda *args, **kwargs: calls.__setitem__("chmod", calls["chmod"] + 1))
+
+    store._ensure_tmp_pypnm_permissions()
+
+    assert calls["chown"] == 0
+    assert calls["chmod"] == 0

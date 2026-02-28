@@ -137,7 +137,7 @@ def test_decode_complex_wrong_endian_changes_values(q) -> None:
 
     # At least one component must differ significantly if endian is wrong.
     mismatches = 0
-    for got, (er, ei) in zip(out_be, expected):
+    for got, (er, ei) in zip(out_be, expected, strict=False):
         if not math.isclose(got.real, er, rel_tol=1e-6, abs_tol=1e-6) or \
            not math.isclose(got.imag, ei, rel_tol=1e-6, abs_tol=1e-6):
             mismatches += 1
@@ -149,6 +149,6 @@ def test_decode_complex_data_multiple_samples_roundtrip_like(q) -> None:
     blob = b"".join(_pack_q_pair(r, i, q, signed=True, endian="little") for (r, i) in samples)
     out = FixedPointDecoder.decode_complex_data(blob, q, signed=True, endian="little")
     assert len(out) == len(samples)
-    for got, (er, ei) in zip(out, samples):
+    for got, (er, ei) in zip(out, samples, strict=False):
         assert got.real == pytest.approx(er, abs=1e-4)
         assert got.imag == pytest.approx(ei,  abs=1e-4)

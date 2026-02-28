@@ -14,6 +14,7 @@ PYPNM_TAG="${PYPNM_TAG:-}"
 PYPNM_PORT="${PYPNM_PORT:-8000}"
 PYPNM_DEPLOY_DIR="${PYPNM_DEPLOY_DIR:-/opt/pypnm}"
 PYPNM_USER="${PYPNM_USER:-${USER}}"
+PYPNM_SHARED_GROUP="${PYPNM_SHARED_GROUP:-pypnm}"
 PYPNM_IMAGE="ghcr.io/PyPNMApps/pypnm:${PYPNM_TAG}"
 PYPNM_FALLBACK_TAG="${PYPNM_FALLBACK_TAG:-v0.9.34.0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,6 +36,18 @@ trap cleanup EXIT
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "Error: missing required command: $1" >&2; exit 1; }
+}
+
+run_with_privilege_if_needed() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return $?
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return $?
+  fi
+  return 1
 }
 
 usage() {
@@ -230,6 +243,57 @@ ensure_compose_ok() {
   exit 1
 }
 
+ensure_pypnm_shared_group() {
+  local users=("${PYPNM_USER}" "${SUDO_USER:-}" "${USER}")
+  local target_user=""
+
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    echo "Skipping '${PYPNM_SHARED_GROUP}' group setup on non-Linux host."
+    return
+  fi
+
+  if getent group "${PYPNM_SHARED_GROUP}" >/dev/null 2>&1; then
+    echo "Group '${PYPNM_SHARED_GROUP}' already exists."
+  else
+    run_with_privilege_if_needed groupadd "${PYPNM_SHARED_GROUP}" || {
+      echo "Unable to create group '${PYPNM_SHARED_GROUP}'." >&2
+      return
+    }
+    echo "Created group '${PYPNM_SHARED_GROUP}'."
+  fi
+
+  for target_user in "${users[@]}"; do
+    [[ -z "${target_user}" ]] && continue
+    if ! id "${target_user}" >/dev/null 2>&1; then
+      continue
+    fi
+    if id -nG "${target_user}" 2>/dev/null | tr ' ' '\n' | grep -qx "${PYPNM_SHARED_GROUP}"; then
+      continue
+    fi
+    if run_with_privilege_if_needed usermod -aG "${PYPNM_SHARED_GROUP}" "${target_user}"; then
+      echo "Added user '${target_user}' to group '${PYPNM_SHARED_GROUP}'."
+    else
+      echo "Unable to add user '${target_user}' to group '${PYPNM_SHARED_GROUP}'." >&2
+    fi
+  done
+}
+
+ensure_tmp_pypnm_shared_permissions() {
+  local tmp_root="/tmp/pypnm"
+  mkdir -p "${tmp_root}" || {
+    echo "Unable to create ${tmp_root}" >&2
+    return
+  }
+
+  chgrp "${PYPNM_SHARED_GROUP}" "${tmp_root}" >/dev/null 2>&1 || run_with_privilege_if_needed chgrp "${PYPNM_SHARED_GROUP}" "${tmp_root}" >/dev/null 2>&1 || {
+    echo "Unable to set group '${PYPNM_SHARED_GROUP}' on ${tmp_root}" >&2
+  }
+
+  chmod 2775 "${tmp_root}" >/dev/null 2>&1 || run_with_privilege_if_needed chmod 2775 "${tmp_root}" >/dev/null 2>&1 || {
+    echo "Unable to set permissions 2775 on ${tmp_root}" >&2
+  }
+}
+
 set_env_var() {
   local file="$1"
   local key="$2"
@@ -348,7 +412,8 @@ sync_deploy_bundle() {
   sudo rm -rf "${PYPNM_DEPLOY_DIR}"
   sudo mkdir -p "${PYPNM_DEPLOY_DIR}"
   (cd "${source_dir}" && sudo tar -cf - .) | (cd "${PYPNM_DEPLOY_DIR}" && sudo tar -xf -)
-  sudo chown -R "${PYPNM_USER}:${PYPNM_USER}" "${PYPNM_DEPLOY_DIR}"
+  sudo chown -R "${PYPNM_USER}:${PYPNM_SHARED_GROUP}" "${PYPNM_DEPLOY_DIR}"
+  sudo chmod 2775 "${PYPNM_DEPLOY_DIR}" || true
 }
 
 initialize_bundle() {
@@ -409,6 +474,8 @@ main() {
   require_cmd python3
   ensure_docker_ok
   ensure_compose_ok
+  ensure_pypnm_shared_group
+  ensure_tmp_pypnm_shared_permissions
   sync_deploy_bundle
   initialize_bundle
   pull_and_start

@@ -23,7 +23,7 @@ def _mk_linear_phase(freqs_hz: np.ndarray, tau_s: float) -> np.ndarray:
 
 
 @pytest.mark.pnm
-def test_group_delay_constant_for_linear_phase_single_snapshot():
+def test_group_delay_constant_for_linear_phase_single_snapshot() -> None:
     K = 256
     tau_true = 5e-6
     f0 = 100e6
@@ -40,7 +40,7 @@ def test_group_delay_constant_for_linear_phase_single_snapshot():
 
 
 @pytest.mark.pnm
-def test_group_delay_median_across_snapshots_with_noise():
+def test_group_delay_median_across_snapshots_with_noise() -> None:
     K = 128
     M = 5
     tau_true = 2.5e-6
@@ -66,7 +66,7 @@ def test_group_delay_median_across_snapshots_with_noise():
 
 
 @pytest.mark.pnm
-def test_input_encodings_pairs_and_mk2():
+def test_input_encodings_pairs_and_mk2() -> None:
     K = 64
     tau_true = 1e-6
     f0 = 200e6
@@ -91,7 +91,7 @@ def test_input_encodings_pairs_and_mk2():
 
 
 @pytest.mark.pnm
-def test_snapshot_group_delay_shape():
+def test_snapshot_group_delay_shape() -> None:
     K = 33
     M = 3
     tau_true = 4e-6
@@ -106,7 +106,7 @@ def test_snapshot_group_delay_shape():
 
 
 @pytest.mark.pnm
-def test_model_build_and_alias_fields():
+def test_model_build_and_alias_fields() -> None:
     K = 40
     tau_true = 3e-6
     f0, df = 70e6, 25e3
@@ -131,7 +131,7 @@ def test_model_build_and_alias_fields():
 
 
 @pytest.mark.pnm
-def test_to_dict_uses_alias_and_is_serializable():
+def test_to_dict_uses_alias_and_is_serializable() -> None:
     K = 16
     tau_true = 1e-6
     f0, df = 10e6, 25e3
@@ -150,7 +150,7 @@ def test_to_dict_uses_alias_and_is_serializable():
 
 
 @pytest.mark.pnm
-def test_validation_duplicate_freqs_and_mismatched_lengths():
+def test_validation_duplicate_freqs_and_mismatched_lengths() -> None:
     freqs = np.array([100.0, 100.0, 200.0])
     H = np.array([1+0j, 1+0j, 1+0j])
     calc = GroupDelayCalculator(H, freqs)

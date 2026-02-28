@@ -74,5 +74,5 @@ def test_snr_to_snr_limit_roundtrip() -> None:
     expected_db_limits = [Shannon.bits_to_snr(b) for b in bits_limits]
     got = Shannon.snr_to_snr_limit(snrs)
     assert len(got) == len(expected_db_limits)
-    for g, e in zip(got, expected_db_limits):
+    for g, e in zip(got, expected_db_limits, strict=False):
         assert g == pytest.approx(e, rel=1e-12)

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import grp
 import json
 import logging
 import os
@@ -57,6 +58,8 @@ class PnmArtifactStore:
         self._last_cleanup = 0.0
 
         self._pnm_dir.mkdir(parents=True, exist_ok=True)
+        self._tmp_root.mkdir(parents=True, exist_ok=True)
+        self._ensure_tmp_pypnm_permissions()
         self._ingress_dir.mkdir(parents=True, exist_ok=True)
         self._materialized_dir.mkdir(parents=True, exist_ok=True)
 
@@ -76,6 +79,8 @@ class PnmArtifactStore:
         Path
             Filesystem path where callers can write the ingress artifact.
         """
+        self._tmp_root.mkdir(parents=True, exist_ok=True)
+        self._ensure_tmp_pypnm_permissions()
         self._ingress_dir.mkdir(parents=True, exist_ok=True)
         return self._ingress_dir / self._normalize_ingress_name(filename)
 
@@ -116,6 +121,34 @@ class PnmArtifactStore:
         if len(matches) == 1:
             return matches[0]
         return None
+
+    def _ensure_tmp_pypnm_permissions(self) -> None:
+        """Ensure /tmp/pypnm uses shared-group permissions when configured as cache root."""
+        expected = Path("/tmp/pypnm")
+        try:
+            if self._tmp_root.resolve() != expected:
+                return
+        except OSError:
+            if self._tmp_root != expected:
+                return
+
+        try:
+            pypnm_gid = grp.getgrnam("pypnm").gr_gid
+        except KeyError:
+            pypnm_gid = None
+
+        if pypnm_gid is not None:
+            try:
+                os.chown(self._tmp_root, -1, pypnm_gid)
+            except OSError as exc:
+                self.logger.warning("Unable to set group 'pypnm' on %s: %s", self._tmp_root, exc)
+        else:
+            self.logger.warning("Group 'pypnm' not found; continuing without chgrp for %s", self._tmp_root)
+
+        try:
+            os.chmod(self._tmp_root, 0o2775)
+        except OSError as exc:
+            self.logger.warning("Unable to set permissions 2775 on %s: %s", self._tmp_root, exc)
 
     @staticmethod
     def _normalize_ingress_name(filename: FileNameStr) -> str:

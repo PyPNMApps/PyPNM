@@ -33,7 +33,7 @@ def _p(name: str) -> Path:
 
 
 @pytest.mark.pnm
-def test_data_files_present():
+def test_data_files_present() -> None:
     assert DATA_DIR.is_dir()
     for f in ALL_FILES:
         assert _p(f).is_file(), f"Missing test file: {f}"
@@ -41,7 +41,7 @@ def test_data_files_present():
 
 @pytest.mark.pnm
 @pytest.mark.parametrize("fname", ALL_FILES)
-def test_pnm_header_per_file(fname: str):
+def test_pnm_header_per_file(fname: str) -> None:
     """Exercise PnmHeader parsing for each file and validate invariants."""
     data = _p(fname).read_bytes()
     hdr = PnmHeader.from_bytes(data)

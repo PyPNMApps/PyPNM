@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from typing import NoReturn
 
 import pytest
 
@@ -77,7 +78,7 @@ def test_subprocess_exception_returns_false(
 ) -> None:
     monkeypatch.setattr("platform.system", lambda: "Linux")
 
-    def boom(*args, **kwargs):
+    def boom(*args, **kwargs) -> NoReturn:
         raise OSError("no ping here")
 
     monkeypatch.setattr("subprocess.run", boom)

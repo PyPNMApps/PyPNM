@@ -12,7 +12,7 @@ from pypnm.api.routes.basic.spec_analyzer_analysis_rpt import (
     SpectrumAnalyzerSignalProcessRptModel,
 )
 from pypnm.lib.db.json_transaction import JsonTransactionDb
-from pypnm.lib.types import ChannelId, FrequencySeriesHz, FloatSeries
+from pypnm.lib.types import ChannelId, FloatSeries, FrequencySeriesHz
 
 
 class _FakeAnalysis:

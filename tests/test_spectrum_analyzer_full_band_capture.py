@@ -11,7 +11,9 @@ import pytest
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.router import SpectrumAnalyzerRouter
 from pypnm.api.routes.docs.pnm.spectrumAnalyzer.schemas import SpecAnCaptureParaFullBand
 from pypnm.docsis.cable_modem import CableModem
-from pypnm.docsis.data_type.DocsIf31CmSystemCfgState import DocsIf31CmSystemCfgDiplexState
+from pypnm.docsis.data_type.DocsIf31CmSystemCfgState import (
+    DocsIf31CmSystemCfgDiplexState,
+)
 from pypnm.lib.types import FrequencyHz
 
 

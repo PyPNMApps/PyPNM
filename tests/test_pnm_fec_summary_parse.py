@@ -21,7 +21,7 @@ def fec_bytes() -> bytes:
 
 
 @pytest.mark.pnm
-def test_fec_summary_parses_and_model_shape(fec_bytes):
+def test_fec_summary_parses_and_model_shape(fec_bytes) -> None:
     """Basic parse + model shape."""
     fec = CmDsOfdmFecSummary(fec_bytes).to_model()
     assert isinstance(fec, CmDsOfdmFecSummaryModel)
@@ -34,7 +34,7 @@ def test_fec_summary_parses_and_model_shape(fec_bytes):
 
 
 @pytest.mark.pnm
-def test_profiles_and_sets_are_consistent(fec_bytes):
+def test_profiles_and_sets_are_consistent(fec_bytes) -> None:
     """Each profile has number_of_sets matching entry arrays, and values are sane."""
     model = CmDsOfdmFecSummary(fec_bytes).to_model()
 
@@ -54,11 +54,11 @@ def test_profiles_and_sets_are_consistent(fec_bytes):
         assert all(x >= 0 for x in tot)
         assert all(x >= 0 for x in cor)
         assert all(x >= 0 for x in unc)
-        assert all(t >= c + u for t, c, u in zip(tot, cor, unc))
+        assert all(t >= c + u for t, c, u in zip(tot, cor, unc, strict=False))
 
 
 @pytest.mark.pnm
-def test_capture_time_overridden_from_first_timestamp(fec_bytes):
+def test_capture_time_overridden_from_first_timestamp(fec_bytes) -> None:
     """
     FEC Summary PNN8 omits header capture_time; the parser should override it
     from the first timestamp in the first profile.
@@ -72,14 +72,14 @@ def test_capture_time_overridden_from_first_timestamp(fec_bytes):
 
 
 @pytest.mark.pnm
-def test_summary_type_label_is_readable(fec_bytes):
+def test_summary_type_label_is_readable(fec_bytes) -> None:
     model = CmDsOfdmFecSummary(fec_bytes).to_model()
     # label should be a non-empty string; known mapping currently has "24-hour interval" for type 2
     assert isinstance(model.summary_type_label, str) and model.summary_type_label
 
 
 @pytest.mark.pnm
-def test_serialization_roundtrip(fec_bytes):
+def test_serialization_roundtrip(fec_bytes) -> None:
     obj = CmDsOfdmFecSummary(fec_bytes)
 
     d = obj.to_dict()
@@ -91,7 +91,7 @@ def test_serialization_roundtrip(fec_bytes):
 
 
 @pytest.mark.pnm
-def test_wrong_type_rejected():
+def test_wrong_type_rejected() -> None:
     """Smoke check: feeding a non-FEC file should raise ValueError."""
     # Use another PNM sample as a negative test if present; fallback to rxmer.bin
     alt_path = DATA_DIR / "rxmer.bin"

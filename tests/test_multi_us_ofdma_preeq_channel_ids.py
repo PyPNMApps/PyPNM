@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
-from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.router import MultiUsOfdmaPreEqRouter
-from pypnm.api.routes.common.extended.common_measure_schema import UpstreamOfdmaParameters
+from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.router import (
+    MultiUsOfdmaPreEqRouter,
+)
+from pypnm.api.routes.common.extended.common_measure_schema import (
+    UpstreamOfdmaParameters,
+)
 from pypnm.lib.types import ChannelId
 
 

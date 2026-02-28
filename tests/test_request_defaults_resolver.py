@@ -17,10 +17,10 @@ from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_snmp im
     SNMPConfig,
     SNMPv2c,
 )
-from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.common.classes.common_endpoint_classes.schemas import (
     PnmSingleCaptureRequest,
 )
+from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.inet import Inet
 

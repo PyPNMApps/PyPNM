@@ -7,8 +7,6 @@ from multiprocessing import get_context
 from multiprocessing.synchronize import Event
 from pathlib import Path
 
-import pytest
-
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.lib.types import GroupId, TransactionId
 

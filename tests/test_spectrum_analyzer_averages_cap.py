@@ -57,4 +57,4 @@ async def test_spectrum_analyzer_averages_capped_to_one() -> None:
 
     assert status == ServiceStatusCode.SUCCESS
     assert cm.last_cmd is not None
-    assert getattr(cm.last_cmd, "docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages") == 1
+    assert cm.last_cmd.docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages == 1
