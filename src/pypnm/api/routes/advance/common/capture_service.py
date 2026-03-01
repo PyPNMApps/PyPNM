@@ -105,7 +105,8 @@ class AbstractCaptureService(ABC):
             "duration":         self.duration,
             "interval":         self.interval,
             "time_remaining":   self.time_remaining,
-            "samples":          []
+            "samples":          [],
+            "task":             None,
         }
 
         self.setOperationFinalInvocation(operation_id, False)
@@ -115,78 +116,96 @@ class AbstractCaptureService(ABC):
             f"({self.duration}s @ {self.interval}s interval)")
 
         async def _runner() -> None:
+            try:
+                end_time = start_time + self.duration
 
-            end_time = start_time + self.duration
+                while (time.time() < end_time) and self._ops[operation_id]["state"] == OperationState.RUNNING:
 
-            while (time.time() < end_time) and self._ops[operation_id]["state"] == OperationState.RUNNING:
+                    now = time.time()
+                    remaining = max(0, int(end_time - now))
+                    self._ops[operation_id]["time_remaining"] = remaining
+                    iteration_ts = Generate.time_stamp()
 
-                now = time.time()
-                remaining = max(0, int(end_time - now))
-                self._ops[operation_id]["time_remaining"] = remaining
-                iteration_ts = Generate.time_stamp()
+                    # Add a waitup front so that it can goto the next function
+                    await asyncio.sleep(self.interval)
 
-                # Add a waitup front so that it can goto the next function
-                await asyncio.sleep(self.interval)
-
-                try:
-                    msg_rsp = await self._capture_message_response()
-                    samples = self._process_captures(msg_rsp)
-                    for sample in samples:
-                        self._ops[operation_id]["samples"].append(sample)
-                        if sample.transaction_id:
-                            self._cap_group.add_transaction(sample.transaction_id)
-                        self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
-
-                except Exception as exc:
-                    error_msg = str(exc)
-                    self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
-                    self._ops[operation_id]["samples"].append(CaptureSample(timestamp       =   cast(TimeStamp, iteration_ts),
-                                                                            transaction_id  =   "",
-                                                                            filename        =   "",
-                                                                            error           =   error_msg))
-
-            # Complete if still running
-            if self._ops[operation_id]["state"] == OperationState.RUNNING:
-
-                self._ops[operation_id]["state"] = OperationState.COMPLETED
-                iteration_ts = time.time()
-
-                try:
-
-                    self.logger.debug(f'Runner ended, Final Invocation , One Last Cycle before ending'
-                                    f'state={self._ops[operation_id]["state"]}'
-                                    f'time-remaining={self._ops[operation_id]["time_remaining"]}')
-
-                    self.setOperationFinalInvocation(operation_id, True)
-                    msg_rsp:MessageResponse = await self._capture_message_response()
-
-                    # This is here to before any last operation at the time of the completion of the task
-                    if msg_rsp.status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE:
-                        self.logger.info('Skipping last _capture_message_response()')
-                    else:
+                    try:
+                        msg_rsp = await self._capture_message_response()
                         samples = self._process_captures(msg_rsp)
                         for sample in samples:
                             self._ops[operation_id]["samples"].append(sample)
                             if sample.transaction_id:
                                 self._cap_group.add_transaction(sample.transaction_id)
-                            self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                            self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
 
-                except Exception as exc:
-                    error_msg = str(exc)
-                    self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
-                    self._ops[operation_id]["samples"].append(
-                        CaptureSample(timestamp         =   cast(TimeStamp, iteration_ts),
-                                      transaction_id    =   "",
-                                      filename          =   "",
-                                      error             =error_msg))
+                    except Exception as exc:
+                        error_msg = str(exc)
+                        self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
+                        self._ops[operation_id]["samples"].append(CaptureSample(timestamp       =   cast(TimeStamp, iteration_ts),
+                                                                                transaction_id  =   "",
+                                                                                filename        =   "",
+                                                                                error           =   error_msg))
 
-            self.logger.info(f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}")
+                # Complete if still running
+                if self._ops[operation_id]["state"] == OperationState.RUNNING:
+
+                    self._ops[operation_id]["state"] = OperationState.COMPLETED
+                    iteration_ts = time.time()
+
+                    try:
+
+                        self.logger.debug(f'Runner ended, Final Invocation , One Last Cycle before ending'
+                                        f'state={self._ops[operation_id]["state"]}'
+                                        f'time-remaining={self._ops[operation_id]["time_remaining"]}')
+
+                        self.setOperationFinalInvocation(operation_id, True)
+                        msg_rsp:MessageResponse = await self._capture_message_response()
+
+                        # This is here to before any last operation at the time of the completion of the task
+                        if msg_rsp.status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE:
+                            self.logger.info('Skipping last _capture_message_response()')
+                        else:
+                            samples = self._process_captures(msg_rsp)
+                            for sample in samples:
+                                self._ops[operation_id]["samples"].append(sample)
+                                if sample.transaction_id:
+                                    self._cap_group.add_transaction(sample.transaction_id)
+                                self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+
+                    except Exception as exc:
+                        error_msg = str(exc)
+                        self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
+                        self._ops[operation_id]["samples"].append(
+                            CaptureSample(timestamp         =   cast(TimeStamp, iteration_ts),
+                                          transaction_id    =   "",
+                                          filename          =   "",
+                                          error             =error_msg))
+            except asyncio.CancelledError:
+                if operation_id in self._ops and self._ops[operation_id]["state"] == OperationState.RUNNING:
+                    self._ops[operation_id]["state"] = OperationState.CANCELLED
+                self.logger.info(f"[{operation_id}] Capture session cancelled")
+                raise
+            finally:
+                if operation_id in self._ops:
+                    self.logger.info(
+                        f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}",
+                    )
 
                                             ###############
                                             # Main RUNNER #
                                             ###############
+        def _on_runner_done(task: asyncio.Task[None]) -> None:
+            op = self._ops.get(operation_id)
+            if op is None:
+                return
+            if task.cancelled() and op.get("state") in (OperationState.RUNNING, None):
+                op["state"] = OperationState.CANCELLED
+                self.logger.info(f"[{operation_id}] Capture session marked cancelled by task callback")
+
         try:
-            asyncio.create_task(_runner())
+            task = asyncio.create_task(_runner())
+            self._ops[operation_id]["task"] = task
+            task.add_done_callback(_on_runner_done)
         except Exception as exc:
             self.logger.error(f"Failed to schedule capture runner task, reason={exc}", exc_info=True)
             raise

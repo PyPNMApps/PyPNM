@@ -15,6 +15,8 @@ class OperationState(str, Enum):
             The capture task is currently in progress.
         COMPLETED:
             The capture task finished normally (duration elapsed).
+        CANCELLED:
+            The capture task was cancelled by task cancellation.
         STOPPED:
             The capture task was halted early by user request.
         UNKNOWN:
@@ -23,5 +25,6 @@ class OperationState(str, Enum):
 
     RUNNING   = "running"    # Task is active and samples are being collected
     COMPLETED = "completed"  # Task reached its full duration and ended
+    CANCELLED = "cancelled"  # Task was cancelled (asyncio task cancellation)
     STOPPED   = "stopped"    # Task was explicitly stopped before completion
     UNKNOWN   = "unknown"    # No such operation ID or state is indeterminate
