@@ -18,7 +18,7 @@ from pypnm.api.routes.basic.abstract.base_models.common_analysis import CommonAn
 from pypnm.api.routes.basic.common.signal_capture_agg import SignalCaptureAggregator
 from pypnm.api.routes.common.classes.analysis.analysis import Analysis
 from pypnm.api.routes.common.classes.analysis.model.schema import (
-    ComplexDataCarrierModel,
+    OfdmaUsPreEqCarrierModel,
     UsOfdmaUsPreEqAnalysisModel,
 )
 from pypnm.lib.csv.manager import CSVManager
@@ -46,6 +46,10 @@ class OfdmaPreEqParameters(BaseModel):
     model_config                   = ConfigDict(populate_by_name=True, extra="ignore")
     regression_line: FloatSeries   = Field(..., description="Regression fitted values per subcarrier.")
     group_delay: FloatSeries       = Field(..., description="Group delay (µs) per subcarrier.")
+    channel_estimate_magnitude_db: FloatSeries = Field(
+        default=[],
+        description="Per-subcarrier channel estimate magnitude in dB from basic OFDMA pre-eq analysis.",
+    )
 
 class IfftTimeResponse(BaseModel):
     """
@@ -318,14 +322,16 @@ class CmUsOfdmaPreEqReport(AnalysisReport):
                 subcarrier_spacing: FrequencyHz    = model.subcarrier_spacing
 
                 # Carrier values block
-                cv: ComplexDataCarrierModel        = model.carrier_values
+                cv: OfdmaUsPreEqCarrierModel       = cast(OfdmaUsPreEqCarrierModel, model.carrier_values)
                 x_raw: FloatSeries                 = list(cv.frequency)
                 y_raw: FloatSeries                 = list(cv.magnitudes)
                 cplex: ComplexArray                = list(cv.complex)
                 group_delay: FloatSeries           = list(cv.group_delay.magnitude)
+                chan_est_raw: FloatSeries          = list(getattr(cv, "channel_estimate_magnitude_db", []))
 
                 x: FloatSeries      = coerce_finite(x_raw, "raw_x")
                 y: FloatSeries      = coerce_finite(y_raw, "raw_y")
+                chan_est: FloatSeries = coerce_finite(chan_est_raw, "channel_estimate_magnitude_db") if chan_est_raw else []
                 y_hat: FloatSeries  = cast(FloatSeries, LinearRegression1D(cast(ArrayLike, y)).fitted_values())
 
                 # IFFT time series computation (seconds + linear magnitude)
@@ -348,8 +354,9 @@ class CmUsOfdmaPreEqReport(AnalysisReport):
                 )
 
                 params = OfdmaPreEqParameters(
-                    regression_line = y_hat,
-                    group_delay     = group_delay,
+                    regression_line               = y_hat,
+                    group_delay                   = group_delay,
+                    channel_estimate_magnitude_db = chan_est,
                 )
 
                 analysis_model = OfdmaPreEqAnalysis(

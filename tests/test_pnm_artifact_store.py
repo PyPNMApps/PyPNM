@@ -6,8 +6,6 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from types import SimpleNamespace
-from typing import NoReturn
 
 from pytest import MonkeyPatch
 
@@ -132,18 +130,21 @@ def test_cleanup_dir_keeps_recent_empty_dirs(tmp_path: Path) -> None:
     assert not old_file.exists()
 
 
-def test_tmp_shared_root_permissions_apply_group_and_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_tmp_shared_root_permissions_sets_0777_for_owned_tree(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     cfg = _build_config(tmp_path / "tmp", min_bytes=0)
     pnm_dir = tmp_path / "pnm"
     store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
     store._tmp_root = Path("/tmp/pypnm")
 
-    calls: dict[str, list[tuple[object, ...]]] = {"chown": [], "chmod": []}
+    calls: dict[str, list[tuple[object, ...]]] = {"chmod": []}
+    owned_uid = 1234
 
-    monkeypatch.setattr("grp.getgrnam", lambda name: SimpleNamespace(gr_gid=4321))
+    monkeypatch.setattr("os.getuid", lambda: owned_uid)
+    monkeypatch.setattr(Path, "rglob", lambda self, _pattern: [Path("/tmp/pypnm/ingress"), Path("/tmp/pypnm/materialized")])
     monkeypatch.setattr(
-        "os.chown",
-        lambda path, uid, gid: calls["chown"].append((Path(path), uid, gid)),
+        Path,
+        "stat",
+        lambda self: type("Stat", (), {"st_uid": owned_uid, "st_mtime": 0.0})(),
     )
     monkeypatch.setattr(
         "os.chmod",
@@ -152,26 +153,31 @@ def test_tmp_shared_root_permissions_apply_group_and_mode(tmp_path: Path, monkey
 
     store._ensure_tmp_pypnm_permissions()
 
-    assert calls["chown"] == [(Path("/tmp/pypnm"), -1, 4321)]
-    assert calls["chmod"] == [(Path("/tmp/pypnm"), 0o2775)]
+    assert calls["chmod"] == [
+        (Path("/tmp/pypnm"), 0o777),
+        (Path("/tmp/pypnm/ingress"), 0o777),
+        (Path("/tmp/pypnm/materialized"), 0o777),
+    ]
 
 
-def test_tmp_shared_root_permissions_without_group_still_sets_mode(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_tmp_shared_root_permissions_skips_non_owned_paths(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     cfg = _build_config(tmp_path / "tmp", min_bytes=0)
     pnm_dir = tmp_path / "pnm"
     store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
     store._tmp_root = Path("/tmp/pypnm")
 
-    calls: dict[str, list[tuple[object, ...]]] = {"chown": [], "chmod": []}
+    calls: dict[str, list[tuple[object, ...]]] = {"chmod": []}
+    owner_uid = 1111
+    other_uid = 2222
 
-    def _raise_missing_group(_name: str) -> NoReturn:
-        raise KeyError("pypnm")
+    monkeypatch.setattr("os.getuid", lambda: owner_uid)
+    monkeypatch.setattr(Path, "rglob", lambda self, _pattern: [Path("/tmp/pypnm/owned"), Path("/tmp/pypnm/foreign")])
 
-    monkeypatch.setattr("grp.getgrnam", _raise_missing_group)
-    monkeypatch.setattr(
-        "os.chown",
-        lambda path, uid, gid: calls["chown"].append((Path(path), uid, gid)),
-    )
+    def _fake_stat(path: Path) -> object:
+        uid = owner_uid if path == Path("/tmp/pypnm/owned") else other_uid
+        return type("Stat", (), {"st_uid": uid, "st_mtime": 0.0})()
+
+    monkeypatch.setattr(Path, "stat", _fake_stat)
     monkeypatch.setattr(
         "os.chmod",
         lambda path, mode: calls["chmod"].append((Path(path), mode)),
@@ -179,8 +185,7 @@ def test_tmp_shared_root_permissions_without_group_still_sets_mode(tmp_path: Pat
 
     store._ensure_tmp_pypnm_permissions()
 
-    assert calls["chown"] == []
-    assert calls["chmod"] == [(Path("/tmp/pypnm"), 0o2775)]
+    assert calls["chmod"] == [(Path("/tmp/pypnm/owned"), 0o777)]
 
 
 def test_tmp_permissions_skip_non_shared_root(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -188,13 +193,10 @@ def test_tmp_permissions_skip_non_shared_root(tmp_path: Path, monkeypatch: Monke
     pnm_dir = tmp_path / "pnm"
     store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
 
-    calls: dict[str, int] = {"chown": 0, "chmod": 0}
+    calls: dict[str, int] = {"chmod": 0}
 
-    monkeypatch.setattr("grp.getgrnam", lambda name: SimpleNamespace(gr_gid=9999))
-    monkeypatch.setattr("os.chown", lambda *args, **kwargs: calls.__setitem__("chown", calls["chown"] + 1))
     monkeypatch.setattr("os.chmod", lambda *args, **kwargs: calls.__setitem__("chmod", calls["chmod"] + 1))
 
     store._ensure_tmp_pypnm_permissions()
 
-    assert calls["chown"] == 0
     assert calls["chmod"] == 0

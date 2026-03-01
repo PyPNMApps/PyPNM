@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import grp
 import json
 import logging
 import os
@@ -59,9 +58,9 @@ class PnmArtifactStore:
 
         self._pnm_dir.mkdir(parents=True, exist_ok=True)
         self._tmp_root.mkdir(parents=True, exist_ok=True)
-        self._ensure_tmp_pypnm_permissions()
         self._ingress_dir.mkdir(parents=True, exist_ok=True)
         self._materialized_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_tmp_pypnm_permissions()
 
     def ingress_path(self, filename: FileNameStr, transaction_id: TransactionId | None = None) -> Path:
         """
@@ -80,8 +79,8 @@ class PnmArtifactStore:
             Filesystem path where callers can write the ingress artifact.
         """
         self._tmp_root.mkdir(parents=True, exist_ok=True)
-        self._ensure_tmp_pypnm_permissions()
         self._ingress_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_tmp_pypnm_permissions()
         return self._ingress_dir / self._normalize_ingress_name(filename)
 
     def ingress_candidate_path(self, filename: FileNameStr, transaction_id: TransactionId | None = None) -> Path:
@@ -123,7 +122,7 @@ class PnmArtifactStore:
         return None
 
     def _ensure_tmp_pypnm_permissions(self) -> None:
-        """Ensure /tmp/pypnm uses shared-group permissions when configured as cache root."""
+        """Ensure /tmp/pypnm and all descendants are world-writable for shared cache usage."""
         expected = Path("/tmp/pypnm")
         try:
             if self._tmp_root.resolve() != expected.resolve():
@@ -132,23 +131,20 @@ class PnmArtifactStore:
             if self._tmp_root != expected:
                 return
 
-        try:
-            pypnm_gid = grp.getgrnam("pypnm").gr_gid
-        except KeyError:
-            pypnm_gid = None
+        uid = os.getuid()
+        for path in [self._tmp_root, *self._tmp_root.rglob("*")]:
+            self._chmod_world_writable_if_owned(path, uid)
 
-        if pypnm_gid is not None:
-            try:
-                os.chown(self._tmp_root, -1, pypnm_gid)
-            except OSError as exc:
-                self.logger.warning("Unable to set group 'pypnm' on %s: %s", self._tmp_root, exc)
-        else:
-            self.logger.warning("Group 'pypnm' not found; continuing without chgrp for %s", self._tmp_root)
-
+    def _chmod_world_writable_if_owned(self, path: Path, uid: int) -> None:
+        """Set path mode to 0777 when owned by the current process user."""
         try:
-            os.chmod(self._tmp_root, 0o2775)
+            if path.stat().st_uid != uid:
+                return
+            os.chmod(path, 0o777)
+        except PermissionError:
+            return
         except OSError as exc:
-            self.logger.warning("Unable to set permissions 2775 on %s: %s", self._tmp_root, exc)
+            self.logger.warning("Unable to set permissions 0777 on %s: %s", path, exc)
 
     @staticmethod
     def _normalize_ingress_name(filename: FileNameStr) -> str:
@@ -512,17 +508,31 @@ class PnmArtifactStore:
         if ttl_seconds <= 0:
             return
         now = time.time()
+        skipped_files = 0
         for path in root.rglob("*"):
-            if path.is_file():
-                age = now - path.stat().st_mtime
-                if age >= ttl_seconds:
-                    path.unlink(missing_ok=True)
-        for path in sorted(root.rglob("*"), reverse=True):
-            if path.is_dir():
+            try:
+                if not path.is_file():
+                    continue
                 age = now - path.stat().st_mtime
                 if age < ttl_seconds:
                     continue
-                try:
-                    path.rmdir()
-                except OSError:
+                path.unlink(missing_ok=True)
+            except OSError as exc:
+                skipped_files += 1
+                self.logger.debug("Skipping cache file cleanup for %s: %s", path, exc)
+        for path in sorted(root.rglob("*"), reverse=True):
+            try:
+                if not path.is_dir():
                     continue
+                age = now - path.stat().st_mtime
+                if age < ttl_seconds:
+                    continue
+                path.rmdir()
+            except OSError:
+                continue
+        if skipped_files:
+            self.logger.warning(
+                "Skipped cleanup of %d file(s) under %s due to permission/IO errors",
+                skipped_files,
+                root,
+            )
