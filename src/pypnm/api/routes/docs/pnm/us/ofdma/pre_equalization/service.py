@@ -36,13 +36,15 @@ class CmUsOfdmaPreEqService(CommonMeasureService):
         self,
         cable_modem: CableModem,
         tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-        tftp_path: str = PnmConfigManager.get_tftp_path()
+        tftp_path: str = PnmConfigManager.get_tftp_path(),
+        system_description: dict[str, str] | None = None,
     ) -> None:
         super().__init__(
             DocsPnmCmCtlTest.US_PRE_EQUALIZER_COEF,
             cable_modem,
             tftp_servers,
             tftp_path,
-            cable_modem.getWriteCommunity()
+            cable_modem.getWriteCommunity(),
+            system_description=system_description,
         )
         self.logger = logging.getLogger(self.__class__.__name__)

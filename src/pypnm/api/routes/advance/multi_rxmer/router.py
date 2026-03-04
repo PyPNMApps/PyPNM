@@ -20,6 +20,7 @@ from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.multi_rxmer.schemas import (
     MultiRxMerAnalysisRequest,
@@ -56,6 +57,7 @@ from pypnm.api.routes.common.extended.common_measure_schema import (
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.api.routes.docs.pnm.files.service import FileType, PnmFileService
 from pypnm.docsis.cable_modem import CableModem
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 from pypnm.lib.inet import Inet, InetAddressStr
 from pypnm.lib.mac_address import MacAddress
@@ -139,7 +141,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                 f"(duration={duration}s, interval={interval}s)")
 
             snmp_config = SNMPConfig(snmp_v2c=SNMPv2c(community=community))
-            status, msg = await CableModemServicePreCheck(
+            precheck = CableModemServicePreCheck(
                 mac_address=mac_address,
                 ip_address=ip_address,
                 snmp_config=snmp_config,
@@ -147,10 +149,17 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                 validate_ofdm_exist=True,
                 validate_ds_channel_ids_exist=channel_ids,
                 validate_pnm_ready_status=True,
-            ).run_precheck()
+            )
+            status, msg = await precheck.run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(msg)
                 return SnmpResponse(mac_address=mac_address, status=status, message=msg)
+            precheck_sys_descr = precheck.get_system_description_model()
+            system_description = (
+                precheck_sys_descr.model_dump(exclude={"is_empty"})
+                if not precheck_sys_descr.is_empty
+                else None
+            )
 
             cable_modem = CableModem(
                 mac_address=MacAddress(mac_address),
@@ -167,6 +176,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     tftp_servers,
                     duration=duration,
                     interval=interval,
+                    system_description=system_description,
                     interface_parameters=interface_parameters,)
 
             elif measure_modes == MultiRxMerMeasureModes.OFDM_PERFORMANCE_1:
@@ -178,6 +188,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     tftp_servers,
                     duration=duration,
                     interval=interval,
+                    system_description=system_description,
                     interface_parameters=interface_parameters,)
 
             else:
@@ -190,6 +201,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             return MultiRxMerStartResponse(
                 mac_address =   mac_address,
+                system_description = precheck_sys_descr,
                 status      =   OperationState.RUNNING,
                 message     =   msg,
                 group_id    =   group_id,
@@ -233,6 +245,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             return MultiRxMerStatusResponse(
                 mac_address =   service.cm.get_mac_address.mac_address,
+                system_description = service.get_system_description(),
                 status      =   "success",
                 message     =   None,
                 operation   =   MultiRxMerResponseStatus(
@@ -309,6 +322,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             return MultiRxMerStatusResponse(
                 mac_address=service.cm.get_mac_address.mac_address,
+                system_description=service.get_system_description(),
                 status=OperationState.STOPPED,
                 message=None,
                 operation=MultiRxMerResponseStatus(
@@ -322,6 +336,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
         @self.router.post("/analysis",
             response_model=MultiRxMerAnalysisResponse,
+            response_model_exclude_none=True,
             summary="Perform signal analysis on a previously executed Multi-RxMER captures",
             responses=FAST_API_RESPONSE,)
         def analysis(request: MultiRxMerAnalysisRequest) -> MultiRxMerAnalysisResponse | FileResponse:
@@ -365,6 +380,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     status      =   ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
                     message     =   f"No capture group found for operation {request.operation_id}",
                     data        =   {})
+            self._repair_capture_group_from_service_samples(request.operation_id, capture_group_id)
             self.logger.info(f'[analysis] - OperationID: {request.operation_id} -> CaptureGroup: {capture_group_id}')
 
             cda = CaptureDataAggregator(capture_group_id)
@@ -432,14 +448,56 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     data        =   {})
 
             mac_address = multi_analysis.mac_address
+            fallback_mac = MacAddress.null()
+            fallback_system_description = None
+            try:
+                service_for_context = cast(MultiRxMerService, self.getService(request.operation_id))
+                fallback_mac = service_for_context.cm.get_mac_address.mac_address
+                service_sd = service_for_context.get_system_description()
+                if any(str(service_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
+                    fallback_system_description = SystemDescriptor.load_from_dict(service_sd).to_model()
+            except Exception:
+                op_rec = OperationManager.get_operation_record(request.operation_id)
+                if isinstance(op_rec, dict):
+                    metadata = op_rec.get("metadata")
+                    if isinstance(metadata, dict):
+                        md_mac = metadata.get("mac_address")
+                        if isinstance(md_mac, str) and md_mac.strip():
+                            fallback_mac = md_mac
+                        md_sd = metadata.get("system_description")
+                        if isinstance(md_sd, dict) and any(str(md_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
+                            fallback_system_description = SystemDescriptor.load_from_dict(md_sd).to_model()
+
+            if mac_address == MacAddress.null():
+                mac_address = fallback_mac
+
+            response_system_description = multi_analysis.system_description or fallback_system_description
 
             if output_type == OutputType.JSON:
+                err = multi_analysis.error
+                status_code = ServiceStatusCode.SUCCESS if not err else ServiceStatusCode.FAILURE
+                response_message = err or message
                 data = multi_analysis.model_dump().get("data", {})
+                if err:
+                    try:
+                        svc_for_err = cast(MultiRxMerService, self.getService(request.operation_id))
+                        samples_for_err = svc_for_err.results(request.operation_id)
+                        sample_errors = [str(s.error) for s in samples_for_err if getattr(s, "error", None)]
+                        if sample_errors:
+                            response_message = f"{response_message} Last capture error: {sample_errors[-1]}"
+                    except Exception:
+                        pass
+                response_kwargs: dict[str, object] = {}
+                if response_system_description is not None:
+                    response_kwargs["device"] = {
+                        "mac_address": mac_address,
+                        "system_description": response_system_description,
+                    }
                 return MultiRxMerAnalysisResponse(
                     mac_address =   mac_address,
-                    system_description = multi_analysis.system_description,
-                    status      =   ServiceStatusCode.SUCCESS,
-                    message     =   message,
+                    status      =   status_code,
+                    message     =   response_message,
+                    **response_kwargs,
                     data        =   data,)
 
             elif output_type == OutputType.ARCHIVE:

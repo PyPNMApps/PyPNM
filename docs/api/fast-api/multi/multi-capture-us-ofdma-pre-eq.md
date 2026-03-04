@@ -40,6 +40,14 @@ capture window completes, you can download a ZIP of the PNM files or run post-ca
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "running",
   "message": null,
   "group_id": "3bd6f7c107ad465b",
@@ -56,6 +64,14 @@ capture window completes, you can download a ZIP of the PNM files or run post-ca
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "success",
   "message": null,
   "operation": {
@@ -81,6 +97,31 @@ Returns a ZIP file containing the captured PNM files for each iteration.
 **Request** `DELETE /advance/multi/us/ofdmaPreEqualization/stop/{operation_id}`
 
 Stops the capture after the current iteration finishes. The `status` endpoint will reflect final state once complete.
+
+Typical stop response:
+
+```json
+{
+  "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
+  "status": "stopped",
+  "message": null,
+  "operation": {
+    "operation_id": "4aca137c1e9d4eb6",
+    "state": "stopped",
+    "collected": 8,
+    "time_remaining": 0,
+    "message": null
+  }
+}
+```
 
 ## Analysis
 
@@ -155,3 +196,11 @@ For **Echo-Detection (IFFT)**:
   }
 }
 ```
+
+## Session Metadata
+
+`system_description` behavior for multi-capture:
+1. Captured once during start precheck.
+2. Cached for the operation session.
+3. Returned in start/status/stop responses.
+4. Reused for transaction metadata insertion to avoid repeated per-sample SNMP sysDescr calls.

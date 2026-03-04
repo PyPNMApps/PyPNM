@@ -43,7 +43,12 @@ class AbstractCaptureService(ABC):
         logger (logging.Logger): Logger for operational messages.
     """
 
-    def __init__(self, duration: float, interval: float) -> None:
+    def __init__(
+        self,
+        duration: float,
+        interval: float,
+        system_description: dict[str, str] | None = None,
+    ) -> None:
         """
         Initialize the capture service framework.
 
@@ -67,6 +72,7 @@ class AbstractCaptureService(ABC):
 
         self._capture_group_id: GroupId = GroupId("")
         self._operation_id: OperationId = OperationId("")
+        self._system_description: dict[str, str] = self._normalize_system_description(system_description)
 
     async def start(self) -> tuple[GroupId, OperationId]:
         """
@@ -90,9 +96,18 @@ class AbstractCaptureService(ABC):
             self.logger.error(f"Failed to create capture group, reason={exc}", exc_info=True)
             raise
 
+        operation_metadata: dict[str, Any] = {}
+        cm = getattr(self, "cm", None)
+        mac_obj = getattr(cm, "get_mac_address", None)
+        mac_str = getattr(mac_obj, "mac_address", None)
+        if mac_str:
+            operation_metadata["mac_address"] = str(mac_str)
+        if self._has_populated_system_description(self._system_description):
+            operation_metadata["system_description"] = dict(self._system_description)
+
         try:
             om = OperationManager(capture_group_id=group_id)
-            operation_id:OperationId = om.register()
+            operation_id:OperationId = om.register(metadata=operation_metadata)
         except Exception as exc:
             self.logger.error(f"Failed to create operation manager, reason={exc}", exc_info=True)
             raise
@@ -131,12 +146,29 @@ class AbstractCaptureService(ABC):
 
                     try:
                         msg_rsp = await self._capture_message_response()
-                        samples = self._process_captures(msg_rsp)
-                        for sample in samples:
-                            self._ops[operation_id]["samples"].append(sample)
-                            if sample.transaction_id:
-                                self._cap_group.add_transaction(sample.transaction_id)
-                            self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                        if msg_rsp.status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE:
+                            self.logger.info(f"[{operation_id}] Capture iteration skipped by service status.")
+                            continue
+
+                        if isinstance(msg_rsp.payload, list):
+                            samples = self._process_captures(msg_rsp)
+                            for sample in samples:
+                                self._ops[operation_id]["samples"].append(sample)
+                                if sample.transaction_id:
+                                    self._cap_group.add_transaction(sample.transaction_id)
+                                self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                        else:
+                            status_name = msg_rsp.status.name if isinstance(msg_rsp.status, ServiceStatusCode) else str(msg_rsp.status)
+                            err = f"Capture response returned no transaction payload (status={status_name})"
+                            self.logger.warning(f"[{operation_id}] {err}")
+                            self._ops[operation_id]["samples"].append(
+                                CaptureSample(
+                                    timestamp=cast(TimeStamp, iteration_ts),
+                                    transaction_id="",
+                                    filename="",
+                                    error=err,
+                                ),
+                            )
 
                     except Exception as exc:
                         error_msg = str(exc)
@@ -165,12 +197,25 @@ class AbstractCaptureService(ABC):
                         if msg_rsp.status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE:
                             self.logger.info('Skipping last _capture_message_response()')
                         else:
-                            samples = self._process_captures(msg_rsp)
-                            for sample in samples:
-                                self._ops[operation_id]["samples"].append(sample)
-                                if sample.transaction_id:
-                                    self._cap_group.add_transaction(sample.transaction_id)
-                                self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                            if isinstance(msg_rsp.payload, list):
+                                samples = self._process_captures(msg_rsp)
+                                for sample in samples:
+                                    self._ops[operation_id]["samples"].append(sample)
+                                    if sample.transaction_id:
+                                        self._cap_group.add_transaction(sample.transaction_id)
+                                    self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
+                            else:
+                                status_name = msg_rsp.status.name if isinstance(msg_rsp.status, ServiceStatusCode) else str(msg_rsp.status)
+                                err = f"Final capture response returned no transaction payload (status={status_name})"
+                                self.logger.warning(f"[{operation_id}] {err}")
+                                self._ops[operation_id]["samples"].append(
+                                    CaptureSample(
+                                        timestamp=cast(TimeStamp, iteration_ts),
+                                        transaction_id="",
+                                        filename="",
+                                        error=err,
+                                    ),
+                                )
 
                     except Exception as exc:
                         error_msg = str(exc)
@@ -233,6 +278,10 @@ class AbstractCaptureService(ABC):
 
     def getOperationFinalInvocation(self, operation_id:OperationId) -> bool:
             return self._ops[operation_id]["final_invocation"]
+
+    def get_system_description(self) -> dict[str, str]:
+        """Return the cached session-level sysDescr payload used for multi-capture metadata."""
+        return dict(self._system_description)
 
     def status(self, operation_id: OperationId) -> dict[str, Any]:
         """
@@ -363,6 +412,12 @@ class AbstractCaptureService(ABC):
                                              filename       =   filename,
                                              error          =   "no-db-record"))
             else:
+                if not self._ensure_transaction_system_description(txn_id, rec):
+                    samples.append(CaptureSample(timestamp      =   ts,
+                                                 transaction_id =   txn_id,
+                                                 filename       =   filename,
+                                                 error          =   "missing-system-description"))
+                    continue
                 samples.append(CaptureSample(timestamp      =   ts,
                                              transaction_id =   txn_id,
                                              filename       =   filename,
@@ -402,3 +457,59 @@ class AbstractCaptureService(ABC):
           ``status == ServiceStatusCode.SKIP_MESSAGE_RESPONSE``.
         """
         ...
+
+    @staticmethod
+    def _normalize_system_description(system_description: dict[str, Any] | None) -> dict[str, str]:
+        if not isinstance(system_description, dict):
+            return {}
+        normalized: dict[str, str] = {}
+        for key in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL"):
+            value = system_description.get(key, "")
+            normalized[key] = str(value) if value is not None else ""
+        return normalized
+
+    @staticmethod
+    def _has_populated_system_description(system_description: dict[str, Any] | None) -> bool:
+        if not isinstance(system_description, dict):
+            return False
+        return any(str(system_description.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL"))
+
+    @staticmethod
+    def _extract_record_system_description(record: dict[str, Any]) -> dict[str, Any] | None:
+        device_details = record.get("device_details")
+        if not isinstance(device_details, dict):
+            return None
+        system_description = device_details.get("system_description")
+        if not isinstance(system_description, dict):
+            return None
+        return system_description
+
+    def _ensure_transaction_system_description(self, txn_id: str, record: dict[str, Any]) -> bool:
+        current = self._extract_record_system_description(record)
+        if self._has_populated_system_description(current):
+            if not self._has_populated_system_description(self._system_description):
+                self._system_description = self._normalize_system_description(current)
+            return True
+
+        if not self._has_populated_system_description(self._system_description):
+            self.logger.warning("Transaction %s missing system_description and no session fallback is available.", txn_id)
+            return False
+
+        try:
+            updated = PnmFileTransaction().update_record_system_description(
+                txn_id,
+                self._system_description,
+            )
+        except Exception as exc:
+            self.logger.error("Failed to update system_description for txn %s: %s", txn_id, exc, exc_info=True)
+            return False
+
+        if not updated:
+            self.logger.warning("Unable to persist system_description for txn %s", txn_id)
+            return False
+
+        record.setdefault("device_details", {})
+        if isinstance(record["device_details"], dict):
+            record["device_details"]["system_description"] = dict(self._system_description)
+
+        return True

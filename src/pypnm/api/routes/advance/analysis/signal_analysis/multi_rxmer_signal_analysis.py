@@ -29,6 +29,7 @@ from pypnm.api.routes.common.classes.collection.fec_summary_aggregator import (
 from pypnm.docsis.data_type.sysDescr import SystemDescriptorModel
 from pypnm.lib.constants import INVALID_CAPTURE_TIME
 from pypnm.lib.csv.manager import CSVManager
+from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.matplot.manager import MatplotManager, PlotConfig
 from pypnm.lib.signal_processing.shan.series import ShannonSeries
 from pypnm.lib.types import (
@@ -128,12 +129,23 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
         if self._model is not None:
             return self._model
 
-        mac = self.getMacAddresses()
+        macs = self.getMacAddresses()
+        if not macs:
+            err = "No captured transactions found for analysis."
+            self.logger.error(err)
+            self._model = MultiRxMerAnalysisResult(
+                mac_address=MacAddressStr(MacAddress.null()),
+                system_description=self.get_system_description_model(),
+                analysis_type=self.analysis_type,
+                data={},
+                error=err,
+            )
+            return self._model
 
-        if len(mac) > 1:
-            self.logger.error(f'Found #({len(mac)}), Not Expection more than 1 MacAddress -> {mac}')
+        if len(macs) > 1:
+            self.logger.error(f'Found #({len(macs)}), Not Expection more than 1 MacAddress -> {macs}')
 
-        mac = mac[0].to_mac_format()
+        mac = macs[0].to_mac_format()
 
         try:
             data = self._dispatch_build()
@@ -150,7 +162,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 mac_address     =   mac,
                 system_description = self.get_system_description_model(),
                 analysis_type   =   self.analysis_type,
-                data            =   None,
+                data            =   {},
                 error           =   str(e),
             )
 

@@ -244,7 +244,16 @@ class MultiOfdmChanSignalAnalysis(MultiAnalysisRpt, ABC):
         MultiChanEstimationResult
             Aggregated results for the requested analysis type.
         """
-        mac = self.getMacAddresses()[0]
+        macs = self.getMacAddresses()
+        if not macs:
+            return MultiChanEstimationResult(
+                analysis_type=self._analysis_type.name,
+                system_description=self.get_system_description_model(),
+                results=[],
+                error="No captured transactions found for analysis.",
+            )
+
+        mac = macs[0]
         self.logger.info(f"[_process] {self._analysis_type.name} for MAC={mac}")
 
         data: list[ChannelEstimationAnalysisRpt] = []

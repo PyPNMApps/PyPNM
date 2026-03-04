@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from pypnm.api.routes.advance.common.abstract.service import AbstractService
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
+from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.types import GroupId, OperationId
 
@@ -83,3 +84,51 @@ class AbstractMultiCaptureRouter(AbstractService):
         buf.seek(0)
         headers = {"Content-Disposition": f"attachment; filename={filename_prefix}_{mac}_{operation_id}.zip"}
         return StreamingResponse(buf, media_type="application/zip", headers=headers)
+
+    def _repair_capture_group_from_service_samples(self, operation_id: OperationId, capture_group_id: GroupId) -> int:
+        """
+        Backfill capture-group transaction IDs from in-memory service samples.
+
+        This is a no-op when the operation service is not available in memory.
+        Returns the number of transaction IDs added to the capture-group DB.
+        """
+        try:
+            service = self.getService(operation_id)
+        except Exception:
+            return 0
+
+        txn_ids: list[str] = []
+        for sample in service.results(operation_id):
+            txn_id = getattr(sample, "transaction_id", "")
+            if str(txn_id).strip():
+                txn_ids.append(str(txn_id))
+
+        if not txn_ids:
+            return 0
+
+        try:
+            cg = CaptureGroup(capture_group_id)
+            existing = set(str(txn) for txn in cg.getTransactionIds())
+            added = 0
+            for txn_id in txn_ids:
+                if txn_id in existing:
+                    continue
+                cg.add_transaction(txn_id)
+                existing.add(txn_id)
+                added += 1
+            if added > 0:
+                self.logger.warning(
+                    "Repaired capture group %s for op %s by adding %d transaction IDs from in-memory samples.",
+                    capture_group_id,
+                    operation_id,
+                    added,
+                )
+            return added
+        except Exception as exc:
+            self.logger.warning(
+                "Capture-group repair failed for op %s group %s: %s",
+                operation_id,
+                capture_group_id,
+                exc,
+            )
+            return 0

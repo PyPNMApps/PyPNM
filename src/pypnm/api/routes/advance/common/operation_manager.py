@@ -93,7 +93,7 @@ class OperationManager:
         except Exception as e:
             self.logger.error(f"Failed to save operation DB: {e}")
 
-    def register(self) -> OperationId:
+    def register(self, metadata: dict[str, Any] | None = None) -> OperationId:
         """
         Register this operation with its capture group ID in the DB.
 
@@ -121,6 +121,8 @@ class OperationManager:
                 "capture_group_id": self.capture_group_id,
                 "created": int(time.time())
             }
+            if isinstance(metadata, dict) and metadata:
+                db[self.operation_id]["metadata"] = metadata
             self._save(db)
             self.logger.info(
                 f"Registered operation {self.operation_id} for group {self.capture_group_id}"
@@ -174,3 +176,20 @@ class OperationManager:
         except Exception as e:
             logging.getLogger(cls.__name__).error(f"Error listing operations: {e}")
             return []
+
+    @classmethod
+    def get_operation_record(cls, operation_id: OperationId, db_path: Path | None = None) -> dict[str, Any] | None:
+        """
+        Retrieve the full persisted operation record for an operation_id.
+        """
+        if not db_path:
+            db_str = SystemConfigSettings.operation_db()
+            db_path = Path(db_str)
+        try:
+            with JsonFileLock(db_path), db_path.open("r", encoding="utf-8") as f:
+                db = json.load(f)
+            rec = db.get(operation_id)
+            return rec if isinstance(rec, dict) else None
+        except Exception as e:
+            logging.getLogger(cls.__name__).error(f"Error retrieving operation record for {operation_id}: {e}")
+            return None

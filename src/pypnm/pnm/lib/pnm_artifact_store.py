@@ -61,6 +61,7 @@ class PnmArtifactStore:
         self._ingress_dir.mkdir(parents=True, exist_ok=True)
         self._materialized_dir.mkdir(parents=True, exist_ok=True)
         self._ensure_tmp_pypnm_permissions()
+        self._ensure_writable_cache_dirs()
 
     def ingress_path(self, filename: FileNameStr, transaction_id: TransactionId | None = None) -> Path:
         """
@@ -145,6 +146,59 @@ class PnmArtifactStore:
             return
         except OSError as exc:
             self.logger.warning("Unable to set permissions 0777 on %s: %s", path, exc)
+
+    def _ensure_writable_cache_dirs(self) -> None:
+        """
+        Ensure ingress/materialized cache roots are writable for the current user.
+
+        In mixed-user environments, shared cache dirs may be owned by another user.
+        When unwritable, switch to per-user cache directories under the same tmp root.
+        """
+        uid = os.getuid()
+        self._ingress_dir = self._ensure_writable_cache_dir(
+            current_dir=self._ingress_dir,
+            fallback_name=f"{self._config.cache.ingress_dir}-{uid}",
+            label="ingress",
+        )
+        self._materialized_dir = self._ensure_writable_cache_dir(
+            current_dir=self._materialized_dir,
+            fallback_name=f"{self._config.cache.materialized_dir}-{uid}",
+            label="materialized",
+        )
+
+    def _ensure_writable_cache_dir(self, current_dir: Path, fallback_name: str, label: str) -> Path:
+        if os.access(current_dir, os.W_OK | os.X_OK):
+            return current_dir
+
+        fallback = self._tmp_root / fallback_name
+        try:
+            fallback.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            self.logger.warning(
+                "Cache dir %s is not writable (%s) and fallback %s could not be created: %s",
+                label,
+                current_dir,
+                fallback,
+                exc,
+            )
+            return current_dir
+
+        if not os.access(fallback, os.W_OK | os.X_OK):
+            self.logger.warning(
+                "Cache dir %s is not writable (%s) and fallback %s is also not writable",
+                label,
+                current_dir,
+                fallback,
+            )
+            return current_dir
+
+        self.logger.warning(
+            "Cache dir %s is not writable (%s); using fallback %s",
+            label,
+            current_dir,
+            fallback,
+        )
+        return fallback
 
     @staticmethod
     def _normalize_ingress_name(filename: FileNameStr) -> str:

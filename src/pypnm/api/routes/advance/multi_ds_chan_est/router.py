@@ -91,23 +91,32 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
             cm = CableModem(mac_address=MacAddress(mac_address), inet=Inet(ip_address), write_community=community)
 
              # Pre-checks
-            status, msg = await CableModemServicePreCheck(
+            precheck = CableModemServicePreCheck(
                 cable_modem=cm,
                 tftp_config=request.cable_modem.pnm_parameters.tftp,
                 validate_ofdm_exist=True,
                 validate_ds_channel_ids_exist=channel_ids,
-            ).run_precheck()
+            )
+            status, msg = await precheck.run_precheck()
             if status != ServiceStatusCode.SUCCESS:
                 self.logger.error(f"[start] Precheck failed for MAC={mac_address}: {msg}")
                 return SnmpResponse(mac_address=mac_address, status=status, message=msg)
+            precheck_sys_descr = precheck.get_system_description_model()
+            system_description = (
+                precheck_sys_descr.model_dump(exclude={"is_empty"})
+                if not precheck_sys_descr.is_empty
+                else None
+            )
 
             group_id, operation_id = await self.loadService(MultiChannelEstimationService,
                                                             cm,
                                                             tftp_servers,
                                                             duration=duration,
                                                             interval=interval,
+                                                            system_description=system_description,
                                                             interface_parameters=interface_parameters,)
             return MultiChanEstimationStartResponse(mac_address     =   mac_address,
+                                                    system_description = precheck_sys_descr,
                                                     status          =   OperationState.RUNNING,
                                                     message         =   None,
                                                     group_id        =   group_id,
@@ -126,6 +135,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
             status = service.status(operation_id)
             return MultiChanEstStatusResponse(
                 mac_address     =   service.cm.get_mac_address.mac_address,
+                system_description = service.get_system_description(),
                 status          =   "success",
                 message         =   None,
                 operation       =   MultiChanEstimationResponseStatus(
@@ -161,6 +171,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
             status = service.status(operation_id)
             return MultiChanEstStatusResponse(
                 mac_address =   service.cm.get_mac_address.mac_address,
+                system_description = service.get_system_description(),
                 status      =   OperationState.STOPPED,
                 message     =   None,
                 operation   =   MultiChanEstimationResponseStatus(
@@ -174,6 +185,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
 
         @self.router.post("/analysis",
             response_model=MultiChanEstimationAnalysisResponse,
+            response_model_exclude_none=True,
             summary="Perform signal analysis on a previously executed Multi-ChannelEstimation")
         def analysis(request: MultiChanEstAnalysisRequest) -> MultiChanEstimationAnalysisResponse | FileResponse:
             """
@@ -195,6 +207,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                     status          =   ServiceStatusCode.CAPTURE_GROUP_NOT_FOUND,
                     message         =   msg,
                     data            =   AnalysisDataModel(analysis_type="UNKNOWN", results=[]))
+            self._repair_capture_group_from_service_samples(request.operation_id, capture_group_id)
             self.logger.info(f"[analysis] operation_id={request.operation_id} capture_group={capture_group_id}")
 
             # Prepare data aggregator
@@ -248,11 +261,18 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                 mac = engine.getMacAddresses()[0].mac_address
                 self.logger.info(f"[analysis] type={atype.name} mac={mac} status={status.name} group={capture_group_id}")
 
+                response_kwargs: dict[str, object] = {}
+                if analysis_result.system_description is not None:
+                    response_kwargs["device"] = {
+                        "mac_address": mac,
+                        "system_description": analysis_result.system_description,
+                    }
+
                 return MultiChanEstimationAnalysisResponse(
                     mac_address =   mac,
-                    system_description = analysis_result.system_description,
                     status      =   status,
                     message     =   message,
+                    **response_kwargs,
                     data        =   data_model)
 
             elif output_type == OutputType.ARCHIVE:

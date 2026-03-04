@@ -141,8 +141,13 @@ class CommonResponse(BaseModel):
         device = dict(payload.get("device") or {})
         if "mac_address" in payload and "mac_address" not in device:
             device["mac_address"] = payload.get("mac_address")
-        if "system_description" in payload and "system_description" not in device:
-            device["system_description"] = payload.get("system_description")
+        system_description = payload.get("system_description")
+        if (
+            "system_description" in payload
+            and "system_description" not in device
+            and system_description is not None
+        ):
+            device["system_description"] = system_description
         if device:
             payload["device"] = device
         return payload

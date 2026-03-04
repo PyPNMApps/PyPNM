@@ -46,7 +46,8 @@ class MultiRxMerService(AbstractCaptureService):
     def __init__(self, cm: CableModem, duration: float, interval: float,
                  tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                  tftp_path: str = PnmConfigManager.get_tftp_path(),
-                 interface_parameters: DownstreamOfdmParameters | None = None,) -> None:
+                 interface_parameters: DownstreamOfdmParameters | None = None,
+                 system_description: dict[str, str] | None = None,) -> None:
         """
         Initialize the MultiRxMerService.
 
@@ -55,7 +56,7 @@ class MultiRxMerService(AbstractCaptureService):
             duration: Total duration (seconds) to run periodic captures.
             interval: Time (seconds) between successive captures.
         """
-        super().__init__(duration, interval)
+        super().__init__(duration, interval, system_description=system_description)
         self.cm = cm
         self.tftp_servers = tftp_servers
         self.tftp_path = tftp_path
@@ -79,6 +80,7 @@ class MultiRxMerService(AbstractCaptureService):
                 self.cm,
                 self.tftp_servers,
                 self.tftp_path,
+                system_description=self.get_system_description(),
             ).set_and_go(interface_parameters=self._interface_parameters)
 
         except Exception as exc:
@@ -115,7 +117,8 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                 tftp_path: str = PnmConfigManager.get_tftp_path(),
                 duration: float = 1, interval: float = 1,
-                interface_parameters: DownstreamOfdmParameters | None = None,) -> None:
+                interface_parameters: DownstreamOfdmParameters | None = None,
+                system_description: dict[str, str] | None = None,) -> None:
         """
         Initialize the MultiRxMerService.
 
@@ -124,7 +127,7 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
             duration: Total duration (seconds) to run periodic captures.
             interval: Time (seconds) between successive captures.
         """
-        super().__init__(duration, interval)
+        super().__init__(duration, interval, system_description=system_description)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.cm = cm
         self.tftp_servers = tftp_servers
@@ -174,6 +177,7 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
                 self.cm,
                 self.tftp_servers,
                 self.tftp_path,
+                system_description=self.get_system_description(),
             ).set_and_go(interface_parameters=self._interface_parameters)
         except Exception as exc:
             self.logger.error(f"Exception during RxMER capture: {exc}", exc_info=True)
@@ -189,6 +193,7 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
                     self.cm,
                     self.tftp_servers,
                     self.tftp_path,
+                    system_description=self.get_system_description(),
                 ).set_and_go(interface_parameters=self._interface_parameters)
 
             except Exception as exc:
@@ -217,6 +222,7 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
                         FecSummaryType.TEN_MIN,
                         tftp_servers=self.tftp_servers,
                         tftp_path=self.tftp_path,
+                        system_description=self.get_system_description(),
                     ).set_and_go(interface_parameters=self._interface_parameters)
 
                 except Exception as exc:

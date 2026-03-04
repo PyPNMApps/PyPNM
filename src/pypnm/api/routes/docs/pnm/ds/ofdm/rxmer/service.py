@@ -29,7 +29,8 @@ class CmDsOfdmRxMerService(CommonMeasureService):
     def __init__(self,
                  cable_modem: CableModem,
                  tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
-                 tftp_path: str = PnmConfigManager.get_tftp_path()) -> None:
+                 tftp_path: str = PnmConfigManager.get_tftp_path(),
+                 system_description: dict[str, str] | None = None) -> None:
         """
         Initializes the RxMER service with the provided cable modem and TFTP configuration.
 
@@ -43,6 +44,7 @@ class CmDsOfdmRxMerService(CommonMeasureService):
         super().__init__(
             DocsPnmCmCtlTest.DS_OFDM_RXMER_PER_SUBCAR,
             cable_modem,tftp_servers,
-            tftp_path,cable_modem.getWriteCommunity())
+            tftp_path,cable_modem.getWriteCommunity(),
+            system_description=system_description)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.propagate = True

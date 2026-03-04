@@ -91,7 +91,13 @@ class PnmFileTransaction:
             "size_after": 0,
         }
 
-    async def insert(self, cable_modem: CableModem, pnm_test_type: DocsPnmCmCtlTest, filename: str) -> TransactionId:
+    async def insert(
+        self,
+        cable_modem: CableModem,
+        pnm_test_type: DocsPnmCmCtlTest,
+        filename: str,
+        system_description: dict[str, str] | None = None,
+    ) -> TransactionId:
         """
         Record A Transaction Initiated From An Actual Cable Modem Test.
 
@@ -119,12 +125,15 @@ class PnmFileTransaction:
             Newly generated transaction identifier (16-character SHA-256
             digest prefix) suitable for later lookup (download and analysis).
         """
-        sd: SystemDescriptor = await cable_modem.getSysDescr()
+        if system_description is None:
+            sd: SystemDescriptor = await cable_modem.getSysDescr()
+            system_description = sd.to_dict()
+
         return self._insert_generic(
             mac_address        = cable_modem.get_mac_address,
             pnm_test_type      = pnm_test_type,
             filename           = filename,
-            system_description = sd.to_dict(),
+            system_description = system_description,
         )
 
     @staticmethod
@@ -243,6 +252,27 @@ class PnmFileTransaction:
 
     def get(self, transaction_id: TransactionId) -> dict | None:
         return self.get_record(transaction_id)
+
+    def update_record_system_description(
+        self,
+        transaction_id: TransactionId,
+        system_description: dict[str, str],
+    ) -> bool:
+        """
+        Update the transaction record with a normalized system description payload.
+        """
+        db = self._load_db()
+        record = db.get(transaction_id)
+        if record is None:
+            self.logger.error("Transaction record not found for sysDescr update: %s", transaction_id)
+            return False
+
+        if "device_details" not in record or not isinstance(record["device_details"], dict):
+            record["device_details"] = {}
+
+        record["device_details"]["system_description"] = dict(system_description)
+        self._save_db(db)
+        return True
 
     def update_record_compression(
         self,
