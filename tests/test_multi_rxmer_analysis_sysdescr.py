@@ -4,6 +4,10 @@
 from __future__ import annotations
 
 from pypnm.api.routes.advance.analysis.report.multi_analysis_rpt import MultiAnalysisRpt
+from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analysis import (
+    MultiRxMerAnalysisType,
+    MultiRxMerSignalAnalysis,
+)
 from pypnm.api.routes.advance.common.transactionsCollection import TransactionCollection
 from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
     AnalysisDataModel as DsAnalysisDataModel,
@@ -75,6 +79,19 @@ def test_multi_analysis_rpt_returns_null_sysdescr_when_no_transactions() -> None
     assert rpt.get_system_description().is_empty() is True
 
 
+def test_multi_rxmer_signal_analysis_empty_collection_returns_error_model() -> None:
+    engine = MultiRxMerSignalAnalysis(
+        _FakeCaptureDataAggregator(TransactionCollection()),
+        MultiRxMerAnalysisType.MIN_AVG_MAX,
+    )
+
+    model = engine.to_model()
+
+    assert model.mac_address == "00:00:00:00:00:00"
+    assert model.data == {}
+    assert model.error
+
+
 def test_multi_rxmer_analysis_response_allows_optional_system_description() -> None:
     resp = MultiRxMerAnalysisResponse(
         mac_address="aa:bb:cc:dd:ee:ff",
@@ -93,9 +110,24 @@ def test_multi_rxmer_analysis_response_allows_optional_system_description() -> N
         mac_address="aa:bb:cc:dd:ee:ff",
         status="success",
         message="ok",
+        system_description=None,
         data={},
     )
     assert resp_none.system_description is None
+
+
+def test_system_descriptor_load_from_dict_marks_non_empty() -> None:
+    sdm = SystemDescriptor.load_from_dict(
+        {
+            "HW_REV": "0B",
+            "VENDOR": "Hitron Technologies",
+            "BOOTR": "2022.01-MXL-v-4.0.369",
+            "SW_REV": "8.5.0.0.1b4",
+            "MODEL": "CGNDP4",
+        }
+    ).to_model()
+
+    assert sdm.is_empty is False
 
 
 def test_multi_ds_chan_est_analysis_response_allows_optional_system_description() -> None:

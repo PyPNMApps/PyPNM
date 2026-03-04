@@ -200,3 +200,34 @@ def test_tmp_permissions_skip_non_shared_root(tmp_path: Path, monkeypatch: Monke
     store._ensure_tmp_pypnm_permissions()
 
     assert calls["chmod"] == 0
+
+
+def test_cache_dirs_fallback_to_user_scoped_when_unwritable(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    pnm_dir = tmp_path / "pnm"
+
+    uid = 1001
+    ingress_default = (tmp_path / "tmp" / "ingress").resolve()
+    materialized_default = (tmp_path / "tmp" / "materialized").resolve()
+    ingress_fallback = (tmp_path / "tmp" / f"ingress-{uid}").resolve()
+    materialized_fallback = (tmp_path / "tmp" / f"materialized-{uid}").resolve()
+
+    monkeypatch.setattr("os.getuid", lambda: uid)
+    real_access = os.access
+
+    def _fake_access(path: object, mode: int) -> bool:
+        p = Path(path).resolve()
+        if p in (ingress_default, materialized_default):
+            return False
+        if p in (ingress_fallback, materialized_fallback):
+            return True
+        return real_access(path, mode)
+
+    monkeypatch.setattr("os.access", _fake_access)
+
+    store = PnmArtifactStore(config=cfg, pnm_dir=pnm_dir)
+
+    assert store._ingress_dir == ingress_fallback
+    assert store._materialized_dir == materialized_fallback
+    assert store._ingress_dir.exists()
+    assert store._materialized_dir.exists()

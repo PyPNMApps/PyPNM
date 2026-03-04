@@ -106,6 +106,14 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "running",
   "message": "Starting Multi-RxMER capture for MAC=aa:bb:cc:dd:ee:ff",
   "group_id": "3bd6f7c107ad465b",
@@ -122,6 +130,14 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "success",
   "message": null,
   "operation": {
@@ -165,6 +181,14 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "stopped",
   "message": null,
   "operation": {
@@ -260,6 +284,7 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 | Field                       | Type    | Description                                                                 |
 | -------------------------- | ------- | --------------------------------------------------------------------------- |
 | `mac_address`              | string  | Cable modem MAC address.                                                    |
+| `system_description`       | object  | Parsed sysDescr model captured once at start/precheck and reused for status/stop. |
 | `status`                   | string  | Start: `"running"`; Status/Stop: high‑level status string.                |
 | `message`                  | string  | Optional detail text.                                                       |
 | `group_id`                 | string  | Logical grouping for related operations (Start only).                       |
@@ -267,6 +292,11 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 | `operation.state`          | string  | Current state: `running`, `completed`, or `stopped`.                        |
 | `operation.collected`      | integer | Number of captured samples.                                                 |
 | `operation.time_remaining` | integer | Estimated seconds left.                                                     |
+
+`system_description` capture behavior:
+1. Captured once during start precheck.
+2. Cached for the operation session.
+3. Reused for start/status/stop responses and inserted into each transaction record.
 
 ### Download ZIP
 

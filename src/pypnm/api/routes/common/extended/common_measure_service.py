@@ -550,7 +550,7 @@ class CommonMeasureService(CommonMessagingService):
         trans_id = self._get_transaction_id_by_filename(str(pnm_file_name))
         if not trans_id:
             self.logger.warning("%s - Transaction ID not found for %s", self.log_prefix, pnm_file_name)
-        ingress_path = self._artifact_store.ingress_path(pnm_file_name, trans_id)
+        ingress_path = self._resolve_ingress_path(pnm_file_name, trans_id)
 
         try:
             if method == "local":
@@ -596,6 +596,41 @@ class CommonMeasureService(CommonMessagingService):
                 return ServiceStatusCode.TRANSACTION_RECORD_SET_FAILED, None
 
         return ServiceStatusCode.SUCCESS, result
+
+    def _resolve_ingress_path(self, pnm_file_name: FileNameStr, transaction_id: str | None) -> Path:
+        """
+        Resolve a writable ingress path for capture retrieval.
+
+        In mixed-user environments `/tmp/pypnm/ingress` can be created by a
+        different account with non-world-writable permissions. When that
+        happens, fallback to a user-scoped ingress path to avoid write failures.
+        """
+        ingress_path = self._artifact_store.ingress_path(pnm_file_name, cast(TransactionId | None, transaction_id))
+        parent = ingress_path.parent
+        if os.access(parent, os.W_OK | os.X_OK):
+            return ingress_path
+
+        fallback_parent = Path("/tmp/pypnm") / f"ingress-{os.getuid()}"
+        try:
+            fallback_parent.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            self.logger.warning(
+                "%s - Unable to create fallback ingress dir %s: %s; using default %s",
+                self.log_prefix,
+                fallback_parent,
+                exc,
+                ingress_path,
+            )
+            return ingress_path
+
+        fallback_path = fallback_parent / Path(str(pnm_file_name)).name
+        self.logger.warning(
+            "%s - Ingress dir not writable (%s); using fallback path %s",
+            self.log_prefix,
+            parent,
+            fallback_path,
+        )
+        return fallback_path
 
     async def _get_indexes_via_pnm_test_type(self, ifParameters: DownstreamOfdmParameters | UpstreamOfdmaParameters | None = None
                                              ) -> tuple[ServiceStatusCode, list[tuple[InterfaceIndex, ChannelId]] | None]:
@@ -1047,34 +1082,52 @@ class CommonMeasureService(CommonMessagingService):
         """
 
         src_dir = SystemConfigSettings.local_src_dir()
+        retries = max(1, SystemConfigSettings.file_retrieval_retries())
+        file_name = Path(pnm_file_name).name
+        src_path = Path(src_dir) / file_name
 
         self.logger.debug(
             f'{self.log_prefix} - Local Copy - SRC: {src_dir} - SAVE: {dest_path} - FN: {pnm_file_name}'
         )
 
-        if not os.path.isdir(src_dir) or not os.path.isdir(dest_path.parent):
+        try:
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            self.logger.error(f"{self.log_prefix} - Unable to create destination directory {dest_path.parent}: {exc}")
+            return ServiceStatusCode.LOCAL_FETCH_FAILURE
+
+        if not os.path.isdir(src_dir):
             self.logger.error(f"{self.log_prefix} - Invalid source or destination directory")
             return ServiceStatusCode.LOCAL_FETCH_FAILURE
 
-        while True:
-            await asyncio.sleep(1)
-            file_found = False
-            for filename in os.listdir(src_dir):
-                if filename == pnm_file_name:
-                    file_found = True
-                    src_path = os.path.join(src_dir, filename)
-                    try:
-                        shutil.copy2(src_path, dest_path)
-                        self.logger.debug(f"{self.log_prefix} - Copied {filename} to {dest_path}")
-                        return ServiceStatusCode.SUCCESS
-                    except Exception as e:
-                        self.logger.error(f"{self.log_prefix} - Copy failed for {filename}: {e}")
-                        return ServiceStatusCode.LOCAL_FETCH_FAILURE
+        for attempt in range(1, retries + 1):
+            if src_path.is_file():
+                try:
+                    shutil.copy2(src_path, dest_path)
+                    self.logger.debug(f"{self.log_prefix} - Copied {file_name} to {dest_path}")
+                    return ServiceStatusCode.SUCCESS
+                except Exception as e:
+                    self.logger.error(
+                        "%s - Copy failed for %s (attempt %d/%d): %s",
+                        self.log_prefix,
+                        file_name,
+                        attempt,
+                        retries,
+                        e,
+                    )
+            else:
+                self.logger.warning(
+                    "%s - File not found in source directory (attempt %d/%d): %s",
+                    self.log_prefix,
+                    attempt,
+                    retries,
+                    file_name,
+                )
 
-            if not file_found:
-                self.logger.warning(f"{self.log_prefix} - File not found in source directory: {pnm_file_name}")
+            if attempt < retries:
+                await asyncio.sleep(1)
 
-            return ServiceStatusCode.LOCAL_FETCH_FAILURE
+        return ServiceStatusCode.LOCAL_FETCH_FAILURE
 
     def _handle_sftp_fetch(self, pnm_file_name: FileNameStr, dest_path: Path) -> ServiceStatusCode:
         """
@@ -1280,7 +1333,16 @@ class CommonMeasureService(CommonMessagingService):
 
         file_name:FileNameStr = FileNameStr(f"{test_prefix}_{self.cm.get_mac_address.to_mac_format()}{suffix}_{Generate.time_stamp()}{ext}")
 
-        transaction_id = await PnmFileTransaction().insert(self.cm, test_type, file_name)
+        system_description = self.extra_options.get("system_description")
+        if not isinstance(system_description, dict):
+            system_description = None
+
+        transaction_id = await PnmFileTransaction().insert(
+            self.cm,
+            test_type,
+            file_name,
+            system_description=system_description,
+        )
 
         self.logger.debug(f"Generated PNM file name: {file_name} -> TransID: {transaction_id}")
 

@@ -39,7 +39,8 @@ class MultiUsOfdmaPreEqService(AbstractCaptureService):
                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                 tftp_path: str = PnmConfigManager.get_tftp_path(),
                  duration: float = 1, interval: float = 1,
-                 interface_parameters: UpstreamOfdmaParameters | None = None,) -> None:
+                 interface_parameters: UpstreamOfdmaParameters | None = None,
+                 system_description: dict[str, str] | None = None,) -> None:
         """
         Initialize the MultiUsOfdmaPreEqService.
 
@@ -50,7 +51,7 @@ class MultiUsOfdmaPreEqService(AbstractCaptureService):
             duration: Total duration (seconds) to run periodic captures.
             interval: Time (seconds) between successive captures.
         """
-        super().__init__(duration, interval)
+        super().__init__(duration, interval, system_description=system_description)
         self.cm = cm
         self.tftp_servers = tftp_servers
         self.tftp_path = tftp_path
@@ -74,6 +75,7 @@ class MultiUsOfdmaPreEqService(AbstractCaptureService):
                 self.cm,
                 self.tftp_servers,
                 self.tftp_path,
+                system_description=self.get_system_description(),
             ).set_and_go(interface_parameters=self._interface_parameters)
 
         except Exception as exc:

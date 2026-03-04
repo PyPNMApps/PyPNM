@@ -111,12 +111,20 @@ class SystemDescriptor:
         """
         Load a SysDescr from a dictionary.
         """
+        hw_rev   = data.get('HW_REV', '')
+        vendor   = data.get('VENDOR', '')
+        boot_rev = data.get('BOOTR', '')
+        sw_rev   = data.get('SW_REV', '')
+        model    = data.get('MODEL', '')
+        is_empty = not any(str(v).strip() for v in (hw_rev, vendor, boot_rev, sw_rev, model))
+
         return cls(
-            hw_rev  =   data.get('HW_REV', ''),
-            vendor  =   data.get('VENDOR', ''),
-            boot_rev=   data.get('BOOTR', ''),
-            sw_rev  =   data.get('SW_REV', ''),
-            model   =   data.get('MODEL', '')
+            hw_rev  =   hw_rev,
+            vendor  =   vendor,
+            boot_rev=   boot_rev,
+            sw_rev  =   sw_rev,
+            model   =   model,
+            _is_empty = is_empty,
         )
 
     @classmethod

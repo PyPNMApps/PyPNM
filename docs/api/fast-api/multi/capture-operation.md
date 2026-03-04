@@ -98,6 +98,24 @@ A detailed manifest of every PNM file moved into `data/pnm/` during the capture.
 * **compression**: Compression metadata when stored in compressed form.
 * **device\_details.system\_description**: Snapshot of modem metadata at capture time.
 
+### sysDescr Collection Behavior
+
+For multi-capture workflows, `system_description` is captured once per operation during precheck/start and then reused:
+1. The session-level sysDescr snapshot is cached in memory for the operation.
+2. Each transaction record in `transactions.json` receives that cached snapshot under `device_details.system_description`.
+3. If a transaction is missing sysDescr metadata, PyPNM backfills it from the cached session snapshot.
+
+This avoids repeated per-sample SNMP sysDescr calls while keeping report metadata complete.
+
+### Local Retrieval Reliability
+
+When `PnmFileRetrieval.retrieval_method.method` is `local`, PyPNM now:
+1. Retries local file copy using `PnmFileRetrieval.retries` before failing.
+2. Uses a user-scoped ingress fallback under `/tmp/pypnm/ingress-<uid>/` if the default ingress directory is not writable.
+3. Uses a user-scoped materialized-cache fallback under `/tmp/pypnm/materialized-<uid>/` when report analysis cannot write to the shared materialized cache.
+
+This prevents capture failures in shared or mixed-user environments where `/tmp/pypnm/ingress` permissions can differ by user.
+
 ## Workflow Summary
 
 1. **Start Multi‑Capture**: System generates a new `operation_id` linked to a new `capture_group_id`.

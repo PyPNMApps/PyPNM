@@ -89,6 +89,14 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "running",
   "message": null,
   "group_id": "3bd6f7c107ad465b",
@@ -105,6 +113,14 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "success",
   "message": null,
   "operation": {
@@ -142,6 +158,14 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 ```json
 {
   "mac_address": "aa:bb:cc:dd:ee:ff",
+  "system_description": {
+    "HW_REV": "1.0",
+    "VENDOR": "LANCity",
+    "BOOTR": "NONE",
+    "SW_REV": "1.0.0",
+    "MODEL": "LCPET-3",
+    "is_empty": false
+  },
   "status": "stopped",
   "message": null,
   "operation": {
@@ -251,6 +275,7 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 | Field                       | Type    | Description                                                                 |
 | --------------------------- | ------- | --------------------------------------------------------------------------- |
 | `mac_address`               | string  | Cable modem MAC address.                                                    |
+| `system_description`        | object  | Parsed sysDescr model captured once at start/precheck and reused for status/stop. |
 | `status`                    | string  | Start: `"running"`; Status/Stop: high-level status string.                 |
 | `message`                   | string  | Optional detail text.                                                       |
 | `group_id`                  | string  | Logical grouping for related operations (Start only).                       |
@@ -258,6 +283,11 @@ ds_ofdm_chan_estimate_coef_aabbccddeeff_160_1751762645.bin
 | `operation.state`           | string  | Current state: `running`, `completed`, or `stopped`.                        |
 | `operation.collected`       | integer | Number of captured samples.                                                 |
 | `operation.time_remaining`  | integer | Estimated seconds left.                                                     |
+
+`system_description` capture behavior:
+1. Captured once during start precheck.
+2. Cached for the operation session.
+3. Reused for start/status/stop responses and inserted into each transaction record.
 
 ### Download ZIP
 
