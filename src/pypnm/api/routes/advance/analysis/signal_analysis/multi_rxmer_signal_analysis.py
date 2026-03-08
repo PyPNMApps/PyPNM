@@ -91,6 +91,7 @@ class ChannelHeatMapModel(MultiRxMerAnalysisBaseModel):
 class EchoReflectionRxMerModel(BaseModel):
     frequency: FrequencySeriesHz = Field(..., description="Per-subcarrier frequency bins (Hz).")
     avg: FloatSeries = Field(..., description="Per-subcarrier average RxMER values used as detector input.")
+    avg_preprocessed: FloatSeries = Field(..., description="Per-subcarrier preprocessed (detrended) average used for echo detection.")
 
 class EchoReflection01Model(BaseModel):
     channel_id: ChannelId = Field(..., description="OFDM channel identifier for this result set.")
@@ -320,9 +321,19 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 self.logger.warning("ECHO_REFLECTION_1: invalid spacing for channel %s; skipping", ch_id)
                 continue
 
+            # Preprocess each capture to suppress DC and slow trend that can mask ripple echoes.
+            series_np = np.asarray(series, dtype=np.float64)
+            x = np.arange(n_bins, dtype=np.float64)
+            preprocessed_np = np.empty_like(series_np)
+            for row_idx in range(series_np.shape[0]):
+                row = series_np[row_idx]
+                slope, intercept = np.polyfit(x, row, 1)
+                trend = slope * x + intercept
+                preprocessed_np[row_idx] = row - trend
+
             sample_rate = float(spacing_hz * n_bins)
             detector = WindowedIfftEchoDetector(
-                freq_data=series,
+                freq_data=preprocessed_np,
                 sample_rate=sample_rate,
                 window="hann",
                 auto_pad_to_pow2=True,
@@ -331,19 +342,21 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
             report = detector.detect_multiple_reflections(
                 cable_type="RG6",
                 velocity_factor=None,
-                threshold_frac=0.2,
+                threshold_frac=0.03,
                 guard_bins=1,
                 min_separation_s=0.0,
                 max_delay_s=None,
-                max_peaks=5,
-                include_time_response=False,
+                max_peaks=8,
+                include_time_response=True,
             )
             avg_values = np.mean(np.asarray(series, dtype=np.float64), axis=0).tolist()
+            avg_pre = np.mean(preprocessed_np, axis=0).tolist()
             out[ch_id] = EchoReflection01Model(
                 channel_id=ch_id,
                 rxmer=EchoReflectionRxMerModel(
                     frequency=channel_freqs_hz.get(ch_id, []),
                     avg=cast(FloatSeries, avg_values),
+                    avg_preprocessed=cast(FloatSeries, avg_pre),
                 ),
                 echo_report=report.model_copy(update={"channel_id": ch_id}),
             )

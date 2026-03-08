@@ -26,6 +26,7 @@ Use these guides when you need periodic or scheduled captures (for example, hour
 | Module | Purpose |
 |--------|---------|
 | [Multi-RxMER min/avg/max](analysis/multi-rxmer-min-avg-max.md) | Roll up RxMER across captures. |
+| [Multi-RxMER echo reflection](multi-capture-rxmer.md#5-analysis) | Detect reflection/echo candidates from trend-removed averaged RxMER via IFFT. |
 | [Multi-ChanEst min/avg/max](analysis/multi-chanest-min-avg-max.md) | Summaries for channel estimation data. |
 | [Group delay calculator](analysis/group-delay-calculator.md) | Compute group delay variations. |
 | [OFDM performance 1:1](analysis/multi-rxmer-ofdm-performance-part-1.md) | Compare per-subcarrier capacity vs profile. |

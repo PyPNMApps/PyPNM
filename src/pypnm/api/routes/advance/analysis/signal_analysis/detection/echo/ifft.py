@@ -487,6 +487,13 @@ class IfftEchoDetector:
         IfftMultiEchoDetectionModel
             Direct path and list of echoes with distances in m/ft.
             NOTE: `channel_id` must be attached by the caller/orchestrator.
+
+        Notes
+        -----
+        Echo post-selection enforces:
+        - forward-lag candidates only (delay bins <= n_fft/2),
+        - mirror-pair deduplication (k and n_fft-k represent the same delay),
+        - final output sorted by increasing time/distance.
         """
         # ensure time response exists (optionally zero-pad)
         if n_fft is not None or self._time_response is None or self._time_axis is None:
@@ -517,17 +524,37 @@ class IfftEchoDetector:
         local_idxs = _local_maxima_indices(cand_region)
         cand_idxs = [start + i for i in local_idxs if cand_region[i] >= thresh]
 
-        # sort by amplitude descending
+        # sort by amplitude descending (selection priority), then post-sort by time
         cand_idxs.sort(key=lambda i: mag[i], reverse=True)
 
         # enforce minimum separation in bins
         min_sep_bins = int(np.ceil(max(0.0, min_separation_s) * self.sample_rate))
         selected: list[int] = []
+        selected_lags: list[int] = []
+        used_canonical_lags: set[int] = set()
         for i in cand_idxs:
-            if not selected or all(abs(i - j) >= min_sep_bins for j in selected):
-                selected.append(i)
+            lag = int((i - i0) % n)
+            # Keep only forward delays and drop wrap-around half.
+            if lag <= 0 or lag > (n // 2):
+                continue
+
+            # Mirror dedupe: lag and n-lag represent the same delay.
+            canonical_lag = int(min(lag, n - lag))
+            if canonical_lag in used_canonical_lags:
+                continue
+
+            # Enforce spacing in delay domain.
+            if selected_lags and any(abs(lag - prev_lag) < min_sep_bins for prev_lag in selected_lags):
+                continue
+
+            selected.append(i)
+            selected_lags.append(lag)
+            used_canonical_lags.add(canonical_lag)
             if len(selected) >= max_peaks:
                 break
+
+        # Output in physical order (increasing delay/time), not amplitude order.
+        selected.sort()
 
         # propagation speed from cable type / override
         vf = float(velocity_factor) if velocity_factor is not None else float(_CABLE_VF[cable_type])
