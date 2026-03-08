@@ -425,6 +425,10 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                 engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1)
                 multi_analysis = engine.to_model()
 
+            elif atype == MultiRxMerAnalysisType.ECHO_REFLECTION_1:
+                engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.ECHO_REFLECTION_1)
+                multi_analysis = engine.to_model()
+
             else:
                 msg = f'Invalid Analysis Type {atype}'
                 return MultiRxMerAnalysisResponse(

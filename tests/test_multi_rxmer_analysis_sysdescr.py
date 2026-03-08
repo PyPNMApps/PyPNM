@@ -92,6 +92,24 @@ def test_multi_rxmer_signal_analysis_empty_collection_returns_error_model() -> N
     assert model.error
 
 
+def test_multi_rxmer_analysis_type_includes_echo_reflection_1() -> None:
+    assert MultiRxMerAnalysisType("echo-reflection-1") == MultiRxMerAnalysisType.ECHO_REFLECTION_1
+
+
+def test_multi_rxmer_signal_analysis_echo_reflection_empty_collection_returns_error_model() -> None:
+    engine = MultiRxMerSignalAnalysis(
+        _FakeCaptureDataAggregator(TransactionCollection()),
+        MultiRxMerAnalysisType.ECHO_REFLECTION_1,
+    )
+
+    model = engine.to_model()
+
+    assert model.mac_address == "00:00:00:00:00:00"
+    assert model.analysis_type == MultiRxMerAnalysisType.ECHO_REFLECTION_1
+    assert model.data == {}
+    assert model.error
+
+
 def test_multi_rxmer_analysis_response_allows_optional_system_description() -> None:
     resp = MultiRxMerAnalysisResponse(
         mac_address="aa:bb:cc:dd:ee:ff",

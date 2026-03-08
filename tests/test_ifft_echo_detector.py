@@ -45,7 +45,7 @@ def test_to_model_detects_single_echo_basic() -> None:
 
     # Model shape fields
     assert m.dataset_info.subcarriers == N
-    assert m.dataset_info.snapshots == 1
+    assert m.dataset_info.captures == 1
     assert m.sample_rate_hz == fs
     assert m.prop_speed_mps == pytest.approx(C0 * vf, rel=1e-12)
 
@@ -113,14 +113,14 @@ def test_accepts_real_imag_pair_inputs_shapes() -> None:
     H_pairs = np.column_stack((H.real, H.imag))
     det_single = IfftEchoDetector(H_pairs, sample_rate=fs)
     m_single = det_single.to_model()
-    assert m_single.dataset_info.snapshots == 1
+    assert m_single.dataset_info.captures == 1
     assert m_single.dataset_info.subcarriers == N
 
     # (M,N,2) real/imag input (two snapshots, identical)
     H_pairs2 = np.stack([H_pairs, H_pairs], axis=0)
     det_multi = IfftEchoDetector(H_pairs2, sample_rate=fs)
     m_multi = det_multi.to_model()
-    assert m_multi.dataset_info.snapshots == 2
+    assert m_multi.dataset_info.captures == 2
     assert m_multi.dataset_info.subcarriers == N
 
 
