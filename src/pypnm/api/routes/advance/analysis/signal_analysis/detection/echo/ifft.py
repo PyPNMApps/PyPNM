@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from pypnm.lib.constants import FEET_PER_METER, SPEED_OF_LIGHT, CableTypes
+from pypnm.lib.signal_processing.window import SignalWindow
 from pypnm.lib.types import ChannelId, ComplexArray, FloatSeries
 
 # ──────────────────────────────────────────────────────────────
@@ -616,3 +617,60 @@ class IfftEchoDetector:
             H_avg           =   H_avg_pairs,
             reflection      =   reflection,
             time_response   =   tr_block,)
+
+
+class WindowedIfftEchoDetector(IfftEchoDetector):
+    """
+    Extension of IfftEchoDetector that preprocesses frequency data before iFFT:
+      - applies a window (Hann by default) to the averaged frequency vector
+      - optionally zero-pads to next power-of-two when n_fft is not provided
+
+    This class reuses the parent detector's input normalization and reflection logic.
+    """
+
+    def __init__(
+        self,
+        freq_data: Sequence[complex] | Sequence[Sequence[complex]] | Sequence[Sequence[float]],
+        sample_rate: float,
+        prop_speed_frac: float = 0.87,
+        *,
+        window: SignalWindow | str = SignalWindow.HANN,
+        auto_pad_to_pow2: bool = True,
+    ) -> None:
+        super().__init__(freq_data=freq_data, sample_rate=sample_rate, prop_speed_frac=prop_speed_frac)
+        self.window = SignalWindow.coerce(window)
+        self.auto_pad_to_pow2 = bool(auto_pad_to_pow2)
+
+    def compute_time_response(self, n_fft: int | None = None) -> tuple[NDArray[np.float64], NDArray[np.complex128]]:
+        """
+        Compute h(t) = IFFT{W(f) * H(f)} with optional zero-padding.
+
+        If n_fft is None and auto_pad_to_pow2=True, n_fft defaults to next power-of-two >= N.
+        """
+        n_use = int(n_fft) if n_fft is not None else self.N
+        if n_fft is None and self.auto_pad_to_pow2:
+            n_use = self._next_power_of_two(self.N)
+        if n_use < self.N:
+            raise ValueError(f"n_fft ({n_use}) must be >= N ({self.N}).")
+
+        win = self._window_values(self.N)
+        h = np.fft.ifft(self.freq_data * win, n=n_use)
+        t = np.arange(n_use, dtype=np.float64) / self.sample_rate
+
+        self._time_axis = t
+        self._time_response = h.astype(np.complex128, copy=False)
+        self._n_fft = n_use
+        return t, self._time_response
+
+    def _window_values(self, n: int) -> NDArray[np.float64]:
+        if self.window is SignalWindow.HANN:
+            return np.hanning(n).astype(np.float64, copy=False)
+        if self.window in (SignalWindow.NONE, SignalWindow.RECTANGULAR):
+            return np.ones(n, dtype=np.float64)
+        raise ValueError(f"Unsupported window '{self.window}'. Supported: hann, none")
+
+    @staticmethod
+    def _next_power_of_two(n: int) -> int:
+        if n < 1:
+            raise ValueError("n must be >= 1")
+        return 1 << (n - 1).bit_length()
