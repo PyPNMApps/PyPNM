@@ -33,7 +33,7 @@ Please gather the following details (copy and paste into your issue body):
    - Python version (for example: 3.10.x).
    - How you are running PyPNM:
      - CLI only, or
-     - FastAPI (for example: `pypnm --reload`), or
+     - FastAPI (for example: `pypnm serve --reload`), or
      - Docker (when available).
 
 3. **What You Were Doing**

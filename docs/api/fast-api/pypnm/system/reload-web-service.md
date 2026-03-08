@@ -74,7 +74,7 @@ The exact error message will depend on the underlying exception encountered whil
 - This endpoint relies on the application being started with an auto-reload mechanism such as:
 
   ```bash
-  pypnm --reload
+  pypnm serve --reload
   ```
 
   or:

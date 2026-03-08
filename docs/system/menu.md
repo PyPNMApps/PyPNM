@@ -62,7 +62,13 @@ prompts for new ones, and asks for confirmation before writing anything.
 
 ## Launching the menu
 
-From the project root, run:
+Preferred:
+
+```bash
+pypnm config-menu
+```
+
+Alternative (direct script):
 
 ```bash
 python tools/system_config/menu.py
