@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from pypnm.lib.constants import FEET_PER_METER, SPEED_OF_LIGHT, CableTypes
-from pypnm.lib.signal_processing.window import SignalWindow
+from pypnm.lib.signal_processing.window import SignalWindow, window_values
 from pypnm.lib.types import ChannelId, ComplexArray, FloatSeries
 
 # ──────────────────────────────────────────────────────────────
@@ -663,11 +663,7 @@ class WindowedIfftEchoDetector(IfftEchoDetector):
         return t, self._time_response
 
     def _window_values(self, n: int) -> NDArray[np.float64]:
-        if self.window is SignalWindow.HANN:
-            return np.hanning(n).astype(np.float64, copy=False)
-        if self.window in (SignalWindow.NONE, SignalWindow.RECTANGULAR):
-            return np.ones(n, dtype=np.float64)
-        raise ValueError(f"Unsupported window '{self.window}'. Supported: hann, none")
+        return window_values(n, self.window)
 
     @staticmethod
     def _next_power_of_two(n: int) -> int:

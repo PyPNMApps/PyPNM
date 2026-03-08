@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pypnm.lib.signal_processing.window import SignalWindow
+from pypnm.lib.signal_processing.window import SignalWindow, window_values
 from pypnm.lib.types import ArrayLikeF64, NDArrayC128, NDArrayF64, TwoDFloatSeries
 
 
@@ -75,11 +75,7 @@ class FrequencyDomainIfftTransformer:
         return out
 
     def _window_values(self, n: int) -> NDArrayF64:
-        if self.window is SignalWindow.HANN:
-            return np.hanning(n).astype(np.float64, copy=False)
-        if self.window in (SignalWindow.NONE, SignalWindow.RECTANGULAR):
-            return np.ones(n, dtype=np.float64)
-        raise ValueError(f"Unsupported window '{self.window}'. Supported: hann, none")
+        return window_values(n, self.window)
 
     @staticmethod
     def _next_power_of_two(n: int) -> int:

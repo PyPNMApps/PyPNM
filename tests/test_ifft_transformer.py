@@ -57,4 +57,12 @@ def test_transform_rejects_ragged_2d_input() -> None:
 
 def test_transform_rejects_unsupported_window() -> None:
     with pytest.raises(ValueError, match="Unsupported window"):
-        FrequencyDomainIfftTransformer(window="blackman")
+        FrequencyDomainIfftTransformer(window="not-a-window")
+
+
+def test_transform_accepts_blackman_window() -> None:
+    x = np.array([1.0, 2.0, 3.0, 4.0], dtype=float)
+    tr = FrequencyDomainIfftTransformer(window="blackman", pad_to_power_of_two=False)
+    y = tr.transform(x)
+    expected = np.fft.ifft(x * np.blackman(x.size), n=x.size)
+    assert np.allclose(y, expected, atol=1e-12)
