@@ -96,8 +96,8 @@ When `pnm_parameters.capture.channel_ids` is omitted or empty, the capture inclu
 
 | Measure Mode        | Suited Analyses                                                | Processes                                |
 | ------------------- | -------------------------------------------------------------- | ---------------------------------------- |
-|      `0`            | `min-avg-max`, `rxmer-heat-map`                                | RxMER                                    |
-|      `1`            | `ofdm-profile-performance-1`, `min-avg-max`, `rxmer-heat-map`  | RxMER + Modulation Profile + FEC Summary |
+|      `0`            | `min-avg-max`, `rxmer-heat-map`, `echo-reflection-1`           | RxMER                                    |
+|      `1`            | `ofdm-profile-performance-1`, `min-avg-max`, `rxmer-heat-map`, `echo-reflection-1` | RxMER + Modulation Profile + FEC Summary |
 
 > Use `mode=1` when you specifically want OFDM performance context; otherwise `mode=0` is recommended for continuous monitoring.
 
@@ -223,6 +223,7 @@ aabbccddeeff_lpet3_1763007737_160_rxmer_heat_map.png
 | `min-avg-max`                | Min/Avg/Max RxMER across samples     | `0` or `1`    |
 | `rxmer-heat-map`             | Time × Frequency heatmap grid        | `0` or `1`    |
 | `ofdm-profile-performance-1` | Per‑subcarrier performance metrics   | `1`           |
+| `echo-reflection-1`          | IFFT echo/reflection detection from averaged RxMER trend-removed input | `0` or `1` |
 
 **Output Types** (`analysis.output.type`)
 
@@ -327,3 +328,20 @@ These keys appear under the `data` object of `MultiRxMerAnalysisResponse`. Per�
 | `profiles[].fec_summary.summary[].summary.total_codewords` | int            | Total FEC codewords counted.                                                         |
 | `profiles[].fec_summary.summary[].summary.corrected`       | int            | FEC corrected codewords.                                                             |
 | `profiles[].fec_summary.summary[].summary.uncorrectable`   | int            | Uncorrectable codewords.                                                             |
+| `rxmer.frequency`                                | array[int] (Hz)          | Per-subcarrier center frequencies used for `echo-reflection-1` input.                |
+| `rxmer.avg`                                      | array[float] (dB)        | Average RxMER across captures before preprocessing.                                  |
+| `rxmer.avg_preprocessed`                         | array[float] (dB, detrended) | Average RxMER after trend removal, used by the echo detector.                    |
+| `echo_report.dataset_info.subcarriers`           | int                      | Number of frequency bins in the detection input.                                     |
+| `echo_report.dataset_info.captures`              | int                      | Number of captures used to build the per-channel average.                            |
+| `echo_report.direct_path.*`                      | object                   | Direct-path peak (bin/time/amplitude and 0-distance reference).                      |
+| `echo_report.echoes[]`                           | array[object]            | Detected echoes with bin/time/amplitude/distance.                                    |
+| `echo_report.cable_type` / `echo_report.velocity_factor` | string / float   | Cable model and VF used for delay-to-distance conversion.                            |
+| `echo_report.time_response`                      | object or `null`         | Optional IFFT time-domain block used for troubleshooting/visualization.              |
+
+#### Echo Reflection Detection Notes
+
+For `echo-reflection-1`, echo candidates are normalized for physical interpretation:
+
+1. Only forward-delay lags are kept (`lag <= n_fft/2`).
+2. Mirror FFT pairs (`k` and `n_fft-k`) are deduplicated.
+3. Output echoes are sorted by increasing delay/distance (not by amplitude).

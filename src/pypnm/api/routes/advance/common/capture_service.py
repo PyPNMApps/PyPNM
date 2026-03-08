@@ -182,7 +182,7 @@ class AbstractCaptureService(ABC):
                 if self._ops[operation_id]["state"] == OperationState.RUNNING:
 
                     self._ops[operation_id]["state"] = OperationState.COMPLETED
-                    iteration_ts = time.time()
+                    iteration_ts = Generate.time_stamp()
 
                     try:
 

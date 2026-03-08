@@ -8,6 +8,7 @@ import pytest
 
 from pypnm.api.routes.advance.analysis.signal_analysis.detection.echo.ifft import (
     IfftEchoDetector,
+    WindowedIfftEchoDetector,
 )
 from pypnm.lib.constants import SPEED_OF_LIGHT as C0
 
@@ -44,7 +45,7 @@ def test_to_model_detects_single_echo_basic() -> None:
 
     # Model shape fields
     assert m.dataset_info.subcarriers == N
-    assert m.dataset_info.snapshots == 1
+    assert m.dataset_info.captures == 1
     assert m.sample_rate_hz == fs
     assert m.prop_speed_mps == pytest.approx(C0 * vf, rel=1e-12)
 
@@ -112,14 +113,14 @@ def test_accepts_real_imag_pair_inputs_shapes() -> None:
     H_pairs = np.column_stack((H.real, H.imag))
     det_single = IfftEchoDetector(H_pairs, sample_rate=fs)
     m_single = det_single.to_model()
-    assert m_single.dataset_info.snapshots == 1
+    assert m_single.dataset_info.captures == 1
     assert m_single.dataset_info.subcarriers == N
 
     # (M,N,2) real/imag input (two snapshots, identical)
     H_pairs2 = np.stack([H_pairs, H_pairs], axis=0)
     det_multi = IfftEchoDetector(H_pairs2, sample_rate=fs)
     m_multi = det_multi.to_model()
-    assert m_multi.dataset_info.snapshots == 2
+    assert m_multi.dataset_info.captures == 2
     assert m_multi.dataset_info.subcarriers == N
 
 
@@ -150,3 +151,36 @@ def test_no_echo_found_when_threshold_too_high() -> None:
     # Threshold above 5% echo → expect failure
     with pytest.raises(RuntimeError):
         det.to_model(threshold_frac=0.2)  # 20% > 5%, so no echo should be found
+
+
+@pytest.mark.pnm
+def test_windowed_ifft_detector_applies_hann_and_auto_pow2_padding() -> None:
+    N = 6
+    fs = 1_000_000.0
+    H = np.array([1, 2, 3, 4, 5, 6], dtype=np.complex128)
+
+    det = WindowedIfftEchoDetector(H, sample_rate=fs, window="hann", auto_pad_to_pow2=True)
+    t, h = det.compute_time_response()
+
+    expected_nfft = 8
+    expected_h = np.fft.ifft(H * np.hanning(N), n=expected_nfft)
+    expected_t = np.arange(expected_nfft, dtype=np.float64) / fs
+
+    assert len(t) == expected_nfft
+    assert len(h) == expected_nfft
+    assert np.allclose(t, expected_t, atol=1e-12)
+    assert np.allclose(h, expected_h, atol=1e-12)
+
+
+@pytest.mark.pnm
+def test_windowed_ifft_detector_none_window_without_auto_padding() -> None:
+    N = 8
+    fs = 2_000_000.0
+    H = np.array([1, 0, 0, 0, 0, 0, 0, 0], dtype=np.complex128)
+
+    det = WindowedIfftEchoDetector(H, sample_rate=fs, window="none", auto_pad_to_pow2=False)
+    _, h = det.compute_time_response()
+
+    expected_h = np.fft.ifft(H, n=N)
+    assert len(h) == N
+    assert np.allclose(h, expected_h, atol=1e-12)

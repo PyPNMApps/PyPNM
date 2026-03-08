@@ -10,6 +10,10 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 from pypnm.api.routes.advance.analysis.report.multi_analysis_rpt import MultiAnalysisRpt
+from pypnm.api.routes.advance.analysis.signal_analysis.detection.echo.ifft import (
+    IfftMultiEchoDetectionModel,
+    WindowedIfftEchoDetector,
+)
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
@@ -57,6 +61,7 @@ class MultiRxMerAnalysisType(StringEnum):
     MIN_AVG_MAX                = "min-avg-max"
     RXMER_HEAT_MAP             = "rxmer-heat-map"
     OFDM_PROFILE_PERFORMANCE_1 = "ofdm-profile-performance-1"
+    ECHO_REFLECTION_1          = "echo-reflection-1"
 
 class MultiRxMerAnalysisBaseModel(BaseModel):
     channel_id: ChannelId = Field(..., description="OFDM channel identifier for this result set.")
@@ -83,13 +88,24 @@ class ChannelHeatMapModel(MultiRxMerAnalysisBaseModel):
     timestamps:  list[TimestampSec]     = Field(..., description="Capture timestamps (epoch) for rows of the heatmap.")
     values:      list[MagnitudeSeries]  = Field(..., description="Matrix: rows=captures, cols=subcarriers; MER values.")
 
+class EchoReflectionRxMerModel(BaseModel):
+    frequency: FrequencySeriesHz = Field(..., description="Per-subcarrier frequency bins (Hz).")
+    avg: FloatSeries = Field(..., description="Per-subcarrier average RxMER values used as detector input.")
+    avg_preprocessed: FloatSeries = Field(..., description="Per-subcarrier preprocessed (detrended) average used for echo detection.")
+
+class EchoReflection01Model(BaseModel):
+    channel_id: ChannelId = Field(..., description="OFDM channel identifier for this result set.")
+    rxmer: EchoReflectionRxMerModel = Field(..., description="RxMER input vectors used by echo reflection analysis.")
+    echo_report: IfftMultiEchoDetectionModel = Field(..., description="IFFT multi-echo detection report for this channel.")
+
 MultiRxMerTemporalObjType   = CmDsOfdmRxMer | CmDsOfdmFecSummary | CmDsOfdmModulationProfile
 TemporalMapping             = tuple[CaptureTime, MultiRxMerTemporalObjType]
 
 MinAvgMaxMap                = dict[ChannelId, MinAvgMaxAnalysisModel]
 OfdmProfilePerf01Map        = dict[ChannelId, ChannelOfdmProfilePerf01Model]
 HeatMapMap                  = dict[ChannelId, ChannelHeatMapModel]
-MultiRxMerAnalysisMap       = MinAvgMaxMap | OfdmProfilePerf01Map | HeatMapMap
+EchoReflection01Map         = dict[ChannelId, EchoReflection01Model]
+MultiRxMerAnalysisMap       = MinAvgMaxMap | OfdmProfilePerf01Map | HeatMapMap | EchoReflection01Map
 
 class MultiRxMerAnalysisResult(BaseModel):
     mac_address:   MacAddressStr            = Field(..., description="Cable modem MAC address associated with this analysis.")
@@ -197,6 +213,9 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
         if self.analysis_type == MultiRxMerAnalysisType.MIN_AVG_MAX:
             return self._analyze_min_avg_max_models()
 
+        if self.analysis_type == MultiRxMerAnalysisType.ECHO_REFLECTION_1:
+            return self._analyze_echo_reflection_1_models()
+
         if self.analysis_type == MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1:
             return self._analyze_ofdm_profile_perf_1_models()
 
@@ -263,6 +282,86 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                 continue
 
         return mamap
+
+    def _analyze_echo_reflection_1_models(self) -> EchoReflection01Map:
+        """
+        Perform echo/reflection detection over per-channel RxMER series.
+
+        Current behavior:
+        - uses all snapshots for a channel as frequency-domain metric input
+        - applies Hann window + auto pow2 padding through WindowedIfftEchoDetector
+        - runs multi-echo detection with DOCSIS cable-type velocity-factor mapping
+        """
+        self.logger.debug("Building ECHO_REFLECTION_1 signal analysis")
+
+        chan_series: dict[ChannelId, list[MagnitudeSeries]] = {}
+        channel_spacing_hz: dict[ChannelId, float] = {}
+        channel_freqs_hz: dict[ChannelId, FrequencySeriesHz] = {}
+        out: EchoReflection01Map = {}
+
+        for _, obj in self._get_temporal_pnm_data():
+            if not isinstance(obj, CmDsOfdmRxMer):
+                continue
+            model: CmDsOfdmRxMerModel = obj.to_model()
+            chan_series.setdefault(model.channel_id, []).append(model.values)
+            channel_spacing_hz[model.channel_id] = float(int(model.subcarrier_spacing))
+            channel_freqs_hz[model.channel_id] = self._build_frequencies(model)
+
+        for ch_id, series in chan_series.items():
+            if not series:
+                continue
+
+            n_bins = len(series[0])
+            if n_bins < 2:
+                self.logger.warning("ECHO_REFLECTION_1: channel %s has insufficient bins (%s); skipping", ch_id, n_bins)
+                continue
+
+            spacing_hz = channel_spacing_hz.get(ch_id, 0.0)
+            if spacing_hz <= 0.0:
+                self.logger.warning("ECHO_REFLECTION_1: invalid spacing for channel %s; skipping", ch_id)
+                continue
+
+            # Preprocess each capture to suppress DC and slow trend that can mask ripple echoes.
+            series_np = np.asarray(series, dtype=np.float64)
+            x = np.arange(n_bins, dtype=np.float64)
+            preprocessed_np = np.empty_like(series_np)
+            for row_idx in range(series_np.shape[0]):
+                row = series_np[row_idx]
+                slope, intercept = np.polyfit(x, row, 1)
+                trend = slope * x + intercept
+                preprocessed_np[row_idx] = row - trend
+
+            sample_rate = float(spacing_hz * n_bins)
+            detector = WindowedIfftEchoDetector(
+                freq_data=preprocessed_np,
+                sample_rate=sample_rate,
+                window="hann",
+                auto_pad_to_pow2=True,
+            )
+
+            report = detector.detect_multiple_reflections(
+                cable_type="RG6",
+                velocity_factor=None,
+                threshold_frac=0.03,
+                guard_bins=1,
+                min_separation_s=0.0,
+                max_delay_s=None,
+                max_peaks=8,
+                include_time_response=True,
+            )
+            avg_values = np.mean(np.asarray(series, dtype=np.float64), axis=0).tolist()
+            avg_pre = np.mean(preprocessed_np, axis=0).tolist()
+            out[ch_id] = EchoReflection01Model(
+                channel_id=ch_id,
+                rxmer=EchoReflectionRxMerModel(
+                    frequency=channel_freqs_hz.get(ch_id, []),
+                    avg=cast(FloatSeries, avg_values),
+                    avg_preprocessed=cast(FloatSeries, avg_pre),
+                ),
+                echo_report=report.model_copy(update={"channel_id": ch_id}),
+            )
+
+        return out
 
     def _analyze_rxmer_heat_map_models(self) -> HeatMapMap:
         """
@@ -514,9 +613,60 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
                     mx = ch_model.max[idx]  if idx < len(ch_model.max)  else None
                     csv_mgr.insert_row([ch_id, f_khz, mn, av, mx])
 
-                csv_fname = self.create_csv_fname(tags=['rxmer_min_avg_max', f'{ch_id}'])
+                csv_fname = self.create_csv_fname(tags=["rxmer_min_avg_max", f"{ch_id}"])
                 csv_mgr.set_path_fname(csv_fname)
 
+                out.append(csv_mgr)
+
+        elif self.analysis_type == MultiRxMerAnalysisType.ECHO_REFLECTION_1:
+            data = cast(EchoReflection01Map, model.data)
+            for ch_id, ch_model in data.items():
+                csv_mgr: CSVManager = self.csv_manager_factory()
+                rpt = ch_model.echo_report
+                csv_mgr.set_header(
+                    [
+                        "channel_id",
+                        "path_type",
+                        "bin_index",
+                        "time_s",
+                        "amplitude",
+                        "distance_m",
+                        "distance_ft",
+                        "cable_type",
+                        "velocity_factor",
+                    ],
+                )
+
+                csv_mgr.insert_row(
+                    [
+                        ch_id,
+                        "direct",
+                        rpt.direct_path.bin_index,
+                        rpt.direct_path.time_s,
+                        rpt.direct_path.amplitude,
+                        rpt.direct_path.distance_m,
+                        rpt.direct_path.distance_ft,
+                        rpt.cable_type,
+                        rpt.velocity_factor,
+                    ],
+                )
+                for echo in rpt.echoes:
+                    csv_mgr.insert_row(
+                        [
+                            ch_id,
+                            "echo",
+                            echo.bin_index,
+                            echo.time_s,
+                            echo.amplitude,
+                            echo.distance_m,
+                            echo.distance_ft,
+                            rpt.cable_type,
+                            rpt.velocity_factor,
+                        ],
+                    )
+
+                csv_fname = self.create_csv_fname(tags=["rxmer_echo_reflection_1", f"{ch_id}"])
+                csv_mgr.set_path_fname(csv_fname)
                 out.append(csv_mgr)
 
         elif self.analysis_type == MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1:

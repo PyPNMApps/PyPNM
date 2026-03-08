@@ -8,9 +8,17 @@ from typing import Final, Literal
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+)
 
 from pypnm.lib.constants import FEET_PER_METER, SPEED_OF_LIGHT, CableTypes
+from pypnm.lib.signal_processing.window import SignalWindow, window_values
 from pypnm.lib.types import ChannelId, ComplexArray, FloatSeries
 
 # ──────────────────────────────────────────────────────────────
@@ -37,20 +45,29 @@ class IfftEchoDetectorDatasetInfo(BaseModel):
     ----------
     subcarriers : int
         Number of frequency bins (N).
-    snapshots : int
-        Number of snapshots (M).
+    captures : int
+        Number of captures/snapshots (M).
     """
     model_config = ConfigDict(str_strip_whitespace=True)
 
     subcarriers: int    = Field(..., description="Number of frequency bins (N)")
-    snapshots: int      = Field(..., description="Number of snapshots (M)")
+    captures: int      = Field(
+        ...,
+        validation_alias=AliasChoices("captures", "snapshots"),
+        description="Number of captures (M)",
+    )
 
-    @field_validator("subcarriers", "snapshots")
+    @field_validator("subcarriers", "captures")
     @classmethod
     def _positive(cls, v: int) -> int:
         if v < 1:
             raise ValueError("Values must be >= 1.")
         return v
+
+    @property
+    def snapshots(self) -> int:
+        """Backward-compatible alias for captures."""
+        return self.captures
 
 class IfftEchoReflectionModel(BaseModel):
     """Direct-path and first-echo metrics derived from |h(t)|.
@@ -174,11 +191,11 @@ class IfftEchoDetectorModel(BaseModel):
                 row_out.append((float(item[0]), float(item[1])))
             out.append(row_out)
         di = info.data.get("dataset_info")
-        if di is not None and hasattr(di, "subcarriers") and hasattr(di, "snapshots"):
+        if di is not None and hasattr(di, "subcarriers") and hasattr(di, "captures"):
             if di.subcarriers != n:
                 raise ValueError(f"H_snap N={n} must match dataset_info.subcarriers={di.subcarriers}.")
-            if di.snapshots != len(out):
-                raise ValueError(f"H_snap M={len(out)} must match dataset_info.snapshots={di.snapshots}.")
+            if di.captures != len(out):
+                raise ValueError(f"H_snap M={len(out)} must match dataset_info.captures={di.captures}.")
         return out
 
 class IfftEchoPathModel(BaseModel):
@@ -470,6 +487,13 @@ class IfftEchoDetector:
         IfftMultiEchoDetectionModel
             Direct path and list of echoes with distances in m/ft.
             NOTE: `channel_id` must be attached by the caller/orchestrator.
+
+        Notes
+        -----
+        Echo post-selection enforces:
+        - forward-lag candidates only (delay bins <= n_fft/2),
+        - mirror-pair deduplication (k and n_fft-k represent the same delay),
+        - final output sorted by increasing time/distance.
         """
         # ensure time response exists (optionally zero-pad)
         if n_fft is not None or self._time_response is None or self._time_axis is None:
@@ -500,17 +524,37 @@ class IfftEchoDetector:
         local_idxs = _local_maxima_indices(cand_region)
         cand_idxs = [start + i for i in local_idxs if cand_region[i] >= thresh]
 
-        # sort by amplitude descending
+        # sort by amplitude descending (selection priority), then post-sort by time
         cand_idxs.sort(key=lambda i: mag[i], reverse=True)
 
         # enforce minimum separation in bins
         min_sep_bins = int(np.ceil(max(0.0, min_separation_s) * self.sample_rate))
         selected: list[int] = []
+        selected_lags: list[int] = []
+        used_canonical_lags: set[int] = set()
         for i in cand_idxs:
-            if not selected or all(abs(i - j) >= min_sep_bins for j in selected):
-                selected.append(i)
+            lag = int((i - i0) % n)
+            # Keep only forward delays and drop wrap-around half.
+            if lag <= 0 or lag > (n // 2):
+                continue
+
+            # Mirror dedupe: lag and n-lag represent the same delay.
+            canonical_lag = int(min(lag, n - lag))
+            if canonical_lag in used_canonical_lags:
+                continue
+
+            # Enforce spacing in delay domain.
+            if selected_lags and any(abs(lag - prev_lag) < min_sep_bins for prev_lag in selected_lags):
+                continue
+
+            selected.append(i)
+            selected_lags.append(lag)
+            used_canonical_lags.add(canonical_lag)
             if len(selected) >= max_peaks:
                 break
+
+        # Output in physical order (increasing delay/time), not amplitude order.
+        selected.sort()
 
         # propagation speed from cable type / override
         vf = float(velocity_factor) if velocity_factor is not None else float(_CABLE_VF[cable_type])
@@ -553,7 +597,7 @@ class IfftEchoDetector:
         # NOTE: channel_id is not known to the detector; the caller should stamp it
         return IfftMultiEchoDetectionModel(
             channel_id      =   ChannelId(-1),  # placeholder; orchestrator must update
-            dataset_info    =   IfftEchoDetectorDatasetInfo(subcarriers=self.N, snapshots=self.M),
+            dataset_info    =   IfftEchoDetectorDatasetInfo(subcarriers=self.N, captures=self.M),
             sample_rate_hz  =   float(self.sample_rate),
             complex         =   COMPLEX_LITERAL,  # alias
             cable_type      =   cable_type,
@@ -590,7 +634,7 @@ class IfftEchoDetector:
         if n_fft is not None or self._time_response is None or self._time_axis is None:
             self.compute_time_response(n_fft=n_fft)
 
-        dataset = IfftEchoDetectorDatasetInfo(subcarriers=self.N, snapshots=self.M)
+        dataset = IfftEchoDetectorDatasetInfo(subcarriers=self.N, captures=self.M)
 
         H_snap_pairs: list[ComplexArray] = self._mat_to_pairs(self.H_snap)
         H_avg_pairs: ComplexArray = self._vec_to_pairs(self.H_avg)
@@ -616,3 +660,56 @@ class IfftEchoDetector:
             H_avg           =   H_avg_pairs,
             reflection      =   reflection,
             time_response   =   tr_block,)
+
+
+class WindowedIfftEchoDetector(IfftEchoDetector):
+    """
+    Extension of IfftEchoDetector that preprocesses frequency data before iFFT:
+      - applies a window (Hann by default) to the averaged frequency vector
+      - optionally zero-pads to next power-of-two when n_fft is not provided
+
+    This class reuses the parent detector's input normalization and reflection logic.
+    """
+
+    def __init__(
+        self,
+        freq_data: Sequence[complex] | Sequence[Sequence[complex]] | Sequence[Sequence[float]],
+        sample_rate: float,
+        prop_speed_frac: float = 0.87,
+        *,
+        window: SignalWindow | str = SignalWindow.HANN,
+        auto_pad_to_pow2: bool = True,
+    ) -> None:
+        super().__init__(freq_data=freq_data, sample_rate=sample_rate, prop_speed_frac=prop_speed_frac)
+        self.window = SignalWindow.coerce(window)
+        self.auto_pad_to_pow2 = bool(auto_pad_to_pow2)
+
+    def compute_time_response(self, n_fft: int | None = None) -> tuple[NDArray[np.float64], NDArray[np.complex128]]:
+        """
+        Compute h(t) = IFFT{W(f) * H(f)} with optional zero-padding.
+
+        If n_fft is None and auto_pad_to_pow2=True, n_fft defaults to next power-of-two >= N.
+        """
+        n_use = int(n_fft) if n_fft is not None else self.N
+        if n_fft is None and self.auto_pad_to_pow2:
+            n_use = self._next_power_of_two(self.N)
+        if n_use < self.N:
+            raise ValueError(f"n_fft ({n_use}) must be >= N ({self.N}).")
+
+        win = self._window_values(self.N)
+        h = np.fft.ifft(self.freq_data * win, n=n_use)
+        t = np.arange(n_use, dtype=np.float64) / self.sample_rate
+
+        self._time_axis = t
+        self._time_response = h.astype(np.complex128, copy=False)
+        self._n_fft = n_use
+        return t, self._time_response
+
+    def _window_values(self, n: int) -> NDArray[np.float64]:
+        return window_values(n, self.window)
+
+    @staticmethod
+    def _next_power_of_two(n: int) -> int:
+        if n < 1:
+            raise ValueError("n must be >= 1")
+        return 1 << (n - 1).bit_length()

@@ -53,6 +53,9 @@ async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.Mo
 
     assert isinstance(service._cap_group, _FakeCaptureGroup)
     assert service._cap_group.added == []
+    op_samples = service._ops["op-1"]["samples"]
+    assert len(op_samples) >= 1
+    assert isinstance(op_samples[0].timestamp, int)
 
 
 def test_process_captures_backfills_missing_system_description(monkeypatch: pytest.MonkeyPatch) -> None:
