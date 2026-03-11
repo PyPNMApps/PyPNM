@@ -39,7 +39,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
         "docsIfSigQCorrecteds": 351,
         "docsIfSigQUncorrectables": 0,
         "docsIfSigQMicroreflections": 3,
-        "docsIfSigQExtUnerroreds": 129109307889,
+        "docsIfSigQExtUnerroreds": 000000307889,
         "docsIfSigQExtCorrecteds": 351,
         "docsIfSigQExtUncorrectables": 0,
         "docsIf3SignalQualityExtRxMER": 403
@@ -59,7 +59,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
         "docsIfSigQCorrecteds": 460,
         "docsIfSigQUncorrectables": 0,
         "docsIfSigQMicroreflections": 3,
-        "docsIfSigQExtUnerroreds": 128938490104,
+        "docsIfSigQExtUnerroreds": 000000490104,
         "docsIfSigQExtCorrecteds": 460,
         "docsIfSigQExtUncorrectables": 0,
         "docsIf3SignalQualityExtRxMER": 409

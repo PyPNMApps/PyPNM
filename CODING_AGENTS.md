@@ -22,6 +22,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - Prefer existing constants over inline values.
 - Prefer existing Pydantic models for public data structures.
 - Refer to shared utilities and helpers before creating new classes.
+- For SNMP-related operations, check `Snmp_v2c` first before creating new helpers. If logic is generic/reusable, add it as a static/class method on `Snmp_v2c`.
 
 ## Common Locations To Consult
 

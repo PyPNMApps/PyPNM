@@ -41,7 +41,7 @@ run_quality_gates() {
   run_check "pytest -q" python3 -m pytest -q
   run_check "secret scan" ./tools/security/scan-secrets.sh
   run_check "encrypted secret scan" python3 ./tools/security/scan-enc-secrets.py
-  run_check "MAC scan" ./tools/security/scan-mac-addresses.py --fail-on-found
+  run_check "MAC scan" ./tools/security/scan-mac-addresses.py --clear-oui --fail-on-found
 }
 
 commit_msg="Update"

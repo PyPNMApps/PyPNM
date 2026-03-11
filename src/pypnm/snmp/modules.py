@@ -48,10 +48,31 @@ class InetAddressType(IntEnum):
     DNS = 16
 
 class DocsisIfType(IntEnum):
+    ethernetCsmacd           = 6     # Ethernet-like interface
+    voiceEM                  = 100   # Voice recEive and transMit
+    voiceFXO                 = 101   # Voice Foreign Exchange Office
+    voiceFXS                 = 102   # Voice Foreign Exchange Station
+    voiceEncap               = 103   # Voice encapsulation
+    voiceOverIp              = 104   # Voice over IP encapsulation
     docsCableMaclayer           = 127   # CATV MAC Layer
     docsCableDownstream         = 128   # CATV Downstream Interface
     docsCableUpstream           = 129   # CATV Upstream Interface
+    voiceOverAtm                = 152   # Voice Over ATM
+    voiceOverFrameRelay         = 153   # Voice Over Frame Relay
+    voiceOverCable              = 198   # Voice Over Cable Interface
     docsCableUpstreamChannel    = 205   # CATV Upstream Channel
+    voiceEMFGD                  = 211   # voice E&M Feature Group D
+    voiceFGDEANA                = 212   # voice FGD Exchange Access North American
+    voiceDID                    = 213   # voice Direct Inward Dialing
+    voiceFGDOS                  = 235   # voice FGD Operator Services
+    voiceEBS                    = 245   # voice P-phone EBS physical interface
     docsCableUpstreamRfPort     = 256   # DOCSIS Upstream RF Port
+    cableDownstreamRfPort       = 257   # CATV downstream RF port
     docsOfdmDownstream          = 277   # DOCSIS Downstream OFDM Interface
     docsOfdmaUpstream           = 278   # DOCSIS Upstream OFDMA Interface
+    docsCableScte55d1FwdOob     = 283   # Cable SCTE 55-1 OOB Forward Channel
+    docsCableScte55d1RetOob     = 284   # Cable SCTE 55-1 OOB Return Channel
+    docsCableScte55d2DsOob      = 285   # Cable SCTE 55-2 OOB Downstream Channel
+    docsCableScte55d2UsOob      = 286   # Cable SCTE 55-2 OOB Upstream Channel
+    docsCableNdf                = 287   # Cable Narrowband Digital Forward
+    docsCableNdr                = 288   # Cable Narrowband Digital Return

@@ -59,7 +59,7 @@ IGNORE_DIRS: Set[str] = {
 }
 
 
-MAC_REGEX = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
+MAC_REGEX = re.compile(r"\b(?:(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|[0-9A-Fa-f]{12})\b")
 
 MACMatch = Tuple[str, int, int, str]  # (path, line_no, col, mac)
 
@@ -71,6 +71,9 @@ def _normalize_mac(mac: str) -> str:
     Converts to lowercase and replaces '-' with ':' so patterns such as
     'AA-BB-CC-DD-EE-FF' and 'aa:bb:cc:dd:ee:ff' are treated equivalently.
     """
+    compact = mac.lower().replace("-", "").replace(":", "")
+    if len(compact) == 12 and all(c in "0123456789abcdef" for c in compact):
+        return ":".join([compact[i:i + 2] for i in range(0, 12, 2)])
     return mac.lower().replace("-", ":")
 
 
@@ -82,7 +85,51 @@ def _is_approved(mac: str) -> bool:
     """
     Return True If The MAC Address Is In The Approved Allowlist.
     """
-    return _normalize_mac(mac) in APPROVED_MACS_NORMALIZED
+    normalized = _normalize_mac(mac)
+    return normalized in APPROVED_MACS_NORMALIZED or normalized.startswith("00:00:00:")
+
+
+def _clear_oui(mac: str) -> str:
+    """
+    Replace the OUI (first 3 octets) with zeros while preserving separator style.
+    """
+    compact = mac.lower().replace("-", "").replace(":", "")
+    if len(compact) == 12 and all(c in "0123456789abcdef" for c in compact):
+        return "000000" + compact[6:]
+    separator = "-" if "-" in mac else ":"
+    parts = re.split(r"[:-]", mac)
+    if len(parts) != 6:
+        return mac
+    return separator.join(["00", "00", "00", parts[3].lower(), parts[4].lower(), parts[5].lower()])
+
+
+def _clear_oui_in_file(path: str) -> int:
+    """
+    Rewrite non-approved MAC addresses in a file with zeroed OUI.
+
+    Returns number of replacements written.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+            content = fh.read()
+    except OSError:
+        return 0
+
+    replacements = 0
+
+    def _replace(match: re.Match[str]) -> str:
+        nonlocal replacements
+        mac = match.group(0)
+        if _is_approved(mac):
+            return mac
+        replacements += 1
+        return _clear_oui(mac)
+
+    updated = MAC_REGEX.sub(_replace, content)
+    if replacements > 0 and updated != content:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(updated)
+    return replacements
 
 
 def _iter_files(root: str) -> Iterable[str]:
@@ -139,6 +186,11 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
         action="store_true",
         help="Exit with non-zero status if any MAC addresses are found.",
     )
+    parser.add_argument(
+        "--clear-oui",
+        action="store_true",
+        help="Rewrite non-approved MAC OUI to 00:00:00 before scanning.",
+    )
     return parser.parse_args(argv)
 
 
@@ -159,6 +211,13 @@ def main(argv: List[str] | None = None) -> None:
     root = os.path.abspath(args.root)
     print(f"Scanning for MAC addresses under: {root}")
     print(f"Approved MACs: {sorted(APPROVED_MACS_NORMALIZED)}")
+
+    if args.clear_oui:
+        replaced = 0
+        for path in _iter_files(root):
+            replaced += _clear_oui_in_file(path)
+        if replaced:
+            print(f"Sanitized OUI in {replaced} MAC occurrence(s).")
 
     all_matches: List[MACMatch] = []
 

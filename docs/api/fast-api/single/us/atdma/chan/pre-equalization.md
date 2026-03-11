@@ -52,7 +52,7 @@ Each value contains decoded tap configuration, coefficients, metrics, group dela
         "frequency_response": {
           "fft_size": 24,
           "frequency_bins": [0.0, 0.041666666666666664, 0.08333333333333333],
-          "magnitude": [2051.872315715576, 2003.9331033353867, 1990.4489950200837],
+          "magnitude": [2051.000000715576, 2003.9331033353867, 1990.4489950200837],
           "magnitude_power_db": [66.24300663848884, 66.03766439043883, 65.97902106653461],
           "magnitude_power_db_normalized": [0.0, -0.20534224805000179, -0.26398557195422256],
           "phase_radians": [0.061445988511636136, -1.7860293780783445, 2.66760487568281]

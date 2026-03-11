@@ -119,12 +119,14 @@ SNRln         = NewType("SNRln", float)
 ChannelId     = NewType("ChannelId", int)
 SubcarrierId  = NewType("SubcarrierId", int)
 SubcarrierIdx = NewType("SubcarrierIdx", int)
+PortId        = NewType("PortId", int)
 
 # SNMP identifiers
 OidStr          = NewType("OidStr", str)              # symbolic or dotted-decimal
 OidNumTuple     = NewType("OidNumTuple", tuple[int, ...])
 SnmpIndex       = NewType("SnmpIndex", int)
 InterfaceIndex  = NewType("InterfaceIndex", int)
+InterfaceIndexStr = NewType("InterfaceIndexStr", str)
 EntryIndex      = NewType("EntryIndex", int)
 
 # Network addressing (store as plain strings; validate elsewhere)
@@ -133,6 +135,7 @@ SnmpReadCommunity  = NewType("SnmpReadCommunity", str)
 SnmpWriteCommunity = NewType("SnmpWriteCommunity", str)
 SnmpCommunity      = SnmpReadCommunity
 MacAddressStr   = NewType("MacAddressStr", str)         # aa:bb:cc:dd:ee:ff | aa-bb-cc-dd-ee-ff | aabb.ccdd.eeff | aabbccddeeff | aabbcc:ddeeff |
+BridgeAddressStr = NewType("BridgeAddressStr", MacAddressStr)
 InetAddressStr  = NewType("InetAddressStr", str)        # 192.168.0.1 | 2001:db8::1
 IPv4Str         = NewType("IPv4Str", InetAddressStr)    # 192.168.0.1
 IPv6Str         = NewType("IPv6Str", InetAddressStr)    # 2001:db8::1
@@ -222,15 +225,15 @@ __all__ = [
     "SampleIndex",
     "FrequencyHz", "BandwidthHz", "ResolutionBw", "SegmentFreqSpan", "NumBins",
     "PowerdBmV", "PowerdB", "MERdB", "SNRdB", "SNRln",
-    "ChannelId", "SubcarrierId",
+    "ChannelId", "SubcarrierId", "PortId",
     "OidStr", "OidNumTuple",
     "SnmpReadCommunity", "SnmpWriteCommunity", "SnmpCommunity",
-    "MacAddressStr", "IPv4Str", "IPv6Str",
+    "MacAddressStr", "BridgeAddressStr", "IPv4Str", "IPv6Str",
     "FileStem", "FileExt", "FileName",
     # analysis tuples / series
     "RegressionCoeffs", "RegressionStats", "SpectrumAnalysisSnmpCaptureParameters", "ResolutionBwSettings",
     "FrequencySeriesHz", "MerSeriesdB", "ShannonSeriesdB", "MagnitudeSeries",
     # modulation/profile & misc
     "ProfileId", "BitsPerSymbol", "BitsPerSymbolSeries", "Microseconds",
-    "HttpRtnCode", "InterfaceIndex", "EntryIndex"
+    "HttpRtnCode", "InterfaceIndex", "InterfaceIndexStr", "EntryIndex"
 ]

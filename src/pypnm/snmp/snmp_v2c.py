@@ -37,6 +37,7 @@ from pypnm.lib.constants import T
 from pypnm.lib.inet import Inet
 from pypnm.lib.inet_utils import InetGenerate
 from pypnm.lib.types import (
+    BridgeAddressStr,
     InetAddressStr,
     InterfaceIndex,
     OidStr,
@@ -837,6 +838,74 @@ class Snmp_v2c:
         except (ValueError, IndexError) as e:
             logging.error(f"Failed to extract index from OID '{oid}': {e}")
             return None
+
+    @staticmethod
+    def as_mac_from_oid(oid: str, base_oid: str) -> BridgeAddressStr | None:
+        """
+        Parse a MAC address from an OID suffix under a table base OID.
+
+        Example:
+            base_oid: 1.3.6.1.2.1.17.4.3.1.1
+            oid:      1.3.6.1.2.1.17.4.3.1.1.170.187.204.221.238.255
+            returns:  aa:bb:cc:dd:ee:ff
+        """
+        suffix = Snmp_v2c.oid_suffix_from_oid(
+            oid=oid,
+            base_oid=base_oid,
+            expected_parts=6,
+            max_part_value=255,
+        )
+        if suffix is None:
+            return None
+        parts = suffix.split(".")
+        try:
+            octets = [int(p) for p in parts]
+        except (TypeError, ValueError):
+            return None
+        if any(o < 0 or o > 255 for o in octets):
+            return None
+        return BridgeAddressStr(":".join(f"{o:02x}" for o in octets))
+
+    @staticmethod
+    def oid_suffix_from_oid(
+        oid: str,
+        base_oid: str,
+        expected_parts: int | None = None,
+        max_part_value: int | None = None,
+    ) -> str | None:
+        """
+        Extract dotted numeric suffix after a base OID.
+
+        Args:
+            oid: Full OID containing base + suffix.
+            base_oid: Base OID prefix.
+            expected_parts: Optional exact number of suffix parts required.
+            max_part_value: Optional max numeric value allowed for each suffix part.
+
+        Returns:
+            The dotted numeric suffix if valid; otherwise None.
+        """
+        oid_str = str(oid)
+        prefix = f"{base_oid}."
+        if not oid_str.startswith(prefix):
+            return None
+
+        suffix = oid_str[len(prefix) :]
+        parts = suffix.split(".")
+        if expected_parts is not None and len(parts) != expected_parts:
+            return None
+
+        try:
+            numeric = [int(p) for p in parts]
+        except (TypeError, ValueError):
+            return None
+
+        if any(p < 0 for p in numeric):
+            return None
+        if max_part_value is not None and any(p > max_part_value for p in numeric):
+            return None
+
+        return suffix
 
     @staticmethod
     def get_inet_address_type(inet_address: InetAddressStr) -> InetAddressType:

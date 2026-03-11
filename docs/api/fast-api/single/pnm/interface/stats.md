@@ -17,7 +17,15 @@ This endpoint returns the standard envelope described in [Common → Response](.
 
 `device` is the top-level device identity block and contains `device.mac_address` and `device.system_description` (empty model when unavailable).
 
-`data` is an object with interface families as arrays: `docsCableMaclayer`, `docsCableDownstream`, `docsCableUpstream`, `docsOfdmDownstream`, and `docsOfdmaUpstream`. Each array item contains an `ifEntry` (base counters) and, when supported, an `ifXEntry` (high-capacity counters).
+`data` is an object keyed by interface family (`ifType` enum name), with each key containing an array of interfaces (for example: `ethernetCsmacd`, `docsCableMaclayer`, `docsCableDownstream`, `docsCableUpstream`, `docsOfdmDownstream`, `docsOfdmaUpstream`, `voiceOverCable`). Each array item contains an `ifEntry` (base counters) and, when supported, an `ifXEntry` (high-capacity counters).
+
+When BRIDGE-MIB is supported on the device, `data` includes grouped bridge schema only:
+
+- `bridge.ifIndexes.<ifIndex>.dot1dBase`
+- `bridge.ifIndexes.<ifIndex>.dot1dBasePortEntry`
+- `bridge.ifIndexes.<ifIndex>.dot1dTpPortEntry`
+- `bridge.ifIndexes.<ifIndex>.dot1dTpFdbEntry`
+- `bridge.ifIndexes.<ifIndex>.ifStackEntry`
 
 ### Abbreviated Example
 
@@ -144,7 +152,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
 | ---------------------------------------------- | -------- | -------------- | ----------------------------------------------------------------------- |
 | `ifIndex`                                      | ifEntry  | Integer        | Unique index for the interface.                                         |
 | `ifDescr`                                      | ifEntry  | String         | Textual description of the interface.                                   |
-| `ifType`                                       | ifEntry  | Enum (Integer) | Interface type (e.g., `6` = ethernetCsmacd, `127` = docsCableMaclayer). |
+| `ifType`                                       | ifEntry  | Enum (Integer) | Interface type (e.g., `6` = ethernetCsmacd, `127` = docsCableMaclayer, `198` = voiceOverCable). |
 | `ifMtu`                                        | ifEntry  | Integer        | Maximum transmission unit size in bytes.                                |
 | `ifSpeed`                                      | ifEntry  | Integer        | Current bandwidth in bits per second.                                   |
 | `ifPhysAddress`                                | ifEntry  | String (MAC)   | MAC address of the interface.                                           |
@@ -176,5 +184,7 @@ This endpoint returns the standard envelope described in [Common → Response](.
 ## Notes
 
 * Null fields may indicate unsupported metrics or interface types on the target device.
-* The `docsCableMaclayer` and other interface families may contain multiple entries.
+* Any returned key in `data` maps to an `ifType` enum family and may contain multiple entries.
+* `bridge.ifIndexes` groups bridge data by `dot1dBasePortIfIndex`, which aligns to `IF-MIB::ifIndex`.
+* `ifStackEntry` rows are derived from `IF-MIB::ifStackStatus` and associated with both higher and lower layer `ifIndex` groups.
 * Prefer high-capacity (`HC`) counters when available to avoid 32-bit rollover on high-traffic links.
