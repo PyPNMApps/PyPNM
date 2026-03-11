@@ -150,7 +150,7 @@ Standard envelope with payload under `data`.
         "num_sample_symbols": 8192,
         "modulation_order": "qam256",
         "complex_unit": "[Real, Imaginary]",
-        "soft": { "complex": [[0.0843505859375, 0.713623046875]] },
+        "soft": { "complex": [[0.0843505859375, 0.000000046875]] },
         "hard": { "complex": [[1.1504474832710556, 1.1504474832710556]] }
       }
     ],
@@ -172,7 +172,7 @@ Standard envelope with payload under `data`.
         "num_sample_symbols": 8192,
         "sample_length": 16384,
         "value_units": "[Real, Imaginary]",
-        "values": [[0.0843505859375, 0.713623046875]]
+        "values": [[0.0843505859375, 0.000000046875]]
       }
     ],
     "measurement_stats": [

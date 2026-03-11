@@ -1,12 +1,12 @@
 # Local PNM File Retrieval Setup (Config Menu)
 
 This example shows how to configure **local PNM file retrieval** using the interactive
-`config-menu` helper. The `local.src_dir` setting must point to the directory
+`pypnm config-menu` helper. The `local.src_dir` setting must point to the directory
 where PNM files are written and where PyPNM should look for them (for example,
 your TFTP root such as `/srv/tftp`).
 
 ```shell
-(.env) PyPNM$ config-menu
+(.env) PyPNM$ pypnm config-menu
 
 PyPNM System Configuration Menu
 ================================

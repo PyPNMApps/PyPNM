@@ -183,22 +183,28 @@ If you used the installer defaults, activate the `.env` environment:
 
 System configuration lives in [deploy/docker/config/system.json](https://github.com/PyPNMApps/PyPNM/blob/main/deploy/docker/config/system.json).
 
-- [Config menu](docs/system/menu.md): `source ~/.bashrc && config-menu`
+- [Config menu](docs/system/menu.md): `pypnm config-menu`
 - [System Configuration Reference](docs/system/system-config.md): field-by-field descriptions and defaults
-If you installed with `--pnm-file-retrieval-setup`, it runs automatically and backs up `system.json` first.
 
 ### 5) [Run the FastAPI service launcher](docs/system/pypnm-cli.md)
 
 HTTP (default: `http://127.0.0.1:8000`):
 
   ```bash
-  pypnm
+  pypnm serve
   ```
 
 Development hot-reload:
 
   ```bash
-  pypnm --reload
+  pypnm serve --reload
+  ```
+
+Optional route policy controls:
+
+  ```bash
+  pypnm serve --mute-tags "PNM Operations - Multi-Downstream OFDM RxMER"
+  pypnm serve --mute-tags "Orchestrator,Operational" --mute-tags-hard
   ```
 
 ### 6) (Optional) Serve the documentation

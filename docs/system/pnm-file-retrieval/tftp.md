@@ -1,7 +1,7 @@
 # TFTP PNM File Retrieval Setup (Config Menu)
 
 This example shows how to configure **TFTP-based PNM file retrieval** using the
-interactive `config-menu` helper. In this scenario, `localhost` is selected as
+interactive `pypnm config-menu` helper. In this scenario, `localhost` is selected as
 the TFTP host, which means the TFTP server and PyPNM are running on the same box.
 PyPNM will still use the TFTP protocol to download PNM files for analysis.
 
@@ -10,7 +10,7 @@ and served. Leaving it empty (`""`) uses the TFTP server's default root
 (often something like `/srv/tftp`, depending on your server configuration).
 
 ```shell
-(.env) PyPNM$ config-menu
+(.env) PyPNM$ pypnm config-menu
 
 PyPNM System Configuration Menu
 ================================

@@ -764,10 +764,10 @@ arrisCmDevProvMethodIndicator OBJECT-TYPE
                                          useing an Arris proprietary method.
                                          
              gupiMacMta(9)          - gupi provisioning that uses MTA MAC address as the MTA config
-                                      file name. (ie- 1337c0ded00d.bin)
+                                      file name. (ie- 000000ded00d.bin)
                                       
              gupiEncryptedMacMta(10) - gupi encrypted mta config provisioning that uses MTA MAC address
-                                       as the MTA config file name. (ie- 1337c0ded00d.bin)
+                                       as the MTA config file name. (ie- 000000ded00d.bin)
              
              gupiTftpSvrOverride(11) - gupi provisioning where the FQDN of the MTA TFTP server is expected to 
                                        be present in the MIB arrisMtaDevTFTPServerAddrOverrideFQDN"

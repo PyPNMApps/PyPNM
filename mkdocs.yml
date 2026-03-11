@@ -60,6 +60,9 @@ nav:
       - Python: api/python/index.md
   - Examples:
       - Index: examples/index.md
+  - Topology:
+      - Overview: topology/index.md
+      - Interactive Tree: topology/collapsible-tree.md
   - Tools:
       - MIB compiler: tools/pypnm-mib-compiler.md
       - Clean: tools/pypnm-clean.md

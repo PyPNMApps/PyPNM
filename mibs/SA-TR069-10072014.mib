@@ -210,7 +210,7 @@ saTR069ClientDeviceIdentifier OBJECT-TYPE
    DESCRIPTION
        "Defines the value used to identify this device with the ACS.  This value will show up in the ACS server under the Serial Number field.
              useSerialNumber(0):       The InternetGatewayDevice.DeviceInfo.SerialNumber parameter will return the device's serial number (e.g. 234567890).
-             useCmMacAddress(1):    The InternetGatewayDevice.DeviceInfo.SerialNumber parameter will return the device's CM MAC address (e.g. 00407B1A2B3C).
+             useCmMacAddress(1):    The InternetGatewayDevice.DeviceInfo.SerialNumber parameter will return the device's CM MAC address (e.g. 0000001a2b3c).
        "
    DEFVAL { 0 }
    ::= { saTR069ClientConfig 12 }

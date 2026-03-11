@@ -69,6 +69,7 @@ from pypnm.docsis.lib.pnm_bulk_data import DocsPnmBulkDataGroup
 from pypnm.lib.constants import DEFAULT_SPECTRUM_ANALYZER_INDICES
 from pypnm.lib.inet import Inet
 from pypnm.lib.inet_utils import InetGenerate
+from pypnm.lib.interface.bridge.bridge_stats import BridgeSchema, BridgeStats
 from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.types import (
     BandwidthHz,
@@ -1288,6 +1289,15 @@ class CmSnmpOperation:
                 stats[if_type.name] = [iface.model_dump() for iface in interfaces]
 
         return stats
+
+    async def getBridgeStatistics(self) -> BridgeSchema | None:
+        """
+        Retrieves bridge statistics from BRIDGE-MIB tables when available.
+
+        Returns:
+            BridgeSchema | None: Grouped bridge payload model when available.
+        """
+        return await BridgeStats.get(self._snmp)
 
     async def getDocsIf31CmUsOfdmaChanChannelIdIndex(self) -> list[InterfaceIndex]:
         """

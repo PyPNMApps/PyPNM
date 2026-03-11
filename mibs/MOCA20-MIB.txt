@@ -1577,7 +1577,7 @@ mocaIfTabooChannelMask OBJECT-TYPE
     TABOO_CHANNEL_MASK in the beacon, but has a different data
     representation. E.g. If taboo channels consists of 1300, 1350
     and 1400 MHz, TABOO_MASK_START is 52, TABOO_CHANNEL_MASK is
-    'A8000000'h, and 'mocaIfTabooChannelMask' is '015000000000'h.
+    'A8000000'h, and 'mocaIfTabooChannelMask' is '000000000000'h.
 
     Note that in 'mocaIfTabooChannelMask', the lowest represented
     frequency of 400 MHz is represented in bit 0, and increasing bit

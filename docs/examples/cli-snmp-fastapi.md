@@ -151,7 +151,7 @@ Retrieve Logical Interface Statistics From SNMP.
 
 - **Path:** `/docs/pnm/interface/stats`
 - **Method:** `POST`
-- **Purpose:** Aggregate `ifEntry` and `ifXEntry` statistics for DOCSIS MAC, DOCSIS 3.0 SC-QAM, DOCSIS 3.1 OFDM, and OFDMA interfaces.
+- **Purpose:** Aggregate `ifEntry` and `ifXEntry` statistics for DOCSIS interface families, include additional interface types (for example Ethernet and voice/eMTA) when present, and include BRIDGE-MIB tables when available.
 
 Although the path is under `/docs/pnm`, this endpoint is purely SNMP based and returns the current interface counters only.
 
