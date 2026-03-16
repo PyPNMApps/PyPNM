@@ -13,7 +13,11 @@ from fastapi.responses import StreamingResponse
 
 from pypnm.api.routes.advance.common.abstract.service import AbstractService
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
+from pypnm.api.routes.advance.common.schema.common_capture_schema import (
+    MultiCaptureOperationIdResponse,
+)
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.types import GroupId, OperationId
@@ -132,3 +136,8 @@ class AbstractMultiCaptureRouter(AbstractService):
                 exc,
             )
             return 0
+
+    def _build_operation_id_response(self, operation_name: MultiCaptureOperation) -> MultiCaptureOperationIdResponse:
+        """Return persisted operation records for a canonical multi-capture operation family."""
+        operations = OperationManager.list_operation_records_by_name(operation_name.value)
+        return MultiCaptureOperationIdResponse(status="success", message=None, operations=operations)

@@ -20,7 +20,11 @@ from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.advance.common.operation_state import OperationState
+from pypnm.api.routes.advance.common.schema.common_capture_schema import (
+    MultiCaptureOperationIdResponse,
+)
 from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.schemas import (
     AnalysisDataModel,
     MultiUsOfdmaPreEqAnalysisRequest,
@@ -123,10 +127,11 @@ class MultiUsOfdmaPreEqRouter(AbstractMultiCaptureRouter):
                                                     operation_id    =   operation_id)
 
 
-        @self.router.get("/status/{operation_id}",
+        @self.router.get("/status/{operationId}",
             response_model=MultiUsOfdmaPreEqStatusResponse,
             summary="Get status of a multi-sample US OFDMA Pre-Equalization capture")
-        def get_status(operation_id: OperationId) -> MultiUsOfdmaPreEqStatusResponse:
+        def get_status(operationId: OperationId) -> MultiUsOfdmaPreEqStatusResponse:
+            operation_id = operationId
             service: MultiUsOfdmaPreEqService = cast(
                 MultiUsOfdmaPreEqService,
                 self._get_service_or_404(operation_id),
@@ -145,23 +150,31 @@ class MultiUsOfdmaPreEqRouter(AbstractMultiCaptureRouter):
                     time_remaining  =   status["time_remaining"],
                     message         =   None))
 
-        @self.router.get("/results/{operation_id}",
+        @self.router.get("/operationId",
+            response_model=MultiCaptureOperationIdResponse,
+            summary="List persisted Multi-US-OFDMA-Pre-Equalization operation IDs")
+        def get_operation_ids() -> MultiCaptureOperationIdResponse:
+            """Return persisted operation records for Multi-US-OFDMA-Pre-Equalization keyed by operation ID."""
+            return self._build_operation_id_response(MultiCaptureOperation.MULTI_US_OFDMA_PRE_EQUALIZATION)
+
+        @self.router.get("/results/{operationId}",
             summary="Download a ZIP archive of all OFDMA PreEqualization capture files",
             responses={200: {"content": {"application/zip": {}},
                              "description": "ZIP archive of capture files"}})
-        def download_results_zip(operation_id: OperationId) -> StreamingResponse:
-
+        def download_results_zip(operationId: OperationId) -> StreamingResponse:
+            operation_id = operationId
             return self._build_results_zip_response(operation_id, "multiOfdmaPreEqualization")
 
 
-        @self.router.delete("/stop/{operation_id}",
+        @self.router.delete("/stop/{operationId}",
             response_model=MultiUsOfdmaPreEqStatusResponse,
             summary="Stop a running multi-sample US OFDMA Pre-Equalization capture early")
-        def stop_capture(operation_id: OperationId) -> MultiUsOfdmaPreEqStatusResponse:
+        def stop_capture(operationId: OperationId) -> MultiUsOfdmaPreEqStatusResponse:
             """
 
 
             """
+            operation_id = operationId
             service: MultiUsOfdmaPreEqService = cast(
                 MultiUsOfdmaPreEqService,
                 self._get_service_or_404(operation_id),

@@ -6,8 +6,13 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, cast
 
+from pypnm.api.routes.advance.common.operation_kind import (
+    MultiCaptureOperation,
+    MultiCaptureOperationModel,
+)
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
@@ -42,6 +47,9 @@ class AbstractCaptureService(ABC):
         _cap_group (CaptureGroup): Persistence for transaction IDs across restarts.
         logger (logging.Logger): Logger for operational messages.
     """
+
+    OPERATION_NAME: MultiCaptureOperation = MultiCaptureOperation.MULTI_RXMER
+    MEASURE_MODE: str = "standard"
 
     def __init__(
         self,
@@ -104,10 +112,11 @@ class AbstractCaptureService(ABC):
             operation_metadata["mac_address"] = str(mac_str)
         if self._has_populated_system_description(self._system_description):
             operation_metadata["system_description"] = dict(self._system_description)
+        operation = self.get_operation_model()
 
         try:
             om = OperationManager(capture_group_id=group_id)
-            operation_id:OperationId = om.register(metadata=operation_metadata)
+            operation_id:OperationId = om.register(operation=operation, metadata=operation_metadata)
         except Exception as exc:
             self.logger.error(f"Failed to create operation manager, reason={exc}", exc_info=True)
             raise
@@ -283,6 +292,10 @@ class AbstractCaptureService(ABC):
         """Return the cached session-level sysDescr payload used for multi-capture metadata."""
         return dict(self._system_description)
 
+    def get_operation_model(self) -> MultiCaptureOperationModel:
+        """Return the persisted operation block associated with this capture service."""
+        return MultiCaptureOperationModel(name=self.OPERATION_NAME, measure_mode=self._normalize_measure_mode(self.MEASURE_MODE))
+
     def status(self, operation_id: OperationId) -> dict[str, Any]:
         """
         Get the current state and sample count for a capture operation.
@@ -432,6 +445,13 @@ class AbstractCaptureService(ABC):
                                   error             =   "no-transactions")]
 
         return samples
+
+    @staticmethod
+    def _normalize_measure_mode(measure_mode: Enum | str) -> str:
+        """Normalize enum or string measure-mode values for persistence."""
+        if isinstance(measure_mode, Enum):
+            return measure_mode.name.lower()
+        return str(measure_mode).strip().lower()
 
     @abstractmethod
     async def _capture_message_response(self) -> MessageResponse:

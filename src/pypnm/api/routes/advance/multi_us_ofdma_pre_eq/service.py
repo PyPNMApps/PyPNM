@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.common.extended.common_measure_schema import (
     UpstreamOfdmaParameters,
 )
@@ -35,6 +36,9 @@ class MultiUsOfdmaPreEqService(AbstractCaptureService):
       - duration: total measurement duration in seconds.
       - interval: interval between captures in seconds.
     """
+    OPERATION_NAME = MultiCaptureOperation.MULTI_US_OFDMA_PRE_EQUALIZATION
+    MEASURE_MODE = "standard"
+
     def __init__(self, cm: CableModem,
                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                 tftp_path: str = PnmConfigManager.get_tftp_path(),

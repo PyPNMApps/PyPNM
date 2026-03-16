@@ -8,6 +8,7 @@ import math
 from typing import cast
 
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.common.extended.common_measure_schema import (
     DownstreamOfdmParameters,
 )
@@ -43,6 +44,9 @@ class MultiRxMerService(AbstractCaptureService):
       - duration: total measurement duration in seconds.
       - interval: interval between captures in seconds.
     """
+    OPERATION_NAME = MultiCaptureOperation.MULTI_RXMER
+    MEASURE_MODE = "continuous"
+
     def __init__(self, cm: CableModem, duration: float, interval: float,
                  tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                  tftp_path: str = PnmConfigManager.get_tftp_path(),
@@ -113,6 +117,9 @@ class MultiRxMer_Ofdm_Performance_1_Service(AbstractCaptureService):
       - duration: total measurement duration in seconds.
       - interval: interval between captures in seconds.
     """
+    OPERATION_NAME = MultiCaptureOperation.MULTI_RXMER
+    MEASURE_MODE = "ofdm_performance_1"
+
     def __init__(self, cm: CableModem,
                 tftp_servers: tuple[Inet, Inet] = PnmConfigManager.get_tftp_servers(),
                 tftp_path: str = PnmConfigManager.get_tftp_path(),

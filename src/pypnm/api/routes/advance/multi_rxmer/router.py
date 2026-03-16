@@ -20,8 +20,12 @@ from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
 from pypnm.api.routes.advance.common.operation_state import OperationState
+from pypnm.api.routes.advance.common.schema.common_capture_schema import (
+    MultiCaptureOperationIdResponse,
+)
 from pypnm.api.routes.advance.multi_rxmer.schemas import (
     MultiRxMerAnalysisRequest,
     MultiRxMerAnalysisResponse,
@@ -208,11 +212,11 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                 operation_id=   operation_id,
             )
 
-        @self.router.get("/status/{operation_id}",
+        @self.router.get("/status/{operationId}",
             response_model=MultiRxMerStatusResponse,
             summary="Get status of a Multi-RxMER capture",
             responses=FAST_API_RESPONSE,)
-        def get_status(operation_id: OperationId) -> MultiRxMerStatusResponse:
+        def get_status(operationId: OperationId) -> MultiRxMerStatusResponse:
             """
             Check Multi-RxMER Capture Status
 
@@ -237,6 +241,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
+            operation_id = operationId
             service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
 
             status = service.status(operation_id)
@@ -257,10 +262,18 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                 ),
             )
 
-        @self.router.get("/results/{operation_id}",
+        @self.router.get("/operationId",
+            response_model=MultiCaptureOperationIdResponse,
+            summary="List persisted Multi-RxMER operation IDs",
+            responses=FAST_API_RESPONSE,)
+        def get_operation_ids() -> MultiCaptureOperationIdResponse:
+            """Return persisted operation records for Multi-RxMER captures keyed by operation ID."""
+            return self._build_operation_id_response(MultiCaptureOperation.MULTI_RXMER)
+
+        @self.router.get("/results/{operationId}",
             summary="Download a ZIP archive of all RxMER capture files",
             responses=FAST_API_RESPONSE,)
-        def download_measurements_zip(operation_id: OperationId) -> StreamingResponse:
+        def download_measurements_zip(operationId: OperationId) -> StreamingResponse:
             """
             Download Captured RxMER Measurements (ZIP)
 
@@ -285,13 +298,14 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
+            operation_id = operationId
             return self._build_results_zip_response(operation_id, "multiRxMer")
 
-        @self.router.delete("/stop/{operation_id}",
+        @self.router.delete("/stop/{operationId}",
             response_model=MultiRxMerStatusResponse,
             summary="Stop a running Multi-RxMER capture early",
             responses=FAST_API_RESPONSE,)
-        def stop_capture(operation_id: OperationId) -> MultiRxMerStatusResponse:
+        def stop_capture(operationId: OperationId) -> MultiRxMerStatusResponse:
             """
             Stop Multi-RxMER Capture
 
@@ -315,6 +329,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
+            operation_id = operationId
             service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
 
             service.stop(operation_id)
