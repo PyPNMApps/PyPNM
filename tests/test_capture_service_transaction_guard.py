@@ -9,6 +9,10 @@ import pytest
 
 from pypnm.api.routes.advance.common import capture_service
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
+from pypnm.api.routes.advance.common.operation_kind import (
+    MultiCaptureOperation,
+    MultiCaptureOperationModel,
+)
 from pypnm.api.routes.common.extended.common_messaging_service import (
     MessageResponse,
     MessageResponseType,
@@ -29,14 +33,24 @@ class _FakeCaptureGroup:
 
 
 class _FakeOperationManager:
+    register_calls: list[dict[str, object]] = []
+
     def __init__(self, capture_group_id: GroupId) -> None:
         self._capture_group_id = capture_group_id
 
-    def register(self, metadata: dict[str, object] | None = None) -> OperationId:
+    def register(
+        self,
+        operation: MultiCaptureOperationModel | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> OperationId:
+        self.__class__.register_calls.append({"operation": operation, "metadata": metadata})
         return OperationId("op-1")
 
 
 class _FakeCaptureService(AbstractCaptureService):
+    OPERATION_NAME = MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION
+    MEASURE_MODE = "standard"
+
     async def _capture_message_response(self) -> MessageResponse:
         return MessageResponse(ServiceStatusCode.SUCCESS, payload=None)
 
@@ -45,6 +59,7 @@ class _FakeCaptureService(AbstractCaptureService):
 async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(capture_service, "CaptureGroup", _FakeCaptureGroup)
     monkeypatch.setattr(capture_service, "OperationManager", _FakeOperationManager)
+    _FakeOperationManager.register_calls = []
 
     service = _FakeCaptureService(duration=0, interval=0)
     await service.start()
@@ -53,6 +68,15 @@ async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.Mo
 
     assert isinstance(service._cap_group, _FakeCaptureGroup)
     assert service._cap_group.added == []
+    assert _FakeOperationManager.register_calls == [
+        {
+            "operation": MultiCaptureOperationModel(
+                name=MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION,
+                measure_mode="standard",
+            ),
+            "metadata": {},
+        },
+    ]
     op_samples = service._ops["op-1"]["samples"]
     assert len(op_samples) >= 1
     assert isinstance(op_samples[0].timestamp, int)
@@ -111,3 +135,12 @@ def test_process_captures_backfills_missing_system_description(monkeypatch: pyte
     assert samples[0].error is None
     assert fake_txn.updated
     assert fake_txn.updated[0][0] == "tx1"
+
+
+def test_capture_service_builds_operation_model() -> None:
+    service = _FakeCaptureService(duration=0, interval=0)
+
+    assert service.get_operation_model() == MultiCaptureOperationModel(
+        name=MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION,
+        measure_mode="standard",
+    )

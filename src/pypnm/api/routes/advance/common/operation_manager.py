@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperationModel
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import cast
 from pypnm.lib.db.json_file_lock import JsonFileLock
@@ -27,7 +28,11 @@ class OperationManager:
     {
         "<operation_id>": {
             "capture_group_id": "<group_id>",
-            "created": <unix_epoch_seconds>
+            "created": <unix_epoch_seconds>,
+            "operation": {
+                "name": "multi_rxmer",
+                "measure_mode": "ofdm_performance_1"
+            }
         },
         ...
     }
@@ -93,7 +98,11 @@ class OperationManager:
         except Exception as e:
             self.logger.error(f"Failed to save operation DB: {e}")
 
-    def register(self, metadata: dict[str, Any] | None = None) -> OperationId:
+    def register(
+        self,
+        operation: MultiCaptureOperationModel | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> OperationId:
         """
         Register this operation with its capture group ID in the DB.
 
@@ -121,6 +130,8 @@ class OperationManager:
                 "capture_group_id": self.capture_group_id,
                 "created": int(time.time())
             }
+            if operation is not None:
+                db[self.operation_id]["operation"] = operation.model_dump()
             if isinstance(metadata, dict) and metadata:
                 db[self.operation_id]["metadata"] = metadata
             self._save(db)
