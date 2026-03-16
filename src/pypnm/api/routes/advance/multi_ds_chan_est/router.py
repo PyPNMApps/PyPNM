@@ -20,7 +20,11 @@ from pypnm.api.routes.advance.common.abstract.multi_capture_router import (
 from pypnm.api.routes.advance.common.capture_data_aggregator import (
     CaptureDataAggregator,
 )
+from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.advance.common.operation_state import OperationState
+from pypnm.api.routes.advance.common.schema.common_capture_schema import (
+    MultiCaptureOperationIdResponse,
+)
 from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
     AnalysisDataModel,
     MultiChanEstAnalysisRequest,
@@ -123,10 +127,11 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                                                     operation_id    =   operation_id)
 
 
-        @self.router.get("/status/{operation_id}",
+        @self.router.get("/status/{operationId}",
             response_model=MultiChanEstStatusResponse,
             summary="Get status of a multi-sample ChannelEstimation capture")
-        def get_status(operation_id: OperationId) -> MultiChanEstStatusResponse:
+        def get_status(operationId: OperationId) -> MultiChanEstStatusResponse:
+            operation_id = operationId
             service: MultiChannelEstimationService = cast(
                 MultiChannelEstimationService,
                 self._get_service_or_404(operation_id),
@@ -145,23 +150,31 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                     time_remaining  =   status["time_remaining"],
                     message         =   None))
 
-        @self.router.get("/results/{operation_id}",
+        @self.router.get("/operationId",
+            response_model=MultiCaptureOperationIdResponse,
+            summary="List persisted Multi-DS-Channel-Estimation operation IDs")
+        def get_operation_ids() -> MultiCaptureOperationIdResponse:
+            """Return persisted operation records for Multi-DS-Channel-Estimation keyed by operation ID."""
+            return self._build_operation_id_response(MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION)
+
+        @self.router.get("/results/{operationId}",
             summary="Download a ZIP archive of all ChannelEstimation capture files",
             responses={200: {"content": {"application/zip": {}},
                              "description": "ZIP archive of capture files"}})
-        def download_results_zip(operation_id: OperationId) -> StreamingResponse:
-
+        def download_results_zip(operationId: OperationId) -> StreamingResponse:
+            operation_id = operationId
             return self._build_results_zip_response(operation_id, "multiChannelEstimation")
 
 
-        @self.router.delete("/stop/{operation_id}",
+        @self.router.delete("/stop/{operationId}",
             response_model=MultiChanEstStatusResponse,
             summary="Stop a running multi-sample ChannelEstimation capture early")
-        def stop_capture(operation_id: OperationId) -> MultiChanEstStatusResponse:
+        def stop_capture(operationId: OperationId) -> MultiChanEstStatusResponse:
             """
 
 
             """
+            operation_id = operationId
             service: MultiChannelEstimationService = cast(
                 MultiChannelEstimationService,
                 self._get_service_or_404(operation_id),

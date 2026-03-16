@@ -55,3 +55,43 @@ def test_operation_manager_register_persists_operation_block(
     assert persisted[operation_id]["metadata"] == {
         "mac_address": "aa:bb:cc:dd:ee:ff",
     }
+
+
+def test_operation_manager_lists_records_by_operation_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(capture_group_module, "CaptureGroup", _FakeCaptureGroup)
+
+    db_path = tmp_path / "operation_capture.json"
+    db_path.write_text(
+        json.dumps(
+            {
+                "op-rxmer": {
+                    "capture_group_id": "group-1",
+                    "created": 1,
+                    "operation": {
+                        "name": "multi_rxmer",
+                        "measure_mode": "continuous",
+                    },
+                    "metadata": {"mac_address": "aa:bb:cc:dd:ee:ff"},
+                },
+                "op-chan-est": {
+                    "capture_group_id": "group-2",
+                    "created": 2,
+                    "operation": {
+                        "name": "multi_ds_channel_estimation",
+                        "measure_mode": "standard",
+                    },
+                    "metadata": {"mac_address": "00:00:00:dd:ee:ff"},
+                },
+            },
+        ),
+        encoding="utf-8",
+    )
+
+    records = OperationManager.list_operation_records_by_name("multi_rxmer", db_path=db_path)
+
+    assert list(records.keys()) == ["op-rxmer"]
+    assert records["op-rxmer"].operation.name == MultiCaptureOperation.MULTI_RXMER
+    assert records["op-rxmer"].operation.measure_mode == "continuous"
