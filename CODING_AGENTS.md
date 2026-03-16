@@ -47,6 +47,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - When adding new behavior, include tests covering the change.
 - New classes must have pytest coverage at a minimum for IPC and system calls.
 - Use `SystemCall` (`src/pypnm/lib/system_call/`) for subprocess/system calls; do not call `subprocess.run` directly in app code.
+- Avoid `try`/`except` inside hot loops; Ruff PERF rules flag this often. Move exception handling into a helper or restructure the loop before handing back commit/save commands.
 - Avoid broad refactors unless explicitly requested.
 - Any changes to `deploy/docker/config/system.json` must also be made in `demo/settings/system.json`.
 - Keep `deploy/docker/config/system.json.template` aligned with `deploy/docker/config/system.json`.
@@ -117,6 +118,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - Testing expectations:
   - Run at least: `python3 -m compileall src`, `ruff check src`, `ruff format --check .`, `pytest -q`.
   - After any code change, run `ruff check src` and `pytest -q`. If only Markdown changes are made, run `mkdocs build -s` instead.
+  - Review new loops and exception paths for Ruff performance rules before finalizing; do not rely on the user to discover PERF issues during `git-save.sh`.
   - This is mandatory for every code update in this repo: do not finalize work without reporting `ruff check` and `pytest` results (or a clear blocker).
   - If an integration test is optional/gated (for example Postgres DSN), note skips explicitly in the summary.
 - Troubleshooting:

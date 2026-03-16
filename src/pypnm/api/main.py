@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 from collections.abc import Awaitable, Callable
+from time import monotonic, time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,11 +67,80 @@ app = FastAPI(
 )
 
 _hard_muted_routes: list[APIRoute] = []
+API_START_MONOTONIC: float = monotonic()
+API_START_EPOCH: int = int(time())
 
 
 def _route_tag_set(route: APIRoute) -> set[str]:
     tags = route.tags or []
     return {str(tag).strip().lower() for tag in tags if str(tag).strip() != ""}
+
+
+def _read_project_name() -> str:
+    """Read the project name from pyproject.toml, falling back to a stable default."""
+    pyproject_path = project_root.parent / "pyproject.toml"
+    if not pyproject_path.is_file():
+        return "pypnm-docsis"
+
+    pyproject_text = pyproject_path.read_text(encoding="utf-8")
+    project_match = re.search(r"^\[project\]\s*$", pyproject_text, re.MULTILINE)
+    if project_match is None:
+        return "pypnm-docsis"
+
+    tail_text = pyproject_text[project_match.end() :]
+    name_match = re.search(r'^\s*name\s*=\s*"([^"]+)"\s*$', tail_text, re.MULTILINE)
+    if name_match is None:
+        return "pypnm-docsis"
+
+    return name_match.group(1).strip()
+
+
+def _service_uptime_seconds() -> int:
+    """Return process uptime in whole seconds since API module initialization."""
+    elapsed_seconds = int(monotonic() - API_START_MONOTONIC)
+    return max(elapsed_seconds, 0)
+
+
+SERVICE_NAME: str = _read_project_name()
+
+
+def _data_root_path() -> pathlib.Path:
+    """Return the repository-local `.data` directory used for runtime artifacts."""
+    return pathlib.Path(".data")
+
+
+def _folder_size_bytes(folder_path: pathlib.Path) -> int:
+    """Return recursive folder size in bytes, ignoring inaccessible entries."""
+    if not folder_path.exists():
+        return 0
+
+    total_bytes = 0
+    for path in folder_path.rglob("*"):
+        total_bytes += _file_size_bytes(path)
+    return total_bytes
+
+
+def _file_size_bytes(path: pathlib.Path) -> int:
+    """Return file size in bytes, or zero for non-files and inaccessible paths."""
+    try:
+        if path.is_file():
+            return path.stat().st_size
+    except OSError:
+        return 0
+    return 0
+
+
+def _first_level_directory_sizes(folder_path: pathlib.Path) -> dict[str, int]:
+    """Return recursive sizes for each first-level directory under the given root."""
+    if not folder_path.exists():
+        return {}
+
+    sizes: dict[str, int] = {}
+    for child in folder_path.iterdir():
+        if not child.is_dir():
+            continue
+        sizes[child.name] = _folder_size_bytes(child)
+    return sizes
 
 
 def _apply_muted_tag_policy(app_instance: FastAPI) -> None:
@@ -90,9 +161,26 @@ def _apply_muted_tag_policy(app_instance: FastAPI) -> None:
 
 
 @app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
+def health() -> dict[str, str | dict[str, int]]:
     """Lightweight health endpoint for probes."""
-    return {"status": "ok", "version": __version__}
+    uptime_seconds = _service_uptime_seconds()
+    data_root = _data_root_path()
+    return {
+        "status": "ok",
+        "service": {
+            "name": SERVICE_NAME,
+            "version": __version__,
+        },
+        "uptime": {
+            "starttime": API_START_EPOCH,
+            "uptime": uptime_seconds,
+        },
+        "data": {
+            "path": str(data_root),
+            "size_bytes": _folder_size_bytes(data_root),
+            "directories": _first_level_directory_sizes(data_root),
+        },
+    }
 
 app.add_middleware(GZipMiddleware, minimum_size=100_000)
 app.add_middleware(

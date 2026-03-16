@@ -38,7 +38,37 @@ kubectl port-forward --namespace "${NAMESPACE}" deploy/pypnm-api 8000:8000
 curl -i http://127.0.0.1:8000/health
 ```
 
-If the returned `version` is older than expected, verify the tag used in the deploy command and confirm the namespace matches the running deployment.
+Example response:
+
+```json
+{
+  "status": "ok",
+  "service": {
+    "name": "pypnm-docsis",
+    "version": "1.4.2.0"
+  },
+  "uptime": {
+    "starttime": 1773640097,
+    "uptime": 1
+  },
+  "data": {
+    "path": ".data",
+    "size_bytes": 1761579619,
+    "directories": {
+      "json": 1728244816,
+      "xlsx": 0,
+      "pnm": 17349665,
+      "csv": 2819493,
+      "png": 2805111,
+      "db": 3388387,
+      "archive": 6968882,
+      "msg_rsp": 3265
+    }
+  }
+}
+```
+
+If the returned `service.version` is older than expected, verify the tag used in the deploy command and confirm the namespace matches the running deployment.
 
 ## Connect with FreeLens
 
