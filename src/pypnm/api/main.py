@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.routing import APIRoute
+from pydantic import BaseModel, Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -69,6 +70,29 @@ app = FastAPI(
 _hard_muted_routes: list[APIRoute] = []
 API_START_MONOTONIC: float = monotonic()
 API_START_EPOCH: int = int(time())
+
+
+class HealthServiceModel(BaseModel):
+    name: str = Field(..., description="Service name from pyproject metadata.")
+    version: str = Field(..., description="Running PyPNM service version.")
+
+
+class HealthUptimeModel(BaseModel):
+    starttime: int = Field(..., description="Service start time as Unix epoch seconds.")
+    uptime: int = Field(..., description="Elapsed uptime in whole seconds since starttime.")
+
+
+class HealthDataModel(BaseModel):
+    path: str = Field(..., description="Repository-local data directory path.")
+    size_bytes: int = Field(..., description="Recursive apparent size of the data directory in bytes.")
+    directories: dict[str, int] = Field(default_factory=dict, description="Recursive apparent sizes for first-level directories under the data root.")
+
+
+class HealthResponseModel(BaseModel):
+    status: str = Field(..., description="Top-level health status for readiness probes.")
+    service: HealthServiceModel = Field(..., description="Service identity and version metadata.")
+    uptime: HealthUptimeModel = Field(..., description="Service process start time and uptime.")
+    data: HealthDataModel = Field(..., description="Runtime data directory sizing details.")
 
 
 def _route_tag_set(route: APIRoute) -> set[str]:
@@ -160,27 +184,21 @@ def _apply_muted_tag_policy(app_instance: FastAPI) -> None:
             _hard_muted_routes.append(route)
 
 
-@app.get("/health", tags=["health"])
-def health() -> dict[str, str | dict[str, int]]:
+@app.get("/health", tags=["health"], response_model=HealthResponseModel)
+def health() -> HealthResponseModel:
     """Lightweight health endpoint for probes."""
     uptime_seconds = _service_uptime_seconds()
     data_root = _data_root_path()
-    return {
-        "status": "ok",
-        "service": {
-            "name": SERVICE_NAME,
-            "version": __version__,
-        },
-        "uptime": {
-            "starttime": API_START_EPOCH,
-            "uptime": uptime_seconds,
-        },
-        "data": {
-            "path": str(data_root),
-            "size_bytes": _folder_size_bytes(data_root),
-            "directories": _first_level_directory_sizes(data_root),
-        },
-    }
+    return HealthResponseModel(
+        status="ok",
+        service=HealthServiceModel(name=SERVICE_NAME, version=__version__),
+        uptime=HealthUptimeModel(starttime=API_START_EPOCH, uptime=uptime_seconds),
+        data=HealthDataModel(
+            path=str(data_root),
+            size_bytes=_folder_size_bytes(data_root),
+            directories=_first_level_directory_sizes(data_root),
+        ),
+    )
 
 app.add_middleware(GZipMiddleware, minimum_size=100_000)
 app.add_middleware(

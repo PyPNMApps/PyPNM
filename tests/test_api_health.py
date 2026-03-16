@@ -18,7 +18,7 @@ def test_health_includes_uptime(monkeypatch) -> None:
     monkeypatch.setattr(api_main, "_first_level_directory_sizes", lambda _: {"pnm": 1024, "json": 2048})
     monkeypatch.setattr(api_main, "monotonic", lambda: 165.9)
 
-    response = api_main.health()
+    response = api_main.health().model_dump()
 
     assert response == {
         "status": "ok",
