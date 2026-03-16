@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperationModel
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
     CableModemPnmConfig,
-    CommonResponse,
 )
 from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_response import (
     BaseDeviceResponse,
@@ -55,7 +54,9 @@ class MultiCapturePersistedRecordModel(BaseModel):
     metadata: MultiCapturePersistedMetadataModel = Field(default_factory=MultiCapturePersistedMetadataModel, description="Additional persisted metadata such as MAC address and system description.")
 
 
-class MultiCaptureOperationIdResponse(CommonResponse):
+class MultiCaptureOperationIdResponse(BaseModel):
     """Collection of persisted operation records keyed by operation ID."""
 
+    status: str | None = Field(default="success", description="Overall status for the operation-record listing request.")
+    message: str | None = Field(default=None, description="Additional information or error details for the operation-record listing request.")
     operations: dict[OperationId, MultiCapturePersistedRecordModel] = Field(default_factory=dict, description="Persisted operation records keyed by operation ID for the requested operation family.")
