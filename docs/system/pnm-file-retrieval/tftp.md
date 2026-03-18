@@ -5,6 +5,30 @@ interactive `pypnm config-menu` helper. In this scenario, `localhost` is selecte
 the TFTP host, which means the TFTP server and PyPNM are running on the same box.
 PyPNM will still use the TFTP protocol to download PNM files for analysis.
 
+During a normal interactive `./install.sh` run, PyPNM now also offers a local
+`tftpd-hpa` setup helper:
+
+```bash
+./scripts/setup_tftp_server.sh
+```
+
+That helper checks whether `tftpd-hpa` is installed and, when present, rewrites
+`/etc/default/tftpd-hpa` to keep upload-capable options such as `--create`,
+ensures the configured `TFTP_DIRECTORY` exists, and verifies that the daemon
+user can write to it before restarting the service.
+
+The helper is CI-safe:
+
+- `install.sh` only offers it in interactive non-CI runs
+- the helper itself exits immediately when `CI` or `GITHUB_ACTIONS` is set
+
+It is also Linux-safe across other distros:
+
+- on Debian/Ubuntu, it manages `/etc/default/tftpd-hpa`
+- on other Linux systems, it detects whether `tftpd-hpa` is present
+- if the distro does not use the Debian defaults file layout, it exits cleanly
+  with a manual-configuration message instead of forcing Debian-specific paths
+
 The `remote_dir` is the directory on the TFTP server where PNM files are stored
 and served. Leaving it empty (`""`) uses the TFTP server's default root
 (often something like `/srv/tftp`, depending on your server configuration).

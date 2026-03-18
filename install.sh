@@ -68,6 +68,17 @@ Options:
                     • CI/GITHUB_ACTIONS are not set.
                   In CI environments, the option is acknowledged but skipped.
 
+  During interactive local installs, install.sh also offers to inspect and
+  remediate a local tftpd-hpa server for upload-capable TFTP service by
+  running:
+
+      ./scripts/setup_tftp_server.sh
+
+                  On Debian/Ubuntu, this helper updates
+                  /etc/default/tftpd-hpa directly. On other Linux distros,
+                  it performs detection and exits cleanly when the distro uses
+                  a different tftpd-hpa layout.
+
   venv_dir        Optional virtual environment directory name. Defaults to ".env".
 
   --help, -h      Show this help message and exit.
@@ -112,6 +123,10 @@ After installation, you can also configure how PyPNM retrieves PNM files
 (local/TFTP/FTP/SCP/SFTP/HTTP/HTTPS) manually by running:
 
   ./tools/pnm/pnm_file_retrieval_setup.py
+
+And you can inspect or remediate a local tftpd-hpa server manually with:
+
+  ./scripts/setup_tftp_server.sh
 EOF
 }
 
@@ -653,6 +668,35 @@ run_pnm_setup_if_possible() {
   fi
 }
 
+run_tftp_server_setup_offer_if_possible() {
+  if [[ ! -t 0 || -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "ℹ️  Skipping local TFTP server setup offer (non-interactive or CI environment)."
+    echo "    You can run it later with:"
+    echo "      ./scripts/setup_tftp_server.sh"
+    return
+  fi
+
+  if [[ ! -x "${PROJECT_ROOT}/scripts/setup_tftp_server.sh" ]]; then
+    echo "ℹ️  scripts/setup_tftp_server.sh is missing or not executable."
+    echo "    Run it later once available:"
+    echo "      ./scripts/setup_tftp_server.sh"
+    return
+  fi
+
+  echo
+  read -r -p "Offer local tftpd-hpa upload setup now? [y/N]: " setup_tftp_answer || true
+  case "${setup_tftp_answer:-N}" in
+    y|Y|yes|YES)
+      "${PROJECT_ROOT}/scripts/setup_tftp_server.sh"
+      ;;
+    *)
+      echo "ℹ️  Skipping local TFTP server setup."
+      echo "    You can run it later with:"
+      echo "      ./scripts/setup_tftp_server.sh"
+      ;;
+  esac
+}
+
 run_pnm_alias_installer_if_available() {
   if [[ -x "${PROJECT_ROOT}/scripts/install_aliases.sh" ]]; then
     echo "🔗 Installing PyPNM shell aliases (e.g., config-menu)…"
@@ -743,6 +787,8 @@ else
   echo "    You can configure it later with:"
   echo "      ./tools/pnm/pnm_file_retrieval_setup.py"
 fi
+
+run_tftp_server_setup_offer_if_possible
 
 ensure_pypnm_shared_group
 ensure_tmp_pypnm_permissions
