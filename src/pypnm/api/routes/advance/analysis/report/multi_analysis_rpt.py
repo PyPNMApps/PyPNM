@@ -55,6 +55,7 @@ class MultiAnalysisRpt(ABC):
         self.csv_files: list[PathLike]  = []
         self.plot_files: list[PathLike] = []
         self.json_files: list[PathLike] = []
+        self._persist_json_archive_files = False
 
         sys_descr_log = self._sys_descr_model.model_dump() if self._sys_descr_model is not None else None
         self.logger.info(f"MultiAnalysisRpt: MAC: {self._mac_addresses}, "
@@ -179,7 +180,11 @@ class MultiAnalysisRpt(ABC):
             archive = report.build_report()
             return report.to_model()
         """
-        self._process()
+        self._persist_json_archive_files = True
+        try:
+            self._process()
+        finally:
+            self._persist_json_archive_files = False
 
         f:PathArray = [Path('')]
 
@@ -295,6 +300,10 @@ class MultiAnalysisRpt(ABC):
         # We need to make sure its initial derive is from BaseModel
         if not isinstance(model, BaseModel):
             raise TypeError("model must be a Pydantic BaseModel instance")
+
+        if not self._persist_json_archive_files:
+            self.logger.debug("Skipping JSON artifact persistence outside archive report generation.")
+            return
 
         if append_timestamp:
             filename_tags.append(str(Generate.time_stamp(TimeUnit.NANOSECONDS)))

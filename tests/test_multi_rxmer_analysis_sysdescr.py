@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from pydantic import BaseModel
+
 from pypnm.api.routes.advance.analysis.report.multi_analysis_rpt import MultiAnalysisRpt
 from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analysis import (
     MultiRxMerAnalysisType,
@@ -46,6 +48,10 @@ class _DummyMultiAnalysisRpt(MultiAnalysisRpt):
         return []
 
 
+class _JsonModel(BaseModel):
+    value: int
+
+
 def _record(txn_id: str, filename: str, sys_descr: SystemDescriptor) -> TransactionRecordModel:
     return TransactionRecordModel(
         transaction_id=TransactionId(txn_id),
@@ -77,6 +83,24 @@ def test_multi_analysis_rpt_returns_null_sysdescr_when_no_transactions() -> None
 
     assert rpt.get_system_description_model() is None
     assert rpt.get_system_description().is_empty() is True
+
+
+def test_multi_analysis_rpt_skips_json_persistence_outside_build_report(monkeypatch) -> None:
+    rpt = _DummyMultiAnalysisRpt(_FakeCaptureDataAggregator(TransactionCollection()))
+    write_calls: list[str] = []
+
+    def _fake_write_json(*, data: object, fname: str) -> None:
+        write_calls.append(fname)
+
+    monkeypatch.setattr(
+        "pypnm.api.routes.advance.analysis.report.multi_analysis_rpt.JsonTransactionDb.write_json",
+        _fake_write_json,
+    )
+
+    rpt.register_models_for_json_archive_files(_JsonModel(value=1), ["test"])
+
+    assert write_calls == []
+    assert rpt.json_files == []
 
 
 def test_multi_rxmer_signal_analysis_empty_collection_returns_error_model() -> None:
