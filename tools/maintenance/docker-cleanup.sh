@@ -10,7 +10,7 @@ print_usage() {
 docker-cleanup.sh
 
 Usage:
-  docker-cleanup.sh [--safe] [--images] [--builder] [--volumes] [--aggressive] [--dry-run] [--yes]
+  docker-cleanup.sh [--safe] [--images] [--builder] [--volumes] [--aggressive] [--force-running] [--dry-run] [--yes]
 
 Modes:
   --safe         Prune stopped containers + unused networks + dangling images (default)
@@ -18,17 +18,18 @@ Modes:
   --builder      Prune build cache (equivalent to: docker builder prune -a)
   --volumes      Prune unused volumes (equivalent to: docker volume prune)
   --aggressive   Prune: containers + networks + images (-a) + builder (-a) + volumes
+  --force-running Stop and remove running containers before destructive cleanup
   --dry-run      Print what would run; make no changes
   --yes          Do not prompt
 
 Notes:
-  - This script refuses to run destructive modes when containers are running.
+  - Destructive modes refuse to touch running containers unless --force-running is set.
   - If docker requires root, the script will try sudo automatically.
 
 Examples:
   ./scripts/docker-cleanup.sh
   ./scripts/docker-cleanup.sh --images --builder --yes
-  ./scripts/docker-cleanup.sh --aggressive --yes
+  ./scripts/docker-cleanup.sh --aggressive --force-running --yes
 EOU
 }
 
@@ -98,6 +99,7 @@ print_snapshot() {
 
 DRY_RUN=0
 ASSUME_YES=0
+FORCE_RUNNING=0
 
 MODE_SAFE=1
 DO_IMAGES=0
@@ -135,6 +137,9 @@ while [ "${#}" -gt 0 ]; do
             DO_BUILDER=1
             DO_VOLUMES=1
             ;;
+        --force-running)
+            FORCE_RUNNING=1
+            ;;
         --dry-run)
             DRY_RUN=1
             ;;
@@ -169,9 +174,15 @@ print_snapshot "${DC}"
 RUNNING="$(running_containers_count "${DC}")"
 if [ "${RUNNING}" -ne 0 ]; then
     if [ "${MODE_AGGRESSIVE}" -eq 1 ] || [ "${DO_IMAGES}" -eq 1 ] || [ "${DO_VOLUMES}" -eq 1 ]; then
+        if [ "${FORCE_RUNNING}" -eq 1 ]; then
+            echo "Stopping and removing ${RUNNING} running container(s)..."
+            run "${DC} stop \$(${DC} ps -q)"
+            run "${DC} rm -f \$(${DC} ps -aq)"
+        else
         echo "Refusing: ${RUNNING} running container(s) detected."
-        echo "Stop containers before using --aggressive / --images / --volumes."
+        echo "Stop containers first or use --force-running."
         exit 1
+        fi
     fi
 fi
 
@@ -202,6 +213,11 @@ if [ "${DO_VOLUMES}" -eq 1 ]; then
     if confirm "Prune unused volumes (docker volume prune)?" ; then
         run "${DC} volume prune -f"
     fi
+fi
+
+if [ "${MODE_AGGRESSIVE}" -eq 1 ]; then
+    run "${DC} container prune -f"
+    run "${DC} network prune -f"
 fi
 
 echo

@@ -208,7 +208,7 @@ clean_docker_unused() {
     return 1
   fi
 
-  if "$docker_cleanup_script" --aggressive --yes; then
+  if "$docker_cleanup_script" --aggressive --force-running --yes; then
     echo "Docker cleanup complete."
   else
     echo "Docker cleanup failed."
