@@ -14,8 +14,8 @@ Use this tool to:
 
 - run the standard local quality gates
 - stage the current repository changes
+- advance the local build notation before commit
 - create a timestamped commit
-- advance the local build notation after the commit
 
 This is a developer save helper, not a release workflow.
 
@@ -29,12 +29,11 @@ When you run `git-save.sh`, it performs these steps:
    - secret scan
    - encrypted secret scan
    - MAC scan
-2. Stages repository changes with `git add -A`
-3. Creates your requested commit
-4. Bumps only the `BUILD` segment of the version
-5. Leaves the version bump as local, uncommitted file changes
+2. Bumps only the `BUILD` segment of the version
+3. Stages repository changes with `git add -A`
+4. Creates your requested commit, including the updated version files
 
-The post-save version bump updates only:
+The build bump updates only:
 
 - `src/pypnm/version.py`
 - `pyproject.toml`
@@ -43,24 +42,15 @@ It does not rewrite README or docs tag placeholders during `git-save.sh`.
 
 ## Important Version-Control Note
 
-After `git-save.sh` completes successfully, your working tree will usually still
-show modified version files.
-
-That is expected.
-
 Example:
 
 ```text
-Committed change set:      1.5.3.0
-Local working tree after:  1.5.3.1
+Working tree before save:  1.5.3.0
+Committed change set:      1.5.3.1
 ```
 
-This local build bump is a notation advance for the next save/release cycle. It
-is not automatically committed or pushed by `git-save.sh`.
-
-If you run `git-save.sh --push`, only the newly created content commit is
-pushed. The local post-save version bump remains uncommitted until a later save
-or release flow captures it.
+This build bump is part of the save commit. If you run `git-save.sh --push`,
+the pushed commit already includes the updated version notation.
 
 ## Usage
 

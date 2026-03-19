@@ -131,6 +131,8 @@ fi
 echo "Running quality and hygiene checks..."
 run_quality_gates
 
+bump_build_version
+
 echo "Staging changes..."
 git add -A
 

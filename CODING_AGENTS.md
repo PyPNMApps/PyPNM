@@ -56,10 +56,10 @@ Before introducing new types, validators, formats, or storage conventions:
 - Before changing version behavior or release tooling, review `tools/git/`,
   `tools/release/`, and `tools/support/bump_version.py` to avoid version-control
   drift.
-- `tools/git/git-save.sh` creates the main commit first, then advances only the
-  local `BUILD` notation in `src/pypnm/version.py` and `pyproject.toml`.
-- The post-save build bump from `git-save.sh` is intentionally left
-  uncommitted; do not describe it as pushed, released, or tagged.
+- `tools/git/git-save.sh` advances the local `BUILD` notation in
+  `src/pypnm/version.py` and `pyproject.toml` before creating the save commit.
+- The `git-save.sh` commit includes the bumped version files; do not describe
+  that save-path build bump as a release or tag.
 - `tools/release/release.py` is the only supported flow for committed release
   version updates, tags, and pushes.
 
