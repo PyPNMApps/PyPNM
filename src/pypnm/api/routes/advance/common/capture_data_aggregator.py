@@ -14,6 +14,7 @@ from pypnm.api.routes.common.classes.file_capture.pnm_file_transaction import (
 )
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.lib.memory import ProcessMemory
 from pypnm.lib.types import FileNameStr, GroupId, TransactionId
 from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
 
@@ -86,6 +87,17 @@ class CaptureDataAggregator:
                 continue
 
         return self._trans_collection
+
+    def release_payload_bytes(self) -> None:
+        """
+        Release retained raw capture bytes after analysis output is prepared.
+
+        This preserves transaction metadata while dropping the byte payloads held
+        by the underlying transaction collection.
+        """
+        self._trans_collection.release_payload_bytes()
+        self._trans_file_bin_entries = []
+        ProcessMemory.release_unused_memory()
 
     # ──────────────────────────────────────────────────────────────────────
     # Helpers

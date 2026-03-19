@@ -12,6 +12,7 @@ from pydantic import Field
 from pypnm.api.routes.advance.common.types.types import Sort
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.lib.mac_address import MacAddress
+from pypnm.lib.memory import ProcessMemory
 from pypnm.lib.types import ByteArray, TransactionId
 
 
@@ -176,6 +177,23 @@ class TransactionCollection:
 
     def getMacAddresses(self) -> list[MacAddress]:
         return list(self._mac_addresses)
+
+    def release_payload_bytes(self) -> None:
+        """
+        Drop retained raw capture bytes while preserving transaction metadata.
+
+        This is intended for post-analysis cleanup where the parsed result model
+        has already been built and the original file payloads are no longer
+        required in memory.
+        """
+        for record in self._records:
+            record.data = b""
+        for record in self._transaction_models:
+            record.data = b""
+        for record in self._transaction_tm.values():
+            record.data = b""
+
+        ProcessMemory.release_unused_memory()
 
     def _sorted_records(self, sorts: list[Sort], reverse: bool) -> list[TransactionCollectionModel]:
         """

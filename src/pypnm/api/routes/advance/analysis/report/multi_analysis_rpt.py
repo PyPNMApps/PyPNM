@@ -24,6 +24,7 @@ from pypnm.lib.csv.manager import CSVManager
 from pypnm.lib.db.json_transaction import JsonTransactionDb
 from pypnm.lib.mac_address import MacAddress, cast
 from pypnm.lib.matplot.manager import MatplotManager
+from pypnm.lib.memory import ProcessMemory
 from pypnm.lib.types import ChannelId, JSONScalar, PathArray, PathLike, TimeStamp
 from pypnm.lib.utils import Generate, TimeUnit
 
@@ -257,6 +258,19 @@ class MultiAnalysisRpt(ABC):
     def getTransactionCollection(self) -> TransactionCollection:
         """Return the `TransactionCollection` instance used to collect capture files."""
         return self._trans_collect
+
+    def release_analysis_memory(self) -> None:
+        """
+        Release heavy analysis intermediates once the final response/artifact exists.
+
+        This drops raw transaction payloads and common per-channel analysis models
+        that are no longer needed after the caller has built its response body or
+        archive path.
+        """
+        self._common_analysis_model = {}
+        self._capt_data_agg.release_payload_bytes()
+        self._trans_collect.release_payload_bytes()
+        ProcessMemory.release_unused_memory()
 
     def _pluck_system_description_model(self) -> SystemDescriptorModel | None:
         """

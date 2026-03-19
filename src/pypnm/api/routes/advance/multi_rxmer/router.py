@@ -513,16 +513,19 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                         "mac_address": mac_address,
                         "system_description": response_system_description,
                     }
-                self._release_operation_memory(request.operation_id)
-                return MultiRxMerAnalysisResponse(
+                response = MultiRxMerAnalysisResponse(
                     mac_address =   mac_address,
                     status      =   status_code,
                     message     =   response_message,
                     **response_kwargs,
                     data        =   data,)
+                engine.release_analysis_memory()
+                self._release_operation_memory(request.operation_id)
+                return response
 
             elif output_type == OutputType.ARCHIVE:
                 rpt = engine.build_report()
+                engine.release_analysis_memory()
                 self._release_operation_memory(request.operation_id)
                 return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 

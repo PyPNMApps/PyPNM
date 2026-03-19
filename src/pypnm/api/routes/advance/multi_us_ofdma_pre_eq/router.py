@@ -280,18 +280,21 @@ class MultiUsOfdmaPreEqRouter(AbstractMultiCaptureRouter):
                         "system_description": analysis_result.system_description,
                     }
 
-                self._release_operation_memory(request.operation_id)
-                return MultiUsOfdmaPreEqAnalysisResponse(
+                response = MultiUsOfdmaPreEqAnalysisResponse(
                     mac_address =   mac,
                     status      =   status,
                     message     =   message,
                     **response_kwargs,
                     data        =   data_model)
+                engine.release_analysis_memory()
+                self._release_operation_memory(request.operation_id)
+                return response
 
             elif output_type == OutputType.ARCHIVE:
                 try:
                     rpt = engine.build_report()
                     self.logger.info(f"[analysis] Built archive report for group {capture_group_id}")
+                    engine.release_analysis_memory()
                     self._release_operation_memory(request.operation_id)
                     return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
