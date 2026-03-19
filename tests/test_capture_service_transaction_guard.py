@@ -55,6 +55,15 @@ class _FakeCaptureService(AbstractCaptureService):
         return MessageResponse(ServiceStatusCode.SUCCESS, payload=None)
 
 
+class _SlowCaptureService(AbstractCaptureService):
+    OPERATION_NAME = MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION
+    MEASURE_MODE = "standard"
+
+    async def _capture_message_response(self) -> MessageResponse:
+        await asyncio.sleep(5)
+        return MessageResponse(ServiceStatusCode.SUCCESS, payload=None)
+
+
 @pytest.mark.asyncio
 async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(capture_service, "CaptureGroup", _FakeCaptureGroup)
@@ -144,3 +153,26 @@ def test_capture_service_builds_operation_model() -> None:
         name=MultiCaptureOperation.MULTI_DS_CHANNEL_ESTIMATION,
         measure_mode="standard",
     )
+
+
+@pytest.mark.asyncio
+async def test_capture_service_stop_cancels_background_task(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(capture_service, "CaptureGroup", _FakeCaptureGroup)
+    monkeypatch.setattr(capture_service, "OperationManager", _FakeOperationManager)
+    _FakeOperationManager.register_calls = []
+
+    service = _SlowCaptureService(duration=30, interval=0)
+    _, operation_id = await service.start()
+
+    await asyncio.sleep(0)
+
+    task = service._ops[operation_id]["task"]
+    assert isinstance(task, asyncio.Task)
+    assert task.done() is False
+
+    service.stop(operation_id)
+
+    await asyncio.sleep(0)
+
+    assert service._ops[operation_id]["state"] == capture_service.OperationState.STOPPED
+    assert task.cancelled() is True or task.done() is True

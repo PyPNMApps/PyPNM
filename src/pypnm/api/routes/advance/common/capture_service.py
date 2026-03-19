@@ -345,6 +345,9 @@ class AbstractCaptureService(ABC):
         op = self._ops.get(operation_id)
         if op and op["state"] == OperationState.RUNNING:
             op["state"] = OperationState.STOPPED
+            task = op.get("task")
+            if isinstance(task, asyncio.Task) and not task.done():
+                task.cancel()
             self.logger.info(f"[{operation_id}] Stopped by user")
 
     def _process_captures(self, msg_rsp: MessageResponse) -> list[CaptureSample]:
