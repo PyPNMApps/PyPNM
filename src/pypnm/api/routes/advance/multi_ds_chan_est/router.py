@@ -182,6 +182,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
 
             service.stop(operation_id)
             status = service.status(operation_id)
+            self._release_operation_memory(operation_id)
             return MultiChanEstStatusResponse(
                 mac_address =   service.cm.get_mac_address.mac_address,
                 system_description = service.get_system_description(),
@@ -281,6 +282,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                         "system_description": analysis_result.system_description,
                     }
 
+                self._release_operation_memory(request.operation_id)
                 return MultiChanEstimationAnalysisResponse(
                     mac_address =   mac,
                     status      =   status,
@@ -292,6 +294,7 @@ class MultiDsChanEstRouter(AbstractMultiCaptureRouter):
                 try:
                     rpt = engine.build_report()
                     self.logger.info(f"[analysis] Built archive report for group {capture_group_id}")
+                    self._release_operation_memory(request.operation_id)
                     return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
                 except Exception as e:

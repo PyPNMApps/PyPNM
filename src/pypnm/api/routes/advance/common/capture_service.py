@@ -25,6 +25,7 @@ from pypnm.api.routes.common.extended.common_messaging_service import (
     MessageResponseType,
 )
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
+from pypnm.lib.memory import ProcessMemory
 from pypnm.lib.types import GroupId, OperationId, TimeStamp
 from pypnm.lib.utils import Generate
 
@@ -129,6 +130,7 @@ class AbstractCaptureService(ABC):
             "duration":         self.duration,
             "interval":         self.interval,
             "time_remaining":   self.time_remaining,
+            "collected":        0,
             "samples":          [],
             "task":             None,
         }
@@ -162,15 +164,14 @@ class AbstractCaptureService(ABC):
                         if isinstance(msg_rsp.payload, list):
                             samples = self._process_captures(msg_rsp)
                             for sample in samples:
-                                self._ops[operation_id]["samples"].append(sample)
-                                if sample.transaction_id:
-                                    self._cap_group.add_transaction(sample.transaction_id)
+                                self._append_operation_sample(operation_id, sample)
                                 self.logger.debug(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
                         else:
                             status_name = msg_rsp.status.name if isinstance(msg_rsp.status, ServiceStatusCode) else str(msg_rsp.status)
                             err = f"Capture response returned no transaction payload (status={status_name})"
                             self.logger.warning(f"[{operation_id}] {err}")
-                            self._ops[operation_id]["samples"].append(
+                            self._append_operation_sample(
+                                operation_id,
                                 CaptureSample(
                                     timestamp=cast(TimeStamp, iteration_ts),
                                     transaction_id="",
@@ -182,10 +183,10 @@ class AbstractCaptureService(ABC):
                     except Exception as exc:
                         error_msg = str(exc)
                         self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
-                        self._ops[operation_id]["samples"].append(CaptureSample(timestamp       =   cast(TimeStamp, iteration_ts),
-                                                                                transaction_id  =   "",
-                                                                                filename        =   "",
-                                                                                error           =   error_msg))
+                        self._append_operation_sample(
+                            operation_id,
+                            CaptureSample(timestamp=cast(TimeStamp, iteration_ts), transaction_id="", filename="", error=error_msg),
+                        )
 
                 # Complete if still running
                 if self._ops[operation_id]["state"] == OperationState.RUNNING:
@@ -209,15 +210,14 @@ class AbstractCaptureService(ABC):
                             if isinstance(msg_rsp.payload, list):
                                 samples = self._process_captures(msg_rsp)
                                 for sample in samples:
-                                    self._ops[operation_id]["samples"].append(sample)
-                                    if sample.transaction_id:
-                                        self._cap_group.add_transaction(sample.transaction_id)
+                                    self._append_operation_sample(operation_id, sample)
                                     self.logger.info(f"[{operation_id}] Captured sample txn={sample.transaction_id}")
                             else:
                                 status_name = msg_rsp.status.name if isinstance(msg_rsp.status, ServiceStatusCode) else str(msg_rsp.status)
                                 err = f"Final capture response returned no transaction payload (status={status_name})"
                                 self.logger.warning(f"[{operation_id}] {err}")
-                                self._ops[operation_id]["samples"].append(
+                                self._append_operation_sample(
+                                    operation_id,
                                     CaptureSample(
                                         timestamp=cast(TimeStamp, iteration_ts),
                                         transaction_id="",
@@ -229,11 +229,10 @@ class AbstractCaptureService(ABC):
                     except Exception as exc:
                         error_msg = str(exc)
                         self.logger.error(f"[{operation_id}] Capture error: {error_msg}", exc_info=True)
-                        self._ops[operation_id]["samples"].append(
-                            CaptureSample(timestamp         =   cast(TimeStamp, iteration_ts),
-                                          transaction_id    =   "",
-                                          filename          =   "",
-                                          error             =error_msg))
+                        self._append_operation_sample(
+                            operation_id,
+                            CaptureSample(timestamp=cast(TimeStamp, iteration_ts), transaction_id="", filename="", error=error_msg),
+                        )
             except asyncio.CancelledError:
                 if operation_id in self._ops and self._ops[operation_id]["state"] == OperationState.RUNNING:
                     self._ops[operation_id]["state"] = OperationState.CANCELLED
@@ -278,6 +277,20 @@ class AbstractCaptureService(ABC):
     def getOperation(self, operation_id:OperationId) -> dict[str, dict[str, Any]]:
         return self._ops[operation_id]
 
+    def _append_operation_sample(self, operation_id: OperationId, sample: CaptureSample) -> None:
+        """
+        Append a capture sample and update operation-level counters.
+
+        Args:
+            operation_id: Operation receiving the sample.
+            sample: Parsed capture sample to retain.
+        """
+        op = self._ops[operation_id]
+        op["samples"].append(sample)
+        op["collected"] = int(op.get("collected", 0)) + 1
+        if sample.transaction_id:
+            self._cap_group.add_transaction(sample.transaction_id)
+
     def getOperationState(self,operation_id:OperationId) -> OperationState:
         return self._ops[operation_id]["state"]
 
@@ -314,7 +327,7 @@ class AbstractCaptureService(ABC):
 
         return {
             "state": op["state"],
-            "collected": len(op["samples"]),
+            "collected": int(op.get("collected", 0)),
             "time_remaining": op.get("time_remaining", 0)
         }
 
@@ -330,6 +343,26 @@ class AbstractCaptureService(ABC):
         """
         op = self._ops.get(operation_id)
         return op["samples"] if op else []
+
+    def release_operation_memory(self, operation_id: OperationId) -> None:
+        """
+        Drop retained in-memory samples and task references for an operation.
+
+        Args:
+            operation_id: Operation whose transient in-memory state should be released.
+        """
+        op = self._ops.get(operation_id)
+        if not op:
+            return
+
+        released_samples = len(op["samples"])
+        op["samples"] = []
+        op["task"] = None
+
+        if released_samples > 0:
+            self.logger.info("[%s] Released %d retained samples from memory", operation_id, released_samples)
+
+        ProcessMemory.release_unused_memory()
 
     def stop(self, operation_id: OperationId) -> None:
         """

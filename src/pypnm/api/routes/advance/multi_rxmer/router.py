@@ -334,6 +334,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             service.stop(operation_id)
             status = service.status(operation_id)
+            self._release_operation_memory(operation_id)
 
             return MultiRxMerStatusResponse(
                 mac_address=service.cm.get_mac_address.mac_address,
@@ -512,6 +513,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                         "mac_address": mac_address,
                         "system_description": response_system_description,
                     }
+                self._release_operation_memory(request.operation_id)
                 return MultiRxMerAnalysisResponse(
                     mac_address =   mac_address,
                     status      =   status_code,
@@ -521,6 +523,7 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             elif output_type == OutputType.ARCHIVE:
                 rpt = engine.build_report()
+                self._release_operation_memory(request.operation_id)
                 return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
             else:

@@ -19,6 +19,9 @@ from pypnm.api.routes.advance.common.schema.common_capture_schema import (
     MultiCaptureOperationIdResponse,
 )
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
+from pypnm.api.routes.common.classes.file_capture.pnm_file_opearation import (
+    OperationCaptureGroupResolver,
+)
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.types import GroupId, OperationId
 
@@ -62,17 +65,26 @@ class AbstractMultiCaptureRouter(AbstractService):
 
         Missing files are skipped with warnings.
         """
-        service = self._get_service_or_404(operation_id)
-        samples = service.results(operation_id)
-
         pnm_dir = str(SystemConfigSettings.pnm_dir())
-        cm = getattr(service, "cm", None)
-        mac = getattr(getattr(cm, "get_mac_address", None), "mac_address", "unknown")
+        resolver = OperationCaptureGroupResolver()
+        transaction_models = resolver.get_transaction_models_for_operation(operation_id)
+
+        mac = "unknown"
+        if transaction_models:
+            mac = str(transaction_models[0].mac_address)
+        else:
+            op_record = OperationManager.get_operation_record(operation_id)
+            if isinstance(op_record, dict):
+                metadata = op_record.get("metadata")
+                if isinstance(metadata, dict):
+                    md_mac = metadata.get("mac_address")
+                    if isinstance(md_mac, str) and md_mac.strip():
+                        mac = md_mac
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zipf:
-            for sample in samples:
-                filename = getattr(sample, "filename", "")
+            for model in transaction_models:
+                filename = str(model.filename)
                 if not str(filename).strip():
                     continue
 
@@ -87,6 +99,7 @@ class AbstractMultiCaptureRouter(AbstractService):
 
         buf.seek(0)
         headers = {"Content-Disposition": f"attachment; filename={filename_prefix}_{mac}_{operation_id}.zip"}
+        self._release_operation_memory(operation_id)
         return StreamingResponse(buf, media_type="application/zip", headers=headers)
 
     def _repair_capture_group_from_service_samples(self, operation_id: OperationId, capture_group_id: GroupId) -> int:
@@ -141,3 +154,15 @@ class AbstractMultiCaptureRouter(AbstractService):
         """Return persisted operation records for a canonical multi-capture operation family."""
         operations = OperationManager.list_operation_records_by_name(operation_name.value)
         return MultiCaptureOperationIdResponse(status="success", message=None, operations=operations)
+
+    def _release_operation_memory(self, operation_id: OperationId) -> None:
+        """Release transient in-memory capture state when a service is still registered."""
+        try:
+            service = self.getService(operation_id)
+        except Exception:
+            return
+
+        try:
+            service.release_operation_memory(operation_id)
+        except Exception as exc:
+            self.logger.debug("Operation memory release failed for %s: %s", operation_id, exc)

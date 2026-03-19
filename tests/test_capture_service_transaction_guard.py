@@ -13,6 +13,7 @@ from pypnm.api.routes.advance.common.operation_kind import (
     MultiCaptureOperation,
     MultiCaptureOperationModel,
 )
+from pypnm.api.routes.common.classes.file_capture.capture_sample import CaptureSample
 from pypnm.api.routes.common.extended.common_messaging_service import (
     MessageResponse,
     MessageResponseType,
@@ -176,3 +177,27 @@ async def test_capture_service_stop_cancels_background_task(monkeypatch: pytest.
 
     assert service._ops[operation_id]["state"] == capture_service.OperationState.STOPPED
     assert task.cancelled() is True or task.done() is True
+
+
+def test_release_operation_memory_keeps_collected_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = _FakeCaptureService(duration=0, interval=0)
+    service._ops["op-1"] = {
+        "state": capture_service.OperationState.COMPLETED,
+        "collected": 2,
+        "samples": [
+            CaptureSample(timestamp=1, transaction_id="tx1", filename="a.bin", error=None),
+            CaptureSample(timestamp=2, transaction_id="tx2", filename="b.bin", error=None),
+        ],
+        "task": object(),
+        "time_remaining": 0,
+    }
+
+    released_calls: list[str] = []
+    monkeypatch.setattr(capture_service.ProcessMemory, "release_unused_memory", lambda: released_calls.append("released"))
+
+    service.release_operation_memory(OperationId("op-1"))
+
+    assert service._ops["op-1"]["samples"] == []
+    assert service._ops["op-1"]["task"] is None
+    assert service.status(OperationId("op-1"))["collected"] == 2
+    assert released_calls == ["released"]
