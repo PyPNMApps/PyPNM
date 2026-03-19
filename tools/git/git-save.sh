@@ -139,8 +139,6 @@ git add -A
 echo "Creating commit..."
 git commit -m "${final_msg}"
 
-bump_build_version
-
 if [[ "${do_push}" == "true" ]]; then
   remote_name="$(git config branch."${current_branch}".remote || true)"
   echo "Pushing to origin (${current_branch})..."
