@@ -187,6 +187,16 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
     def to_dict(self) -> dict[str, Any]:
         return self.to_model().model_dump()
 
+    def release_analysis_memory(self) -> None:
+        """
+        Release cached multi-RxMER analysis intermediates after response build.
+        """
+        self._model = None
+        self._analysis_map = {}
+        self._sorted_temporal_mapping = []
+        self._is_process = False
+        super().release_analysis_memory()
+
     # -----------------------
     # Internals
     # -----------------------

@@ -188,3 +188,12 @@ class MultiOfdmaPreEqSignalAnalysis(MultiOfdmChanSignalAnalysis):
             self._available_file_types = original_available
 
         return plots
+
+    def release_analysis_memory(self) -> None:
+        """
+        Release cached OFDMA pre-eq analysis intermediates after response build.
+        """
+        self._file_type_by_channel = {}
+        self._available_file_types = set()
+        self._filter_file_type = None
+        super().release_analysis_memory()

@@ -9,6 +9,7 @@ reuse, and maintainability.
 - Keep diffs minimal and focused; avoid formatting churn.
 - Preserve existing naming, alignment, and whitespace patterns.
 - Favor clarity and explicit typing over clever shortcuts.
+- Treat memory management as a first-class design concern alongside Big O and computational complexity.
 - Review this document before making any changes.
   This is a generic guide and does not replace `AGENTS.md`.
 
@@ -48,6 +49,11 @@ Before introducing new types, validators, formats, or storage conventions:
 - New classes must have pytest coverage at a minimum for IPC and system calls.
 - Use `SystemCall` (`src/pypnm/lib/system_call/`) for subprocess/system calls; do not call `subprocess.run` directly in app code.
 - Avoid `try`/`except` inside hot loops; Ruff PERF rules flag this often. Move exception handling into a helper or restructure the loop before handing back commit/save commands.
+- Review memory growth and retention paths before adding or changing long-lived flows, especially:
+  background tasks, multi-capture services, analysis engines, caches, in-memory collections, and byte payload aggregation.
+- Do not assume Python or the allocator will release memory automatically. If code allocates large objects or repeated payloads, add an explicit cleanup or release path when the data is no longer needed.
+- When reviewing an implementation, ask the same questions you would for algorithmic complexity:
+  what grows, who owns it, how long it lives, and when it is released.
 - Avoid broad refactors unless explicitly requested.
 - Any changes to `deploy/docker/config/system.json` must also be made in `demo/settings/system.json`.
 - Keep `deploy/docker/config/system.json.template` aligned with `deploy/docker/config/system.json`.
@@ -83,6 +89,7 @@ Before introducing new types, validators, formats, or storage conventions:
   - Preserve whitespace/alignment in existing files (no auto-reflow).
   - Do not add broad refactors unless explicitly requested.
   - Provide an end-of-run Agent Review Bundle summary: goal, changes, files, tests, notes.
+  - Do not overlook memory retention. For repeated workflows, background operations, or analysis paths, inspect what remains strongly referenced after completion and whether the process has an explicit release path.
 - Typing and API style:
   - Strict typing everywhere; avoid `Dict`/`List`/`Tuple`/`Union` and avoid `Any`.
   - Prefer built-in generics (`dict[str, int]`, `list[str]`) and `A | B` rather than `Union`.
@@ -127,6 +134,7 @@ Before introducing new types, validators, formats, or storage conventions:
   - Run at least: `python3 -m compileall src`, `ruff check src`, `ruff format --check .`, `pytest -q`.
   - After any code change, run `ruff check src` and `pytest -q`. If only Markdown changes are made, run `mkdocs build -s` instead.
   - Review new loops and exception paths for Ruff performance rules before finalizing; do not rely on the user to discover PERF issues during `git-save.sh`.
+  - For code that handles large payloads, repeated captures, or analysis aggregation, review memory behavior explicitly and note any remaining risk or allocator caveat in the summary.
   - This is mandatory for every code update in this repo: do not finalize work without reporting `ruff check` and `pytest` results (or a clear blocker).
   - If an integration test is optional/gated (for example Postgres DSN), note skips explicitly in the summary.
 - Troubleshooting:

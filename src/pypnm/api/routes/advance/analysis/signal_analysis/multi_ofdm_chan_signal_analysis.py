@@ -304,6 +304,14 @@ class MultiOfdmChanSignalAnalysis(MultiAnalysisRpt, ABC):
                 )
         return self._results
 
+    def release_analysis_memory(self) -> None:
+        """
+        Release cached OFDM analysis intermediates after the response is built.
+        """
+        self._results = None
+        self._channel_data = None
+        super().release_analysis_memory()
+
     def create_csv(self, **kwargs: object) -> list[CSVManager]:
         """
         Materialize Per-Channel Analysis Results As CSV Files.
