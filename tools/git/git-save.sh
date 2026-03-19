@@ -19,6 +19,26 @@ Options:
 EOF
 }
 
+read_current_version() {
+  python3 ./tools/support/bump_version.py --current | sed 's/^Current version: //'
+}
+
+bump_build_version() {
+  local previous_version
+  local next_version
+
+  previous_version="$(read_current_version)"
+  echo "Bumping build version..."
+  python3 ./tools/support/bump_version.py --next build --version-files-only --no-sanitize-config
+  next_version="$(read_current_version)"
+
+  if [[ "${previous_version}" == "${next_version}" ]]; then
+    echo "Build version unchanged."
+    return
+  fi
+  echo "Build version updated locally: ${previous_version} -> ${next_version}"
+}
+
 run_check() {
   local label="$1"
   shift
@@ -116,6 +136,8 @@ git add -A
 
 echo "Creating commit..."
 git commit -m "${final_msg}"
+
+bump_build_version
 
 if [[ "${do_push}" == "true" ]]; then
   remote_name="$(git config branch."${current_branch}".remote || true)"

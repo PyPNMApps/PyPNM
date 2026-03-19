@@ -284,12 +284,18 @@ def main() -> None:
         default=DEFAULT_SANITIZE_CONFIG,
         help="Sanitize deploy/docker/config/system.json before running tests (default: True).",
     )
+    parser.add_argument(
+        "--version-files-only",
+        action="store_true",
+        help="Update only src/pypnm/version.py and pyproject.toml; skip README/docs tag rewrites.",
+    )
 
     args = parser.parse_args()
     explicit_version: str | None = args.version
     show_current: bool           = args.current
     next_mode: str | None        = args.next
     sanitize_config: bool        = args.sanitize_config
+    version_files_only: bool     = args.version_files_only
 
     if show_current:
         if explicit_version is not None or next_mode is not None:
@@ -317,7 +323,8 @@ def main() -> None:
         if sanitize_config:
             for cfg_path in GOLDEN_CONFIG_PATHS:
                 _sanitize_system_config(cfg_path)
-        _update_tag_tokens(f"v{next_version}")
+        if not version_files_only:
+            _update_tag_tokens(f"v{next_version}")
         print(f"Updated version: {current} -> {next_version}")
         sys.exit(0)
 
@@ -341,7 +348,8 @@ def main() -> None:
     if sanitize_config:
         for cfg_path in GOLDEN_CONFIG_PATHS:
             _sanitize_system_config(cfg_path)
-    _update_tag_tokens(f"v{new_version}")
+    if not version_files_only:
+        _update_tag_tokens(f"v{new_version}")
     print(f"Updated version: {current} -> {new_version}")
 
 
