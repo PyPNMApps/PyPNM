@@ -6,7 +6,7 @@
 | [PNM File MacAddress Updater](pnm-file-macaddress-updater.md) | A utility to update MAC addresses in PNM files.       |
 | [Clean](pypnm-clean.md)                                       | Clean utility                                         |
 | [Release](../release/release-strategy.md)                     | A tool to manage and automate software versioning.    |
-| [Git Save](git-save.md)                                       | Local save helper with post-commit build bump rules.  |
+| [Git Save](git-save.md)                                       | Local save helper with pre-commit build bump rules.   |
 | [Local Container Build](local-container-build.md)             | Local Docker build + optional health check preflight. |
 | [System Config Apply](system-config-apply.md)                 | Apply JSON config updates without prompts.            |
 | [Local Kubernetes Smoke](local-kubernetes-smoke.md)           | Build/load kind and validate the /health endpoint.    |
