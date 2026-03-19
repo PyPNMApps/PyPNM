@@ -90,6 +90,10 @@ class HealthDataModel(BaseModel):
 
 class HealthMemoryModel(BaseModel):
     rss_bytes: int = Field(..., description="Resident memory usage for the running PyPNM process in bytes.")
+    total_bytes: int = Field(..., description="Total system memory available on the current host in bytes.")
+    free_bytes: int = Field(..., description="Free system memory on the current host in bytes.")
+    available_bytes: int = Field(..., description="Available system memory on the current host in bytes.")
+    usage_percent: float = Field(..., description="Resident process memory as a percentage of total system memory.")
 
 
 class HealthResponseModel(BaseModel):
@@ -192,6 +196,63 @@ def _process_rss_bytes() -> int:
     return 0
 
 
+def _system_total_memory_bytes() -> int:
+    """Return total system memory in bytes using Linux procfs."""
+    meminfo_path = pathlib.Path("/proc/meminfo")
+    if not meminfo_path.is_file():
+        return 0
+
+    try:
+        for line in meminfo_path.read_text(encoding="utf-8").splitlines():
+            if not line.startswith("MemTotal:"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                return 0
+            return int(parts[1]) * 1024
+    except (OSError, ValueError):
+        return 0
+
+    return 0
+
+
+def _read_meminfo_bytes(field_name: str) -> int:
+    """Return a specific `/proc/meminfo` field in bytes."""
+    meminfo_path = pathlib.Path("/proc/meminfo")
+    if not meminfo_path.is_file():
+        return 0
+
+    try:
+        for line in meminfo_path.read_text(encoding="utf-8").splitlines():
+            if not line.startswith(f"{field_name}:"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                return 0
+            return int(parts[1]) * 1024
+    except (OSError, ValueError):
+        return 0
+
+    return 0
+
+
+def _system_free_memory_bytes() -> int:
+    """Return free system memory in bytes using Linux procfs."""
+    return _read_meminfo_bytes("MemFree")
+
+
+def _system_available_memory_bytes() -> int:
+    """Return available system memory in bytes using Linux procfs."""
+    return _read_meminfo_bytes("MemAvailable")
+
+
+def _process_memory_usage_percent(rss_bytes: int, total_bytes: int) -> float:
+    """Return process RSS as a percentage of total system memory."""
+    if total_bytes <= 0:
+        return 0.0
+    return round((rss_bytes / total_bytes) * 100.0, 2)
+
+
 def _apply_muted_tag_policy(app_instance: FastAPI) -> None:
     _hard_muted_routes.clear()
     muted_tags = read_env_csv_set(ENV_MUTE_TAGS)
@@ -214,11 +275,21 @@ def health() -> HealthResponseModel:
     """Lightweight health endpoint for probes."""
     uptime_seconds = _service_uptime_seconds()
     data_root = _data_root_path()
+    rss_bytes = _process_rss_bytes()
+    total_memory_bytes = _system_total_memory_bytes()
+    free_memory_bytes = _system_free_memory_bytes()
+    available_memory_bytes = _system_available_memory_bytes()
     return HealthResponseModel(
         status="ok",
         service=HealthServiceModel(name=SERVICE_NAME, version=__version__),
         uptime=HealthUptimeModel(starttime=API_START_EPOCH, uptime=uptime_seconds),
-        memory=HealthMemoryModel(rss_bytes=_process_rss_bytes()),
+        memory=HealthMemoryModel(
+            rss_bytes=rss_bytes,
+            total_bytes=total_memory_bytes,
+            free_bytes=free_memory_bytes,
+            available_bytes=available_memory_bytes,
+            usage_percent=_process_memory_usage_percent(rss_bytes, total_memory_bytes),
+        ),
         data=HealthDataModel(
             path=str(data_root),
             size_bytes=_folder_size_bytes(data_root),

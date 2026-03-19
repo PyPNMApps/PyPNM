@@ -52,7 +52,11 @@ Example response:
     "uptime": 1
   },
   "memory": {
-    "rss_bytes": 12582912
+    "rss_bytes": 12582912,
+    "total_bytes": 17179869184,
+    "free_bytes": 8216707072,
+    "available_bytes": 10379091968,
+    "usage_percent": 0.07
   },
   "data": {
     "path": ".data",
@@ -72,6 +76,10 @@ Example response:
 ```
 
 `memory.rss_bytes` reports the current resident memory used by the running PyPNM process in bytes.
+`memory.total_bytes` reports host total memory in bytes.
+`memory.free_bytes` reports host free memory in bytes.
+`memory.available_bytes` reports host available memory in bytes.
+`memory.usage_percent` reports resident process memory as a percent of host total memory.
 
 If the returned `service.version` is older than expected, verify the tag used in the deploy command and confirm the namespace matches the running deployment.
 
