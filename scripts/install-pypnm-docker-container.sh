@@ -17,6 +17,7 @@ PYPNM_USER="${PYPNM_USER:-${USER}}"
 PYPNM_SHARED_GROUP="${PYPNM_SHARED_GROUP:-pypnm}"
 PYPNM_IMAGE="ghcr.io/PyPNMApps/pypnm:${PYPNM_TAG}"
 PYPNM_FALLBACK_TAG="${PYPNM_FALLBACK_TAG:-v0.9.34.0}"
+UPDATE_MODE="0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/deploy/docker"
 TMP_BUNDLE_DIR=""
@@ -57,6 +58,9 @@ Usage: install-pypnm-docker-container.sh [options]
 Options:
   --tag <tag>           Install a specific PyPNM release (e.g., v0.9.26.0).
                         If omitted, the latest GitHub release is used.
+  --update [tag]        Stop and remove the existing PyPNM Docker deployment,
+                        then reinstall using the provided tag. If no tag is
+                        given, the latest GitHub release is used.
   --port <port>         Host port that maps to container port 8000 (default: 8000).
   --deploy-dir <path>   Target directory for the deploy bundle (default: /opt/pypnm).
   --user <name>         User that should own the deploy directory (default: current user).
@@ -64,6 +68,8 @@ Options:
 
 Examples:
   ./scripts/install-pypnm-docker-container.sh
+  ./scripts/install-pypnm-docker-container.sh --update
+  ./scripts/install-pypnm-docker-container.sh --update v0.9.26.0
   ./scripts/install-pypnm-docker-container.sh --tag v0.9.26.0 --port 8080
 EOF
 }
@@ -148,6 +154,13 @@ parse_args() {
       --tag)
         shift
         PYPNM_TAG="${1:-}"
+        ;;
+      --update)
+        UPDATE_MODE="1"
+        if [[ $# -gt 1 && "${2:-}" != "" && ! "${2:-}" =~ ^- ]]; then
+          shift
+          PYPNM_TAG="${1:-}"
+        fi
         ;;
       --port)
         shift
@@ -303,6 +316,35 @@ set_env_var() {
     sudo sed -i "s/^${key}=.*/${key}=${value}/" "$file"
   else
     echo "${key}=${value}" | sudo tee -a "$file" >/dev/null
+  fi
+}
+
+stop_existing_stack() {
+  local compose_dir="${PYPNM_DEPLOY_DIR}/compose"
+
+  if [[ -d "${compose_dir}" ]]; then
+    echo "Stopping existing PyPNM compose stack..."
+    (
+      cd "${compose_dir}"
+      docker compose down --remove-orphans --volumes || true
+    )
+  fi
+}
+
+remove_old_pypnm_docker() {
+  local container_ids
+  local image_ids
+
+  echo "Removing old PyPNM containers..."
+  container_ids="$(docker ps -aq --filter "name=pypnm" || true)"
+  if [[ -n "${container_ids}" ]]; then
+    docker rm -f ${container_ids} || true
+  fi
+
+  echo "Removing old PyPNM images..."
+  image_ids="$(docker images -q "ghcr.io/PyPNMApps/pypnm" || true)"
+  if [[ -n "${image_ids}" ]]; then
+    docker rmi -f ${image_ids} || true
   fi
 }
 
@@ -476,6 +518,10 @@ main() {
   ensure_compose_ok
   ensure_pypnm_shared_group
   ensure_tmp_pypnm_shared_permissions
+  if [[ "${UPDATE_MODE}" == "1" ]]; then
+    stop_existing_stack
+    remove_old_pypnm_docker
+  fi
   sync_deploy_bundle
   initialize_bundle
   pull_and_start

@@ -83,6 +83,18 @@ chmod +x install-pypnm-docker-container.sh
 sudo ./install-pypnm-docker-container.sh --tag ${TAG} --port ${PORT}
 ```
 
+Update an existing Docker deployment in place:
+
+```bash
+sudo ./install.sh --update
+sudo ./install.sh --update v1.5.3.0
+```
+
+`--update` stops the existing PyPNM compose stack, removes old PyPNM
+containers/images, then reinstalls using the requested tag or the latest
+release when no tag is provided. Internally, `install.sh` delegates to the
+Docker update helper under `scripts/`.
+
 If Docker isn’t on your host yet, follow the [Install Docker prerequisites](docs/docker/install-docker.md) guide first.
 
 More Docker options and compose workflows: [PyPNM Docker Installation](docs/docker/install.md) and [Developer Workflow](docs/docker/commands.md#developer-workflow).

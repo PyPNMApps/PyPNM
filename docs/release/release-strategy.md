@@ -67,6 +67,9 @@ Rules:
 * Treat `src/pypnm/version.py` as the **single source of truth**.  
 * The `[project].version` field in `pyproject.toml` is a **mirror** that must always match `__version__`.  
 * Do not hand-edit the version in `pyproject.toml`; let the release script maintain it.
+* `tools/git/git-save.sh` may advance the local `BUILD` notation after a
+  development commit. That local post-save bump is intentionally left
+  uncommitted and is not a release.
 
 Example FastAPI wiring:
 
@@ -95,6 +98,30 @@ When you run the release script, it updates or validates these locations:
   `[project].version` is kept in lockstep with `__version__`. Updated to the same value as in `src/pypnm/version.py`.
 
 The release script also performs git operations (commit, tag, push) once the version is updated and tests pass.
+
+### 2.2 Local Development Saves Versus Releases
+
+`tools/git/git-save.sh` and `tools/release/release.py` serve different purposes.
+
+`git-save.sh`:
+
+* runs local quality gates
+* creates a normal development commit
+* advances only the `BUILD` segment locally after the commit
+* leaves the version bump uncommitted in the working tree
+* does not create tags
+
+`release.py`:
+
+* computes or accepts the target release version
+* updates version files for the release
+* runs release checks
+* creates the release commit
+* creates the annotated tag
+* pushes branch and tags
+
+Do not treat the local post-save build bump from `git-save.sh` as a released
+version.
 
 ## 3. Versioning Scheme
 

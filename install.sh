@@ -14,6 +14,8 @@ DEVELOPMENT_MODE="0"
 CLEAN_MODE="0"
 PURGE_CACHE="0"
 UNINSTALL_MODE="0"
+UPDATE_MODE="0"
+UPDATE_TAG=""
 GITLEAKS_VERSION="8.18.1"
 PYPNM_SHARED_GROUP="pypnm"
 GROUP_MEMBERSHIP_CHANGED="0"
@@ -35,6 +37,7 @@ Usage:
   ./install.sh [--demo-mode | --production] [--pnm-file-retrieval-setup] [venv_dir]
   ./install.sh --development
   ./install.sh --clean [--purge-cache]
+  ./install.sh --update [tag]
   ./install.sh --uninstall [venv_dir]
   ./install.sh --help
 
@@ -42,6 +45,10 @@ Options:
   --development  Install Docker Engine + kind/kubectl + gitleaks for local dev and release workflows.
   --clean        Remove prior install artifacts (venv/build/dist/cache) before installing.
   --purge-cache  Clear pip cache after activating the venv (use with --clean when needed).
+  --update       Delegate to the Docker update helper. Stops the current PyPNM
+                 Docker deployment, removes old PyPNM containers/images, and
+                 reinstalls the requested tag. If no tag is provided, the latest
+                 release is used.
   --uninstall    Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
 
   --demo-mode     Enable demo mode by backing up the default
@@ -105,6 +112,12 @@ Examples:
   ./install.sh --clean --purge-cache
       Remove previous install artifacts and clear pip cache before reinstalling.
 
+  ./install.sh --update
+      Update an existing PyPNM Docker deployment to the latest release.
+
+  ./install.sh --update v1.5.3.0
+      Update an existing PyPNM Docker deployment to a specific release.
+
   ./install.sh --uninstall
       Remove local install artifacts and the secrets key at ~/.ssh/pypnm_secrets.key.
 
@@ -127,45 +140,74 @@ After installation, you can also configure how PyPNM retrieves PNM files
 And you can inspect or remediate a local tftpd-hpa server manually with:
 
   ./scripts/setup_tftp_server.sh
+
+To update an existing Docker deployment manually, you can also run:
+
+  ./scripts/update-pypnm-docker-container.sh [tag]
 EOF
 }
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --demo-mode)
       DEMO_MODE="1"
+      shift
       ;;
     --production)
       PRODUCTION_MODE="1"
+      shift
       ;;
     --pnm-file-retrieval-setup)
       PNM_FILE_RETRIEVAL_SETUP="1"
+      shift
       ;;
     --development)
       DEVELOPMENT_MODE="1"
+      shift
       ;;
     --clean)
       CLEAN_MODE="1"
+      shift
       ;;
     --purge-cache)
       PURGE_CACHE="1"
+      shift
+      ;;
+    --update)
+      UPDATE_MODE="1"
+      if [[ $# -gt 1 && "${2:-}" != "" && ! "${2:-}" =~ ^- ]]; then
+        UPDATE_TAG="$2"
+        shift 2
+        continue
+      fi
+      shift
       ;;
     --uninstall)
       UNINSTALL_MODE="1"
+      shift
       ;;
     --help|-h)
       usage
       exit 0
       ;;
     *)
-      VENV_DIR="$arg"
+      VENV_DIR="$1"
+      shift
       ;;
   esac
 done
 
 if [[ "$UNINSTALL_MODE" == "1" ]]; then
-  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" ]]; then
+  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" || "$UPDATE_MODE" == "1" ]]; then
     echo "❌ --uninstall cannot be combined with other flags."
+    usage
+    exit 1
+  fi
+fi
+
+if [[ "$UPDATE_MODE" == "1" ]]; then
+  if [[ "$DEMO_MODE" == "1" || "$PRODUCTION_MODE" == "1" || "$PNM_FILE_RETRIEVAL_SETUP" == "1" || "$DEVELOPMENT_MODE" == "1" || "$CLEAN_MODE" == "1" || "$PURGE_CACHE" == "1" || "$UNINSTALL_MODE" == "1" || "$VENV_DIR" != ".env" ]]; then
+    echo "❌ --update cannot be combined with install/uninstall or venv options."
     usage
     exit 1
   fi
@@ -334,8 +376,29 @@ uninstall_pypnm() {
   echo "✅ Uninstall complete."
 }
 
+run_docker_update() {
+  local update_script="${PROJECT_ROOT}/scripts/update-pypnm-docker-container.sh"
+
+  if [[ ! -x "${update_script}" ]]; then
+    echo "❌ Missing update helper: ${update_script}"
+    exit 1
+  fi
+
+  echo "🔄 Updating PyPNM Docker deployment..."
+  if [[ -n "${UPDATE_TAG}" ]]; then
+    "${update_script}" "${UPDATE_TAG}"
+  else
+    "${update_script}"
+  fi
+}
+
 if [[ "$UNINSTALL_MODE" == "1" ]]; then
   uninstall_pypnm
+  exit 0
+fi
+
+if [[ "$UPDATE_MODE" == "1" ]]; then
+  run_docker_update
   exit 0
 fi
 

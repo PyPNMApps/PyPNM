@@ -53,7 +53,15 @@ Before introducing new types, validators, formats, or storage conventions:
 - Keep `deploy/docker/config/system.json.template` aligned with `deploy/docker/config/system.json`.
 - Keep a brief summary of user prompts after any request for a commit message and track changes since the most recent commit message request.
 - When asked for a commit message, respond with the specified format, keep it succinct, and include all changes since the last commit message request.
-- Commit messages must be returned in Markdown text format (use a code block).
+- Before changing version behavior or release tooling, review `tools/git/`,
+  `tools/release/`, and `tools/support/bump_version.py` to avoid version-control
+  drift.
+- `tools/git/git-save.sh` creates the main commit first, then advances only the
+  local `BUILD` notation in `src/pypnm/version.py` and `pyproject.toml`.
+- The post-save build bump from `git-save.sh` is intentionally left
+  uncommitted; do not describe it as pushed, released, or tagged.
+- `tools/release/release.py` is the only supported flow for committed release
+  version updates, tags, and pushes.
 
 ## Commit Message Format
 - If request via chat request starts with commit-msg, then preface command ./tools/git/git-save.sh with commit-msg "<commit-msg>"

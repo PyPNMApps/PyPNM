@@ -36,6 +36,40 @@ What the script does:
 - Pulls `ghcr.io/PyPNMApps/pypnm:${TAG}` and starts the stack in `/opt/pypnm/compose`.
 - Prints next steps (logs, reload docs, config-menu).
 
+## Update an existing Docker deployment
+
+Use the same helper script to replace an existing PyPNM Docker deployment.
+
+Latest release:
+
+```bash
+sudo ./install.sh --update
+```
+
+Specific release:
+
+```bash
+sudo ./install.sh --update v1.5.3.0
+```
+
+What `--update` does:
+
+- Stops the existing PyPNM compose stack under the deploy directory.
+- Removes old PyPNM containers.
+- Removes old `ghcr.io/PyPNMApps/pypnm:*` images from the host.
+- Downloads the requested deploy bundle.
+- Reinitializes the deploy directory.
+- Pulls and starts the requested PyPNM image.
+
+Use this only for PyPNM Docker hosts where replacing the current deployment is
+intended.
+
+Implementation note:
+
+- `install.sh --update [tag]` is the public entrypoint.
+- It delegates to `scripts/update-pypnm-docker-container.sh`, which then calls
+  the Docker installer helper.
+
 After install (from `/opt/pypnm/compose`):
 
 ```bash
