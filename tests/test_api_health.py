@@ -14,6 +14,7 @@ def test_health_includes_uptime(monkeypatch) -> None:
     monkeypatch.setattr(api_main, "API_START_EPOCH", 1_741_709_200)
     monkeypatch.setattr(api_main, "SERVICE_NAME", "pypnm-docsis")
     monkeypatch.setattr(api_main, "_data_root_path", lambda: Path(".data"))
+    monkeypatch.setattr(api_main, "_process_rss_bytes", lambda: 12_582_912)
     monkeypatch.setattr(api_main, "_folder_size_bytes", lambda _: 4096)
     monkeypatch.setattr(api_main, "_first_level_directory_sizes", lambda _: {"pnm": 1024, "json": 2048})
     monkeypatch.setattr(api_main, "monotonic", lambda: 165.9)
@@ -29,6 +30,9 @@ def test_health_includes_uptime(monkeypatch) -> None:
         "uptime": {
             "starttime": 1_741_709_200,
             "uptime": 65,
+        },
+        "memory": {
+            "rss_bytes": 12_582_912,
         },
         "data": {
             "path": ".data",

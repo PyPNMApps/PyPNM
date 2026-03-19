@@ -88,10 +88,15 @@ class HealthDataModel(BaseModel):
     directories: dict[str, int] = Field(default_factory=dict, description="Recursive apparent sizes for first-level directories under the data root.")
 
 
+class HealthMemoryModel(BaseModel):
+    rss_bytes: int = Field(..., description="Resident memory usage for the running PyPNM process in bytes.")
+
+
 class HealthResponseModel(BaseModel):
     status: str = Field(..., description="Top-level health status for readiness probes.")
     service: HealthServiceModel = Field(..., description="Service identity and version metadata.")
     uptime: HealthUptimeModel = Field(..., description="Service process start time and uptime.")
+    memory: HealthMemoryModel = Field(..., description="Process memory usage for the running PyPNM service.")
     data: HealthDataModel = Field(..., description="Runtime data directory sizing details.")
 
 
@@ -167,6 +172,26 @@ def _first_level_directory_sizes(folder_path: pathlib.Path) -> dict[str, int]:
     return sizes
 
 
+def _process_rss_bytes() -> int:
+    """Return resident memory for the current process in bytes using Linux procfs."""
+    status_path = pathlib.Path("/proc/self/status")
+    if not status_path.is_file():
+        return 0
+
+    try:
+        for line in status_path.read_text(encoding="utf-8").splitlines():
+            if not line.startswith("VmRSS:"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                return 0
+            return int(parts[1]) * 1024
+    except (OSError, ValueError):
+        return 0
+
+    return 0
+
+
 def _apply_muted_tag_policy(app_instance: FastAPI) -> None:
     _hard_muted_routes.clear()
     muted_tags = read_env_csv_set(ENV_MUTE_TAGS)
@@ -193,6 +218,7 @@ def health() -> HealthResponseModel:
         status="ok",
         service=HealthServiceModel(name=SERVICE_NAME, version=__version__),
         uptime=HealthUptimeModel(starttime=API_START_EPOCH, uptime=uptime_seconds),
+        memory=HealthMemoryModel(rss_bytes=_process_rss_bytes()),
         data=HealthDataModel(
             path=str(data_root),
             size_bytes=_folder_size_bytes(data_root),

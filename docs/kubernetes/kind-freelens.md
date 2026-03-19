@@ -45,11 +45,14 @@ Example response:
   "status": "ok",
   "service": {
     "name": "pypnm-docsis",
-    "version": "1.4.2.0"
+    "version": "1.4.3.0"
   },
   "uptime": {
     "starttime": 1773640097,
     "uptime": 1
+  },
+  "memory": {
+    "rss_bytes": 12582912
   },
   "data": {
     "path": ".data",
@@ -67,6 +70,8 @@ Example response:
   }
 }
 ```
+
+`memory.rss_bytes` reports the current resident memory used by the running PyPNM process in bytes.
 
 If the returned `service.version` is older than expected, verify the tag used in the deploy command and confirm the namespace matches the running deployment.
 
