@@ -9,6 +9,7 @@ from pypnm.api.routes.common.classes.analysis.analysis import SpecAnCapturePara
 from pypnm.api.routes.common.extended.common_measure_service import CommonMeasureService
 from pypnm.api.routes.common.service.status_codes import ServiceStatusCode
 from pypnm.docsis.cm_snmp_operation import DocsPnmCmCtlTest
+from pypnm.lib.constants import DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES
 from pypnm.lib.inet import Inet
 from pypnm.pnm.data_type.DocsIf3CmSpectrumAnalysisCtrlCmd import SpectrumRetrievalType
 
@@ -33,7 +34,7 @@ class _FakeCableModem:
 
 
 @pytest.mark.asyncio
-async def test_spectrum_analyzer_averages_capped_to_one() -> None:
+async def test_spectrum_analyzer_averages_capped_to_shared_default() -> None:
     cm = _FakeCableModem()
     service = CommonMeasureService(
         pnm_test_type=DocsPnmCmCtlTest.SPECTRUM_ANALYZER_SNMP_AMP_DATA,
@@ -57,4 +58,4 @@ async def test_spectrum_analyzer_averages_capped_to_one() -> None:
 
     assert status == ServiceStatusCode.SUCCESS
     assert cm.last_cmd is not None
-    assert cm.last_cmd.docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages == 1
+    assert cm.last_cmd.docsIf3CmSpectrumAnalysisCtrlCmdNumberOfAverages == DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES

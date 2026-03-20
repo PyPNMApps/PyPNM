@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
+from pypnm.lib.constants import DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES
 from pypnm.lib.types import STATUS, ResolutionBw
 from pypnm.lib.utils import Generate
 
@@ -90,7 +91,7 @@ class SpectrumAnalysisDefaults(IntEnum):
     NUM_BINS_PER_SEGMENT = 256
     NOISE_BW = 110
     WINDOW_FUNCTION = WindowFunction.HANN
-    NUM_AVERAGES = 1
+    NUM_AVERAGES = DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES
 
     @classmethod
     def to_dict(cls) -> dict:

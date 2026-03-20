@@ -213,6 +213,7 @@ class DocsIf31CmDsOfdmChanIndicator(StringEnum):
 T = TypeVar("T")
 
 DEFAULT_SPECTRUM_ANALYZER_INDICES: Final[list[int]] = [0]
+DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES: Final[int] = 5
 
 
 FEC_SUMMARY_TYPE_STEP_SECONDS: dict[int, int] = {
@@ -248,5 +249,6 @@ __all__ = [
     "DocsIf31CmStatusOfdmaUsRangingStatus",
     "DocsIf31CmDsOfdmChanIndicator",
     "DEFAULT_SPECTRUM_ANALYZER_INDICES",
+    "DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES",
     "FEC_SUMMARY_TYPE_STEP_SECONDS", "FEC_SUMMARY_TYPE_LABEL",
 ]

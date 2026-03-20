@@ -64,6 +64,7 @@ from pypnm.docsis.data_type.pnm.DocsPnmCmUsPreEqEntry import DocsPnmCmUsPreEqEnt
 from pypnm.lib.file_processor import FileProcessor
 from pypnm.lib.ftp.ftp_connector import FTPConnector
 from pypnm.lib.host_endpoint import HostEndpoint
+from pypnm.lib.constants import DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES
 from pypnm.lib.inet import Inet
 from pypnm.lib.ping import Ping
 from pypnm.lib.ssh.ssh_connector import SSHConnector
@@ -105,7 +106,7 @@ MeasurementEntry: TypeAlias =   DocsPnmCmOfdmChanEstCoefEntry   | \
                                 DocsIf3CmSpectrumAnalysisEntry
 
 class CommonMeasureService(CommonMessagingService):
-    SPECTRUM_ANALYZER_AVERAGES_CAP: int = 1
+    SPECTRUM_ANALYZER_AVERAGES_CAP: int = DEFAULT_SPECTRUM_ANALYZER_NUM_AVERAGES
     """
     Base service class for executing common Proactive Network Maintenance (PNM) measurement tests.
 
