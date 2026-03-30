@@ -843,8 +843,7 @@ run_tmp_cleanup_cron_installer_if_available() {
 seed_fastapi_worker_profile_if_available() {
   if [[ -x "${PROJECT_ROOT}/scripts/seed-fastapi-worker-profile.py" ]]; then
     echo "⚙️  Seeding FastAPI worker profile from host CPU and RAM..."
-    "${PROJECT_ROOT}/scripts/seed-fastapi-worker-profile.py" \
-      --write "${PROJECT_ROOT}/.data/runtime/pypnm-serve.env" || true
+    "${PROJECT_ROOT}/scripts/seed-fastapi-worker-profile.py" || true
   fi
 }
 

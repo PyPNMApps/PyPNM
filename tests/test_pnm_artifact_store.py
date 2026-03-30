@@ -14,6 +14,7 @@ from pypnm.config.pnm_artifact_storage import (
     ArtifactCompressionPolicyConfig,
     PnmArtifactStorageConfig,
 )
+from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.types import FileNameStr, TransactionId
 from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
 
@@ -231,3 +232,15 @@ def test_cache_dirs_fallback_to_user_scoped_when_unwritable(tmp_path: Path, monk
     assert store._materialized_dir == materialized_fallback
     assert store._ingress_dir.exists()
     assert store._materialized_dir.exists()
+
+
+def test_load_pnm_dir_falls_back_to_system_config(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    cfg = _build_config(tmp_path / "tmp", min_bytes=0)
+    fallback_pnm_dir = tmp_path / "configured-pnm"
+
+    monkeypatch.setattr("pypnm.pnm.lib.pnm_artifact_store.ConfigManager.get", lambda self, *args: None)
+    monkeypatch.setattr(SystemConfigSettings, "pnm_dir", lambda: str(fallback_pnm_dir))
+
+    store = PnmArtifactStore(config=cfg, pnm_dir=None)
+
+    assert store._pnm_dir == fallback_pnm_dir

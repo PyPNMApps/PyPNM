@@ -19,8 +19,11 @@ Then keep the values operator-overrideable at runtime.
 PyPNM now ships a helper script for that purpose:
 
 ```bash
-./scripts/seed-fastapi-worker-profile.py --write .data/runtime/pypnm-serve.env
+./scripts/seed-fastapi-worker-profile.py
 ```
+
+By default, the helper writes `pypnm-serve.env` under the configured
+`PnmFileRetrieval.runtime_dir` path from `system.json`.
 
 The generated env file is consumed automatically by:
 

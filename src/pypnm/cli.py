@@ -12,6 +12,12 @@ from pathlib import Path
 import uvicorn
 
 from pypnm.config.runtime_flags import ENV_MUTE_TAGS, ENV_MUTE_TAGS_HARD
+from pypnm.support.worker_profile import (
+    WorkerProfile,
+    default_profile_env_path,
+    detect_worker_profile,
+    load_seeded_profile,
+)
 from pypnm.tools.system_config.menu import SystemConfigMenu
 
 try:
@@ -28,6 +34,51 @@ LOG_LEVEL_DEFAULT = "info"
 DEFAULT_WORKERS = 1
 TIMEOUT_KEEP_ALIVE_SECONDS = 120
 DEFAULT_LIMIT_MAX_REQUESTS = 0
+
+
+def _runtime_profile_selection_message(workers: int, limit_max_requests: int) -> str:
+    source = os.environ.get("PYPNM_ACTIVE_RUNTIME_SOURCE", "explicit_cli")
+    profile_env_path = os.environ.get("PYPNM_SERVE_ENV_FILE", str(default_profile_env_path()))
+
+    if source == "seeded_profile":
+        return (
+            "Auto-selected FastAPI runtime profile: "
+            f"workers={workers} limit_max_requests={limit_max_requests} "
+            f"profile={profile_env_path}"
+        )
+
+    return (
+        "FastAPI runtime profile: "
+        f"workers={workers} limit_max_requests={limit_max_requests} "
+        f"source={source} profile={profile_env_path}"
+    )
+
+
+def _log_runtime_profile_selection(workers: int, limit_max_requests: int) -> None:
+    print(f"[INFO] {_runtime_profile_selection_message(workers, limit_max_requests)}")
+
+
+def _resolve_runtime_worker_profile(args: argparse.Namespace) -> tuple[int, int]:
+    profile_env_path = Path(os.environ.get("PYPNM_SERVE_ENV_FILE", str(default_profile_env_path())))
+
+    if args.workers is not None and args.limit_max_requests is not None:
+        os.environ["PYPNM_ACTIVE_RUNTIME_SOURCE"] = "explicit_cli"
+        return args.workers, args.limit_max_requests
+
+    profile: WorkerProfile | None = load_seeded_profile(profile_env_path)
+    if profile is not None:
+        os.environ["PYPNM_ACTIVE_RUNTIME_SOURCE"] = "seeded_profile"
+    else:
+        profile = detect_worker_profile()
+        os.environ["PYPNM_ACTIVE_RUNTIME_SOURCE"] = "hardware_auto"
+
+    workers = args.workers if args.workers is not None else profile.workers
+    limit_max_requests = (
+        args.limit_max_requests
+        if args.limit_max_requests is not None
+        else profile.limit_max_requests
+    )
+    return workers, limit_max_requests
 
 
 def _sanitize_pythonpath_for_serve() -> None:
@@ -97,16 +148,16 @@ def _build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--workers",
         type=int,
-        default=DEFAULT_WORKERS,
-        help="Number of worker processes (default: 1).",
+        default=None,
+        help="Number of worker processes (default: auto-select from hardware profile).",
     )
     serve_parser.add_argument(
         "--limit-max-requests",
         type=int,
-        default=DEFAULT_LIMIT_MAX_REQUESTS,
+        default=None,
         help=(
-            "Restart a worker after serving this many requests (0 disables the limit). "
-            "Useful as a production safety valve for slow memory creep."
+            "Restart a worker after serving this many requests. "
+            "Default: auto-select from hardware profile."
         ),
     )
     serve_parser.add_argument(
@@ -160,14 +211,12 @@ def _run_serve(args: argparse.Namespace) -> int:
     if bool(args.mute_tags_hard):
         os.environ[ENV_MUTE_TAGS_HARD] = "1"
 
-    if args.limit_max_requests < 0:
+    if args.limit_max_requests is not None and args.limit_max_requests < 0:
         print("[ERROR] --limit-max-requests must be >= 0")
         return EXIT_CODE_USAGE
 
-    os.environ.setdefault("PYPNM_SERVE_ENV_FILE", ".data/runtime/pypnm-serve.env")
-    os.environ["PYPNM_ACTIVE_RUNTIME_SOURCE"] = os.environ.get("PYPNM_ACTIVE_RUNTIME_SOURCE", "explicit_cli")
-    os.environ["PYPNM_ACTIVE_WORKERS"] = str(args.workers)
-    os.environ["PYPNM_ACTIVE_LIMIT_MAX_REQUESTS"] = str(args.limit_max_requests)
+    os.environ.setdefault("PYPNM_SERVE_ENV_FILE", str(default_profile_env_path()))
+    resolved_workers, resolved_limit_max_requests = _resolve_runtime_worker_profile(args)
 
     uvicorn_args = {
         "app": "pypnm.api.main:app",
@@ -175,14 +224,14 @@ def _run_serve(args: argparse.Namespace) -> int:
         "port": args.port,
         "timeout_keep_alive": TIMEOUT_KEEP_ALIVE_SECONDS,
         "log_level": args.log_level,
-        "workers": args.workers,
+        "workers": resolved_workers,
         "access_log": not args.no_access_log,
     }
-    if args.limit_max_requests > 0:
-        uvicorn_args["limit_max_requests"] = args.limit_max_requests
+    if resolved_limit_max_requests > 0:
+        uvicorn_args["limit_max_requests"] = resolved_limit_max_requests
 
     if args.reload:
-        if args.workers != DEFAULT_WORKERS:
+        if resolved_workers != DEFAULT_WORKERS:
             print("[WARN] --workers is ignored when --reload is enabled; using workers=1 for dev reload.")
             uvicorn_args["workers"] = DEFAULT_WORKERS
 
@@ -204,6 +253,15 @@ def _run_serve(args: argparse.Namespace) -> int:
                 "ssl_keyfile": args.key,
             },
         )
+
+    effective_workers = int(uvicorn_args["workers"])
+    effective_limit_max_requests = int(uvicorn_args.get("limit_max_requests", 0))
+    os.environ["PYPNM_ACTIVE_WORKERS"] = str(effective_workers)
+    os.environ["PYPNM_ACTIVE_LIMIT_MAX_REQUESTS"] = str(effective_limit_max_requests)
+    _log_runtime_profile_selection(
+        workers=effective_workers,
+        limit_max_requests=effective_limit_max_requests,
+    )
 
     try:
         uvicorn.run(**uvicorn_args)

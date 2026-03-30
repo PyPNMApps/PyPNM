@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from pathlib import Path
 
 from pypnm import cli
 
@@ -18,8 +19,8 @@ def _serve_args(**overrides: object) -> Namespace:
         "mute_tags": "",
         "mute_tags_hard": False,
         "log_level": "info",
-        "workers": 2,
-        "limit_max_requests": 1000,
+        "workers": None,
+        "limit_max_requests": None,
         "no_access_log": False,
         "reload": False,
         "reload_dirs": [],
@@ -38,8 +39,13 @@ def test_run_serve_passes_limit_max_requests(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
     monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    monkeypatch.setattr(
+        cli,
+        "detect_worker_profile",
+        lambda: cli.WorkerProfile(cpu_count=4, total_memory_gib=16.0, workers=2, limit_max_requests=1000),
+    )
 
-    exit_code = cli._run_serve(_serve_args())
+    exit_code = cli._run_serve(_serve_args(workers=2, limit_max_requests=1000))
 
     assert exit_code == cli.SUCCESS_EXIT_CODE
     assert recorded["limit_max_requests"] == 1000
@@ -60,3 +66,84 @@ def test_run_serve_rejects_negative_limit_max_requests(monkeypatch) -> None:
 
     assert exit_code == cli.EXIT_CODE_USAGE
     assert uvicorn_called is False
+
+
+def test_run_serve_logs_seeded_runtime_profile(monkeypatch, capsys) -> None:
+    recorded: dict[str, object] = {}
+
+    def fake_uvicorn_run(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    profile_path = Path("/tmp/pypnm-runtime/pypnm-serve.env")
+    monkeypatch.setenv("PYPNM_SERVE_ENV_FILE", str(profile_path))
+    monkeypatch.setattr(
+        cli,
+        "load_seeded_profile",
+        lambda _path: cli.WorkerProfile(cpu_count=8, total_memory_gib=16.0, workers=4, limit_max_requests=2000),
+    )
+
+    exit_code = cli._run_serve(_serve_args())
+    captured = capsys.readouterr()
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert recorded["workers"] == 4
+    assert recorded["limit_max_requests"] == 2000
+    assert (
+        f"[INFO] Auto-selected FastAPI runtime profile: workers=4 limit_max_requests=2000 profile={profile_path}"
+        in captured.out
+    )
+
+
+def test_run_serve_logs_effective_reload_worker_profile(monkeypatch, capsys) -> None:
+    recorded: dict[str, object] = {}
+
+    def fake_uvicorn_run(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    monkeypatch.setattr(
+        cli,
+        "detect_worker_profile",
+        lambda: cli.WorkerProfile(cpu_count=8, total_memory_gib=16.0, workers=4, limit_max_requests=2000),
+    )
+
+    exit_code = cli._run_serve(_serve_args(workers=4, limit_max_requests=2000, reload=True))
+    captured = capsys.readouterr()
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert recorded["workers"] == cli.DEFAULT_WORKERS
+    assert recorded["limit_max_requests"] == 2000
+    assert (
+        "[INFO] FastAPI runtime profile: workers=1 limit_max_requests=2000 source=explicit_cli"
+        in captured.out
+    )
+
+
+def test_run_serve_auto_selects_hardware_profile_when_no_seed_exists(monkeypatch, capsys) -> None:
+    recorded: dict[str, object] = {}
+
+    def fake_uvicorn_run(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    monkeypatch.setattr(cli, "load_seeded_profile", lambda _path: None)
+    monkeypatch.setattr(
+        cli,
+        "detect_worker_profile",
+        lambda: cli.WorkerProfile(cpu_count=8, total_memory_gib=32.0, workers=4, limit_max_requests=2000),
+    )
+
+    exit_code = cli._run_serve(_serve_args())
+    captured = capsys.readouterr()
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert recorded["workers"] == 4
+    assert recorded["limit_max_requests"] == 2000
+    assert (
+        "[INFO] FastAPI runtime profile: workers=4 limit_max_requests=2000 source=hardware_auto"
+        in captured.out
+    )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sys
@@ -24,6 +25,7 @@ from pypnm.config.runtime_flags import (
     is_env_flag_enabled,
     read_env_csv_set,
 )
+from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.startup.startup import StartUp
 from pypnm.version import __version__
 
@@ -138,8 +140,34 @@ SERVICE_NAME: str = _read_project_name()
 
 
 def _data_root_path() -> pathlib.Path:
-    """Return the repository-local `.data` directory used for runtime artifacts."""
-    return pathlib.Path(".data")
+    """Return the configured common root for runtime artifact directories."""
+    configured_paths = [
+        pathlib.Path(SystemConfigSettings.pnm_dir()),
+        pathlib.Path(SystemConfigSettings.csv_dir()),
+        pathlib.Path(SystemConfigSettings.json_dir()),
+        pathlib.Path(SystemConfigSettings.xlsx_dir()),
+        pathlib.Path(SystemConfigSettings.png_dir()),
+        pathlib.Path(SystemConfigSettings.archive_dir()),
+        pathlib.Path(SystemConfigSettings.message_response_dir()),
+        pathlib.Path(SystemConfigSettings.runtime_dir()),
+    ]
+
+    database_paths = [
+        SystemConfigSettings.transaction_db(),
+        SystemConfigSettings.capture_group_db(),
+        SystemConfigSettings.session_group_db(),
+        SystemConfigSettings.operation_db(),
+        SystemConfigSettings.json_db(),
+    ]
+    for db_path in database_paths:
+        if db_path.strip() == "":
+            continue
+        configured_paths.append(pathlib.Path(db_path).parent)
+
+    try:
+        return pathlib.Path(os.path.commonpath([str(path) for path in configured_paths]))
+    except ValueError:
+        return pathlib.Path(SystemConfigSettings.pnm_dir()).parent
 
 
 def _folder_size_bytes(folder_path: pathlib.Path) -> int:

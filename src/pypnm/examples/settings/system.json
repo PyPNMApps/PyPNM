@@ -48,6 +48,7 @@
         "png_dir": ".data/png",
         "archive_dir": ".data/archive",
         "msg_rsp_dir": ".data/msg_rsp",
+        "runtime_dir": ".data/runtime",
         "transaction_db": ".data/db/transactions.json",
         "capture_group_db": ".data/db/capture_group.json",
         "session_group_db": ".data/db/session_group.json",

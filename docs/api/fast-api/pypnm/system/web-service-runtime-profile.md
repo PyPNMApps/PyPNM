@@ -11,6 +11,9 @@ This includes:
 - the active runtime values currently in use by the service
 - whether those active values came from an explicit CLI choice or the seeded profile
 
+The profile file path is resolved from `PnmFileRetrieval.runtime_dir` in
+`system.json`, unless `PYPNM_SERVE_ENV_FILE` explicitly overrides it.
+
 ## Endpoint
 
 `GET /pypnm/system/webService/runtimeProfile`

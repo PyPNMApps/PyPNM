@@ -49,6 +49,7 @@ class SystemConfigSettings:
     _DEFAULT_PNG_DIR: str                   = ".data/png"
     _DEFAULT_ARCHIVE_DIR: str               = ".data/archive"
     _DEFAULT_MSG_RSP_DIR: str               = ".data/msg_rsp"
+    _DEFAULT_RUNTIME_DIR: str               = ".data/runtime"
 
     _ENCRYPTED_TOKEN_PREFIX: str            = "ENC["
 
@@ -605,6 +606,10 @@ class SystemConfigSettings:
         return cls._get_str(cls._DEFAULT_MSG_RSP_DIR, "PnmFileRetrieval", "msg_rsp_dir")
 
     @classmethod
+    def runtime_dir(cls) -> str:
+        return cls._get_str(cls._DEFAULT_RUNTIME_DIR, "PnmFileRetrieval", "runtime_dir")
+
+    @classmethod
     def transaction_db(cls) -> str:
         return cls._get_str("", "PnmFileRetrieval", "transaction_db")
 
@@ -868,6 +873,7 @@ class SystemConfigSettings:
             cls.png_dir(),
             cls.archive_dir(),
             cls.message_response_dir(),
+            cls.runtime_dir(),
             cls.log_dir(),
         ]
         for directory in directories:

@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE_ENV_FILE="${PYPNM_SERVE_ENV_FILE:-.data/runtime/pypnm-serve.env}"
+resolve_profile_env_file() {
+  if [[ -n "${PYPNM_SERVE_ENV_FILE:-}" ]]; then
+    printf '%s\n' "${PYPNM_SERVE_ENV_FILE}"
+    return 0
+  fi
+
+  python3 - <<'PY'
+from pathlib import Path
+import sys
+import os
+
+project_root = Path(os.environ["PYPNM_PROJECT_ROOT"])
+src_dir = project_root / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+from pypnm.support.worker_profile import default_profile_env_path
+
+print(default_profile_env_path())
+PY
+}
+
+PROFILE_ENV_FILE="$(PYPNM_PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" resolve_profile_env_file)"
 
 if [[ -f "${PROFILE_ENV_FILE}" ]]; then
   # shellcheck disable=SC1090

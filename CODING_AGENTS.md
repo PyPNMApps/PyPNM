@@ -24,6 +24,7 @@ Before introducing new types, validators, formats, or storage conventions:
 - Prefer existing Pydantic models for public data structures.
 - Refer to shared utilities and helpers before creating new classes.
 - For SNMP-related operations, check `Snmp_v2c` first before creating new helpers. If logic is generic/reusable, add it as a static/class method on `Snmp_v2c`.
+- Do not hardcode `.data` paths. Resolve runtime/storage paths from `SystemConfigSettings` or other config-backed accessors instead of embedding literal `.data/...` strings in app code, scripts, or docs.
 
 ## Common Locations To Consult
 

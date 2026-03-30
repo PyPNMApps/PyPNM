@@ -226,11 +226,21 @@ def test_initialize_directories_creates_expected_default_dirs(
         base / ".data" / "png",
         base / ".data" / "archive",
         base / ".data" / "msg_rsp",
+        base / ".data" / "runtime",
         base / "logs",
     ]
 
     for d in expected_dirs:
         assert d.is_dir(), f"Expected directory to exist: {d}"
+
+
+def test_runtime_dir_uses_config_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeConfigManager(
+        {"PnmFileRetrieval.runtime_dir": "/var/lib/pypnm/runtime"}
+    )
+    monkeypatch.setattr(SystemConfigSettings, "_cfg", fake)
+
+    assert SystemConfigSettings.runtime_dir() == "/var/lib/pypnm/runtime"
 
 
 def test_reload_calls_config_reload_and_initializes_directories(
