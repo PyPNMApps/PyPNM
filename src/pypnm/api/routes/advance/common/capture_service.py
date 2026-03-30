@@ -6,6 +6,7 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
 from typing import Any, cast
 
@@ -82,6 +83,7 @@ class AbstractCaptureService(ABC):
         self._capture_group_id: GroupId = GroupId("")
         self._operation_id: OperationId = OperationId("")
         self._system_description: dict[str, str] = self._normalize_system_description(system_description)
+        self._terminal_cleanup_callback: Callable[[OperationId], None] | None = None
 
     async def start(self) -> tuple[GroupId, OperationId]:
         """
@@ -240,9 +242,11 @@ class AbstractCaptureService(ABC):
                 raise
             finally:
                 if operation_id in self._ops:
+                    self._persist_operation_status(operation_id)
                     self.logger.info(
                         f"[{operation_id}] Capture session ended with state={self._ops[operation_id]['state']}",
                     )
+                    self._release_terminal_operation(operation_id)
 
                                             ###############
                                             # Main RUNNER #
@@ -270,6 +274,10 @@ class AbstractCaptureService(ABC):
 
     def getCaptureGroupID(self) -> GroupId:
         return self._capture_group_id
+
+    def set_terminal_cleanup_callback(self, callback: Callable[[OperationId], None]) -> None:
+        """Register a callback used to evict terminal services from router memory."""
+        self._terminal_cleanup_callback = callback
 
     def getOperationID(self) -> OperationId:
         return self._operation_id
@@ -362,6 +370,8 @@ class AbstractCaptureService(ABC):
         if released_samples > 0:
             self.logger.info("[%s] Released %d retained samples from memory", operation_id, released_samples)
 
+        self._persist_operation_status(operation_id)
+        self._release_terminal_operation(operation_id)
         ProcessMemory.release_unused_memory()
 
     def stop(self, operation_id: OperationId) -> None:
@@ -378,10 +388,53 @@ class AbstractCaptureService(ABC):
         op = self._ops.get(operation_id)
         if op and op["state"] == OperationState.RUNNING:
             op["state"] = OperationState.STOPPED
+            self._persist_operation_status(operation_id)
             task = op.get("task")
             if isinstance(task, asyncio.Task) and not task.done():
                 task.cancel()
             self.logger.info(f"[{operation_id}] Stopped by user")
+
+    @staticmethod
+    def _is_terminal_state(state: object) -> bool:
+        """Return True when the provided operation state is terminal."""
+        return state in {
+            OperationState.COMPLETED,
+            OperationState.CANCELLED,
+            OperationState.STOPPED,
+        }
+
+    def _persist_operation_status(self, operation_id: OperationId) -> None:
+        """Persist the latest known runtime state for an operation."""
+        op = self._ops.get(operation_id)
+        if not op:
+            return
+        try:
+            OperationManager.update_operation_status(
+                operation_id=operation_id,
+                state=cast(OperationState, op.get("state", OperationState.UNKNOWN)),
+                collected=int(op.get("collected", 0)),
+                time_remaining=int(op.get("time_remaining", 0)),
+            )
+        except Exception as exc:
+            self.logger.debug("Unable to persist operation status for %s: %s", operation_id, exc)
+
+    def _release_terminal_operation(self, operation_id: OperationId) -> None:
+        """Drop terminal operation state and notify the router to evict the service."""
+        op = self._ops.get(operation_id)
+        if not op:
+            return
+        if not self._is_terminal_state(op.get("state")):
+            return
+
+        op["samples"] = []
+        op["task"] = None
+        del self._ops[operation_id]
+
+        if self._terminal_cleanup_callback is not None:
+            try:
+                self._terminal_cleanup_callback(operation_id)
+            except Exception as exc:
+                self.logger.debug("Terminal cleanup callback failed for %s: %s", operation_id, exc)
 
     def _process_captures(self, msg_rsp: MessageResponse) -> list[CaptureSample]:
         """

@@ -35,6 +35,7 @@ class _FakeCaptureGroup:
 
 class _FakeOperationManager:
     register_calls: list[dict[str, object]] = []
+    update_calls: list[dict[str, object]] = []
 
     def __init__(self, capture_group_id: GroupId) -> None:
         self._capture_group_id = capture_group_id
@@ -46,6 +47,24 @@ class _FakeOperationManager:
     ) -> OperationId:
         self.__class__.register_calls.append({"operation": operation, "metadata": metadata})
         return OperationId("op-1")
+
+    @classmethod
+    def update_operation_status(
+        cls,
+        operation_id: OperationId,
+        state: capture_service.OperationState,
+        collected: int,
+        time_remaining: int,
+    ) -> bool:
+        cls.update_calls.append(
+            {
+                "operation_id": operation_id,
+                "state": state,
+                "collected": collected,
+                "time_remaining": time_remaining,
+            },
+        )
+        return True
 
 
 class _FakeCaptureService(AbstractCaptureService):
@@ -70,6 +89,7 @@ async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.Mo
     monkeypatch.setattr(capture_service, "CaptureGroup", _FakeCaptureGroup)
     monkeypatch.setattr(capture_service, "OperationManager", _FakeOperationManager)
     _FakeOperationManager.register_calls = []
+    _FakeOperationManager.update_calls = []
 
     service = _FakeCaptureService(duration=0, interval=0)
     await service.start()
@@ -87,9 +107,9 @@ async def test_capture_service_skips_empty_transaction_id(monkeypatch: pytest.Mo
             "metadata": {},
         },
     ]
-    op_samples = service._ops["op-1"]["samples"]
-    assert len(op_samples) >= 1
-    assert isinstance(op_samples[0].timestamp, int)
+    assert "op-1" not in service._ops
+    assert _FakeOperationManager.update_calls[-1]["operation_id"] == "op-1"
+    assert _FakeOperationManager.update_calls[-1]["state"] == capture_service.OperationState.COMPLETED
 
 
 def test_process_captures_backfills_missing_system_description(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -161,6 +181,7 @@ async def test_capture_service_stop_cancels_background_task(monkeypatch: pytest.
     monkeypatch.setattr(capture_service, "CaptureGroup", _FakeCaptureGroup)
     monkeypatch.setattr(capture_service, "OperationManager", _FakeOperationManager)
     _FakeOperationManager.register_calls = []
+    _FakeOperationManager.update_calls = []
 
     service = _SlowCaptureService(duration=30, interval=0)
     _, operation_id = await service.start()
@@ -175,12 +196,14 @@ async def test_capture_service_stop_cancels_background_task(monkeypatch: pytest.
 
     await asyncio.sleep(0)
 
-    assert service._ops[operation_id]["state"] == capture_service.OperationState.STOPPED
+    assert operation_id not in service._ops
     assert task.cancelled() is True or task.done() is True
+    assert _FakeOperationManager.update_calls[-1]["state"] == capture_service.OperationState.STOPPED
 
 
 def test_release_operation_memory_keeps_collected_count(monkeypatch: pytest.MonkeyPatch) -> None:
     service = _FakeCaptureService(duration=0, interval=0)
+    persisted_status_calls: list[dict[str, object]] = []
     service._ops["op-1"] = {
         "state": capture_service.OperationState.COMPLETED,
         "collected": 2,
@@ -194,10 +217,14 @@ def test_release_operation_memory_keeps_collected_count(monkeypatch: pytest.Monk
 
     released_calls: list[str] = []
     monkeypatch.setattr(capture_service.ProcessMemory, "release_unused_memory", lambda: released_calls.append("released"))
+    monkeypatch.setattr(
+        capture_service.OperationManager,
+        "update_operation_status",
+        lambda **kwargs: persisted_status_calls.append(kwargs) or True,
+    )
 
     service.release_operation_memory(OperationId("op-1"))
 
-    assert service._ops["op-1"]["samples"] == []
-    assert service._ops["op-1"]["task"] is None
-    assert service.status(OperationId("op-1"))["collected"] == 2
+    assert "op-1" not in service._ops
+    assert persisted_status_calls[0]["collected"] == 2
     assert released_calls == ["released"]

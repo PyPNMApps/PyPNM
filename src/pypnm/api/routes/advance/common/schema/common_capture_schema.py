@@ -6,6 +6,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperationModel
+from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.common.classes.common_endpoint_classes.common_req_resp import (
     CableModemPnmConfig,
 )
@@ -45,6 +46,15 @@ class MultiCapturePersistedMetadataModel(BaseModel):
     system_description: dict[str, str] = Field(default_factory=dict, description="Persisted system-description fields captured when the operation was started.")
 
 
+class MultiCapturePersistedStatusModel(BaseModel):
+    """Persisted runtime status for a multi-capture operation."""
+
+    state: OperationState = Field(default=OperationState.UNKNOWN, description="Most recently persisted operation state.")
+    collected: int = Field(default=0, ge=0, description="Most recently persisted sample count.")
+    time_remaining: int = Field(default=0, ge=0, description="Most recently persisted remaining runtime in seconds.")
+    updated: TimestampSec | None = Field(default=None, description="Unix epoch seconds when the runtime status was last persisted.")
+
+
 class MultiCapturePersistedRecordModel(BaseModel):
     """Persisted multi-capture operation record stored by operation ID."""
 
@@ -52,6 +62,7 @@ class MultiCapturePersistedRecordModel(BaseModel):
     created: TimestampSec = Field(..., description="Unix epoch seconds when the operation record was created.")
     operation: MultiCaptureOperationModel = Field(..., description="Canonical operation identity and measure-mode metadata.")
     metadata: MultiCapturePersistedMetadataModel = Field(default_factory=MultiCapturePersistedMetadataModel, description="Additional persisted metadata such as MAC address and system description.")
+    operation_status: MultiCapturePersistedStatusModel = Field(default_factory=MultiCapturePersistedStatusModel, description="Persisted runtime status for the operation, used when no live in-memory service is available.")
 
 
 class MultiCaptureOperationIdResponse(BaseModel):

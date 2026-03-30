@@ -10,13 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperationModel
+from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.common.schema.common_capture_schema import (
     MultiCapturePersistedRecordModel,
+    MultiCapturePersistedStatusModel,
 )
 from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.constants import cast
 from pypnm.lib.db.json_file_lock import JsonFileLock
-from pypnm.lib.types import GroupId, OperationId
+from pypnm.lib.types import GroupId, OperationId, TimestampSec
 
 
 class OperationManager:
@@ -131,7 +133,13 @@ class OperationManager:
             db = self._load()
             db[self.operation_id] = {
                 "capture_group_id": self.capture_group_id,
-                "created": int(time.time())
+                "created": int(time.time()),
+                "operation_status": MultiCapturePersistedStatusModel(
+                    state=OperationState.RUNNING,
+                    collected=0,
+                    time_remaining=0,
+                    updated=cast(TimestampSec, int(time.time())),
+                ).model_dump(),
             }
             if operation is not None:
                 db[self.operation_id]["operation"] = operation.model_dump()
@@ -142,6 +150,56 @@ class OperationManager:
                 f"Registered operation {self.operation_id} for group {self.capture_group_id}"
             )
         return self.operation_id
+
+    @classmethod
+    def update_operation_status(
+        cls,
+        operation_id: OperationId,
+        state: OperationState,
+        collected: int,
+        time_remaining: int,
+        db_path: Path | None = None,
+    ) -> bool:
+        """
+        Persist runtime status for an existing operation record.
+
+        Returns:
+            True when the operation record was found and updated, otherwise False.
+        """
+        if not db_path:
+            db_str = SystemConfigSettings.operation_db()
+            db_path = Path(db_str)
+
+        try:
+            with JsonFileLock(db_path):
+                if not db_path.exists():
+                    return False
+                with db_path.open("r", encoding="utf-8") as f:
+                    db = json.load(f)
+
+                rec = db.get(operation_id)
+                if not isinstance(rec, dict):
+                    return False
+
+                rec["operation_status"] = MultiCapturePersistedStatusModel(
+                    state=state,
+                    collected=max(0, int(collected)),
+                    time_remaining=max(0, int(time_remaining)),
+                    updated=cast(TimestampSec, int(time.time())),
+                ).model_dump()
+
+                temp = db_path.with_suffix(".tmp")
+                with temp.open("w", encoding="utf-8") as f:
+                    json.dump(db, f, indent=2)
+                temp.replace(db_path)
+                return True
+        except Exception as e:
+            logging.getLogger(cls.__name__).error(
+                "Error updating operation status for %s: %s",
+                operation_id,
+                e,
+            )
+            return False
 
     @classmethod
     def get_capture_group(cls, operation_id: OperationId, db_path: Path | None = None) -> GroupId:
