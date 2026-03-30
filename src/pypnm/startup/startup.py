@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from pypnm.api.routes.common.extended.common_process_service import SystemConfigSettings
 from pypnm.cli import _runtime_profile_selection_message
@@ -30,8 +31,47 @@ class StartUp:
         LoggerConfigurator(SystemConfigSettings.log_dir(),
                            SystemConfigSettings.log_filename(),
                            SystemConfigSettings.log_level())
+        cls._log_service_start_once()
+        cls._log_worker_start()
         cls._log_runtime_profile_selection()
         cls._start_tmp_cache_cleanup()
+
+    @classmethod
+    def _startup_session_id(cls) -> str:
+        return os.environ.get("PYPNM_SERVE_SESSION_ID", "").strip()
+
+    @classmethod
+    def _startup_banner_marker_path(cls) -> Path:
+        session_id = cls._startup_session_id()
+        runtime_dir = Path(SystemConfigSettings.runtime_dir())
+        return runtime_dir / f".startup-banner-{session_id}.marker"
+
+    @classmethod
+    def _log_service_start_once(cls) -> None:
+        logger = logging.getLogger()
+        session_id = cls._startup_session_id()
+        if session_id == "":
+            logger.info("==== PyPNM REST API Starting ====")
+            return
+
+        marker_path = cls._startup_banner_marker_path()
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fd = os.open(marker_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return
+        else:
+            os.close(fd)
+            logger.info("==== PyPNM REST API Starting ====")
+
+    @classmethod
+    def _log_worker_start(cls) -> None:
+        logger = logging.getLogger(cls.__name__)
+        session_id = cls._startup_session_id()
+        if session_id == "":
+            logger.info("FastAPI worker started: pid=%s", os.getpid())
+            return
+        logger.info("FastAPI worker started: pid=%s session=%s", os.getpid(), session_id)
 
     @classmethod
     def _log_runtime_profile_selection(cls) -> None:

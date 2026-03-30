@@ -8,6 +8,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from time import time
 
 import uvicorn
 
@@ -256,6 +257,7 @@ def _run_serve(args: argparse.Namespace) -> int:
 
     effective_workers = int(uvicorn_args["workers"])
     effective_limit_max_requests = int(uvicorn_args.get("limit_max_requests", 0))
+    os.environ.setdefault("PYPNM_SERVE_SESSION_ID", f"{os.getpid()}-{int(time())}")
     os.environ["PYPNM_ACTIVE_WORKERS"] = str(effective_workers)
     os.environ["PYPNM_ACTIVE_LIMIT_MAX_REQUESTS"] = str(effective_limit_max_requests)
     _log_runtime_profile_selection(

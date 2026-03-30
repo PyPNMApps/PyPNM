@@ -14,7 +14,7 @@ from pypnm.lib.types import FileNameStr, PathLike
 class LoggerConfigurator:
     """
     Configure application logging to a file (and optionally console),
-    with optional rotation and a standardized startup banner.
+    with optional rotation.
     """
 
     def __init__(self,
@@ -71,6 +71,3 @@ class LoggerConfigurator:
             console = logging.StreamHandler(sys.stderr)
             console.setFormatter(fmt)
             root.addHandler(console)
-
-        # 5. Startup banner to mark the beginning of a new run
-        root.info("==== PyPNM REST API Starting ====")
