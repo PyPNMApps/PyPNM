@@ -242,22 +242,19 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
             [API Guide - Results](https://github.com/PyPNMApps/PyPNM/blob/main/docs/api/fast-api/multi/multi-capture-rxmer.md#3-download-measurements)
             """
             operation_id = operationId
-            service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
+            operation_status = self._get_operation_status_or_404(operation_id)
 
-            status = service.status(operation_id)
-
-            self.logger.debug(f'OpId: {operation_id} - Status: {status}')
+            self.logger.debug(f'OpId: {operation_id} - Status: {operation_status.state}')
 
             return MultiRxMerStatusResponse(
-                mac_address =   service.cm.get_mac_address.mac_address,
-                system_description = service.get_system_description(),
+                device      =   operation_status.device,
                 status      =   "success",
                 message     =   None,
                 operation   =   MultiRxMerResponseStatus(
-                                    operation_id    =   operation_id,
-                                    state           =   status["state"],
-                                    collected       =   status["collected"],
-                                    time_remaining  =   status["time_remaining"],
+                                    operation_id    =   operation_status.operation_id,
+                                    state           =   operation_status.state,
+                                    collected       =   operation_status.collected,
+                                    time_remaining  =   operation_status.time_remaining,
                                     message         =   None,
                 ),
             )
@@ -333,19 +330,18 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
             service:MultiRxMerService = cast(MultiRxMerService, self._get_service_or_404(operation_id))
 
             service.stop(operation_id)
-            status = service.status(operation_id)
             self._release_operation_memory(operation_id)
+            operation_status = self._get_operation_status_or_404(operation_id)
 
             return MultiRxMerStatusResponse(
-                mac_address=service.cm.get_mac_address.mac_address,
-                system_description=service.get_system_description(),
+                device=operation_status.device,
                 status=OperationState.STOPPED,
                 message=None,
                 operation=MultiRxMerResponseStatus(
-                    operation_id    =   operation_id,
-                    state           =   status["state"],
-                    collected       =   status["collected"],
-                    time_remaining  =   status["time_remaining"],
+                    operation_id    =   operation_status.operation_id,
+                    state           =   operation_status.state,
+                    collected       =   operation_status.collected,
+                    time_remaining  =   operation_status.time_remaining,
                     message         =   None,
                 ),
             )

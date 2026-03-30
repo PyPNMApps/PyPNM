@@ -70,6 +70,7 @@ class AbstractService:
 
         """
         service: T = service_cls(*args, **kwargs)
+        service.set_terminal_cleanup_callback(self.removeService)
         group_id, operation_id = await service.start()
         self._service_store[operation_id] = service
         return group_id, operation_id
@@ -110,3 +111,8 @@ class AbstractService:
                 active_services[operation_id] = self._service_store[operation_id]
 
         return active_services
+
+    def removeService(self, operation_id: OperationId) -> None:
+        """Remove a terminal service instance from the in-memory registry."""
+        if operation_id in self._service_store:
+            del self._service_store[operation_id]

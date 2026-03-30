@@ -3,7 +3,7 @@
 Use these guides when you need periodic or scheduled captures (for example, hourly RxMER snapshots) along with downstream analysis.
 
 > **Background**
-> Read the [capture operation guide](capture-operation.md) first. It explains how capture operations, transactions, and storage hang together.
+> Read the [capture operation guide](capture-operation.md) first. It explains how capture operations, transactions, storage, and memory lifecycle hang together.
 
 ## Workflow at a glance
 
@@ -12,6 +12,20 @@ Use these guides when you need periodic or scheduled captures (for example, hour
 3. **Monitor** - Poll operation status and review logs via the [PyPNM system endpoints](../pypnm/index.md).
 4. **Download** - Use the workflow guide or [file manager](../file-manager/file-manager-api.md) to grab ZIP archives once captures complete.
 5. **Analyze** - Feed the captures into one of the advanced analysis modules listed below.
+
+## Memory Behavior
+
+Multi-capture workflows have two distinct memory phases:
+
+1. **Capture phase**
+   Active operations keep a live in-memory capture service plus per-operation counters and temporary samples.
+
+2. **Analysis phase**
+   Analysis requests decode staged PNM files into parser objects, models, and sometimes NumPy arrays before releasing those intermediates.
+
+Completed capture services no longer need to remain in memory just to serve status. Terminal operation status is now persisted and used as a fallback when the live service has already been evicted.
+
+For the full lifecycle and memory discussion, see [Multi-Capture Operation Overview](capture-operation.md#runtime-lifecycle).
 
 ## Multi-capture workflows
 

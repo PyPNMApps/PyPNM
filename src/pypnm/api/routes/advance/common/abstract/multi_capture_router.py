@@ -15,14 +15,21 @@ from pypnm.api.routes.advance.common.abstract.service import AbstractService
 from pypnm.api.routes.advance.common.capture_service import AbstractCaptureService
 from pypnm.api.routes.advance.common.operation_kind import MultiCaptureOperation
 from pypnm.api.routes.advance.common.operation_manager import OperationManager
+from pypnm.api.routes.advance.common.operation_state import OperationState
 from pypnm.api.routes.advance.common.schema.common_capture_schema import (
     MultiCaptureOperationIdResponse,
+    MultiCaptureParametersResponse,
+    MultiCapturePersistedRecordModel,
+)
+from pypnm.api.routes.common.classes.common_endpoint_classes.schema.base_response import (
+    DeviceIdentity,
 )
 from pypnm.api.routes.common.classes.file_capture.capture_group import CaptureGroup
 from pypnm.api.routes.common.classes.file_capture.pnm_file_opearation import (
     OperationCaptureGroupResolver,
 )
 from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.docsis.data_type.sysDescr import SystemDescriptor
 from pypnm.lib.types import GroupId, OperationId
 
 
@@ -154,6 +161,52 @@ class AbstractMultiCaptureRouter(AbstractService):
         """Return persisted operation records for a canonical multi-capture operation family."""
         operations = OperationManager.list_operation_records_by_name(operation_name.value)
         return MultiCaptureOperationIdResponse(status="success", message=None, operations=operations)
+
+    def _get_operation_status_or_404(self, operation_id: OperationId) -> MultiCaptureParametersResponse:
+        """Return live operation status, or a persisted terminal fallback when available."""
+        try:
+            service = self.getService(operation_id)
+            status = service.status(operation_id)
+            mac_address = getattr(getattr(service, "cm", None), "get_mac_address", None)
+            return MultiCaptureParametersResponse(
+                status="success",
+                message=None,
+                device=DeviceIdentity(
+                    mac_address=getattr(mac_address, "mac_address", ""),
+                    system_description=service.get_system_description(),
+                ),
+                operation_id=operation_id,
+                state=status["state"],
+                collected=status["collected"],
+                time_remaining=status["time_remaining"],
+            )
+        except KeyError:
+            record = OperationManager.get_operation_record(operation_id)
+            if not isinstance(record, dict):
+                raise HTTPException(status_code=404, detail="Operation not found") from None
+
+            persisted = MultiCapturePersistedRecordModel(**record)
+            persisted_status = persisted.operation_status
+            if persisted_status.state == OperationState.UNKNOWN:
+                raise HTTPException(status_code=404, detail="Operation not found") from None
+
+            system_description = persisted.metadata.system_description
+            return MultiCaptureParametersResponse(
+                status="success",
+                message=None,
+                device=DeviceIdentity(
+                    mac_address=persisted.metadata.mac_address,
+                    system_description=(
+                        SystemDescriptor.load_from_dict(system_description).to_model()
+                        if system_description
+                        else SystemDescriptor.empty().to_model()
+                    ),
+                ),
+                operation_id=operation_id,
+                state=persisted_status.state,
+                collected=persisted_status.collected,
+                time_remaining=persisted_status.time_remaining,
+            )
 
     def _release_operation_memory(self, operation_id: OperationId) -> None:
         """Release transient in-memory capture state when a service is still registered."""
