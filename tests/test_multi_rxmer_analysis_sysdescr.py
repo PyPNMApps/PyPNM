@@ -8,7 +8,9 @@ from pydantic import BaseModel
 from pypnm.api.routes.advance.analysis.report.multi_analysis_rpt import MultiAnalysisRpt
 from pypnm.api.routes.advance.analysis.signal_analysis.multi_rxmer_signal_analysis import (
     MultiRxMerAnalysisType,
+    MultiRxMerAnalysisResult,
     MultiRxMerSignalAnalysis,
+    TemporalMapping,
 )
 from pypnm.api.routes.advance.common.transactionsCollection import TransactionCollection
 from pypnm.api.routes.advance.multi_ds_chan_est.schemas import (
@@ -26,6 +28,7 @@ from pypnm.api.routes.advance.multi_us_ofdma_pre_eq.schemas import (
 )
 from pypnm.api.routes.common.classes.file_capture.types import TransactionRecordModel
 from pypnm.docsis.data_type.sysDescr import SystemDescriptor
+from pypnm.lib.mac_address import MacAddress
 from pypnm.lib.types import TransactionId
 
 
@@ -50,6 +53,33 @@ class _DummyMultiAnalysisRpt(MultiAnalysisRpt):
 
 class _JsonModel(BaseModel):
     value: int
+
+
+class _CountingMultiRxMerSignalAnalysis(MultiRxMerSignalAnalysis):
+    def __init__(self) -> None:
+        super().__init__(
+            _FakeCaptureDataAggregator(TransactionCollection()),
+            MultiRxMerAnalysisType.MIN_AVG_MAX,
+        )
+        self.build_temporal_mapping_calls = 0
+        self.dispatch_build_calls = 0
+
+    def getMacAddresses(self) -> list[MacAddress]:
+        return [MacAddress("aa:bb:cc:dd:ee:ff")]
+
+    def _build_temporal_mapping(self) -> list[TemporalMapping]:
+        self.build_temporal_mapping_calls += 1
+        return []
+
+    def _dispatch_build(self) -> dict[int, dict[str, object]]:
+        self.dispatch_build_calls += 1
+        return {}
+
+    def create_csv(self, **kwargs: object) -> list[object]:
+        return []
+
+    def create_matplot(self, **kwargs: object) -> list[object]:
+        return []
 
 
 def _record(txn_id: str, filename: str, sys_descr: SystemDescriptor) -> TransactionRecordModel:
@@ -132,6 +162,18 @@ def test_multi_rxmer_signal_analysis_echo_reflection_empty_collection_returns_er
     assert model.analysis_type == MultiRxMerAnalysisType.ECHO_REFLECTION_1
     assert model.data == {}
     assert model.error
+
+
+def test_multi_rxmer_build_report_reuses_processed_temporal_mapping() -> None:
+    engine = _CountingMultiRxMerSignalAnalysis()
+
+    model: MultiRxMerAnalysisResult = engine.to_model()
+    assert model.error == ""
+
+    engine.build_report()
+
+    assert engine.build_temporal_mapping_calls == 1
+    assert engine.dispatch_build_calls == 1
 
 
 def test_multi_rxmer_analysis_response_allows_optional_system_description() -> None:
