@@ -132,6 +132,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
         self._sorted_temporal_mapping: list[TemporalMapping] = []
         self._analysis_map: MultiRxMerAnalysisMap = {}
         self._is_process:bool = False
+        self._archive_temporal_models_registered: bool = False
 
     # -----------------------
     # Public API
@@ -195,6 +196,7 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
         self._analysis_map = {}
         self._sorted_temporal_mapping = []
         self._is_process = False
+        self._archive_temporal_models_registered = False
         super().release_analysis_memory()
 
     # -----------------------
@@ -541,25 +543,28 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
         4) Produce a list `self._sorted_temporal_mapping` of (capture_time, obj) tuples,
         sorted by ascending capture_time, for downstream iteration.
         """
-        self._is_process = True
-        self.logger.info("Processing Multi-RxMER Analysis Report")
+        if not self._is_process:
+            self.logger.info("Processing Multi-RxMER Analysis Report")
+            self._sorted_temporal_mapping = self._build_temporal_mapping()
+            self._is_process = True
 
-        # Convert Transactions to PNM RxMER Data
+        if self._persist_json_archive_files and not self._archive_temporal_models_registered:
+            self._register_temporal_models_for_archive()
+            self._archive_temporal_models_registered = True
+
+    def _build_temporal_mapping(self) -> list[TemporalMapping]:
+        """Decode transaction payloads once and return sorted temporal parser objects."""
         tc = self.getTransactionCollection()
-        tcms:list[TransactionCollectionModel] = tc.getTransactionCollectionModel()
-        temporal_mapping:dict[CaptureTime, CmDsOfdmRxMer | CmDsOfdmFecSummary | CmDsOfdmModulationProfile] = {}
+        tcms: list[TransactionCollectionModel] = tc.getTransactionCollectionModel()
+        temporal_mapping: dict[CaptureTime, CmDsOfdmRxMer | CmDsOfdmFecSummary | CmDsOfdmModulationProfile] = {}
 
         self.logger.info(f'TransactionCollectionModel Count: {len(tcms)}')
 
-        # Groom data for general use due to various Analysis that is performed
         for count, tcm in enumerate(tcms):
-
             try:
                 dorm = CmDsOfdmRxMer(tcm.data)
                 capture_time: CaptureTime = dorm.getPnmHeaderModel().pnm_header.capture_time or INVALID_CAPTURE_TIME
                 temporal_mapping[capture_time] = dorm
-                model = dorm.to_model()
-                self.register_models_for_json_archive_files(model, [str(model.channel_id) , "CmDsOfdmRxMer" ])
                 continue
 
             except Exception as e:
@@ -567,10 +572,8 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
 
             try:
                 dofs = CmDsOfdmFecSummary(tcm.data)
-                capture_time: CaptureTime = dofs.getPnmHeaderModel().pnm_header.capture_time or INVALID_CAPTURE_TIME
+                capture_time = dofs.getPnmHeaderModel().pnm_header.capture_time or INVALID_CAPTURE_TIME
                 temporal_mapping[capture_time] = dofs
-                model = dofs.to_model()
-                self.register_models_for_json_archive_files(model, [str(model.channel_id) , "CmDsOfdmFecSummary"])
                 continue
 
             except Exception as e:
@@ -578,22 +581,34 @@ class MultiRxMerSignalAnalysis(MultiAnalysisRpt):
 
             try:
                 domp = CmDsOfdmModulationProfile(tcm.data)
-                capture_time: CaptureTime = domp.getPnmHeaderModel().pnm_header.capture_time or INVALID_CAPTURE_TIME
+                capture_time = domp.getPnmHeaderModel().pnm_header.capture_time or INVALID_CAPTURE_TIME
                 temporal_mapping[capture_time] = domp
-                model = domp.to_model()
-                self.register_models_for_json_archive_files(model, [str(model.channel_id) , "CmDsOfdmModulationProfile"])
                 continue
 
             except Exception as e:
                 self.logger.debug(f'PNM file {count} is not compatible with CmDsOfdmModulationProfile, skipping: {e}')
 
-        # Create a sorted list of tuples based on capture_time (ascending)
-        self._sorted_temporal_mapping = sorted(temporal_mapping.items(), key=lambda x: x[0])
-
+        sorted_mapping = sorted(temporal_mapping.items(), key=lambda x: x[0])
         self.logger.debug(
-            f"Temporal mapping size={len(temporal_mapping)}, sorted entries={len(self._sorted_temporal_mapping)}")
+            f"Temporal mapping size={len(temporal_mapping)}, sorted entries={len(sorted_mapping)}")
+        return sorted_mapping
 
-        self._dispatch_build()
+    def _register_temporal_models_for_archive(self) -> None:
+        """Persist decoded temporal models for archive output without reparsing payload bytes."""
+        for _, obj in self._sorted_temporal_mapping:
+            if isinstance(obj, CmDsOfdmRxMer):
+                model = obj.to_model()
+                self.register_models_for_json_archive_files(model, [str(model.channel_id), "CmDsOfdmRxMer"])
+                continue
+
+            if isinstance(obj, CmDsOfdmFecSummary):
+                model = obj.to_model()
+                self.register_models_for_json_archive_files(model, [str(model.channel_id), "CmDsOfdmFecSummary"])
+                continue
+
+            if isinstance(obj, CmDsOfdmModulationProfile):
+                model = obj.to_model()
+                self.register_models_for_json_archive_files(model, [str(model.channel_id), "CmDsOfdmModulationProfile"])
 
     def create_csv(self, **kwargs: object) -> list[CSVManager]:
         """

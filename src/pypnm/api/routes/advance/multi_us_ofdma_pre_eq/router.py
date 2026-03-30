@@ -249,65 +249,66 @@ class MultiUsOfdmaPreEqRouter(AbstractMultiCaptureRouter):
                     data            =   AnalysisDataModel(analysis_type="UNKNOWN", results=[]))
 
             # Determine output type
-            output_type:OutputType = request.analysis.output.type
+            output_type: OutputType = request.analysis.output.type
             engine = analysis_map[atype](cda)
-            analysis_result = engine.to_model()
 
-            # Handle output formats
-            if output_type == OutputType.JSON:
-                err = analysis_result.error
-                status = ServiceStatusCode.SUCCESS if not err else ServiceStatusCode.FAILURE
-                message = err or f"Analysis {analysis_result.analysis_type} completed for group {capture_group_id}"
+            try:
+                if output_type == OutputType.JSON:
+                    analysis_result = engine.to_model()
+                    err = analysis_result.error
+                    status = ServiceStatusCode.SUCCESS if not err else ServiceStatusCode.FAILURE
+                    message = err or f"Analysis {analysis_result.analysis_type} completed for group {capture_group_id}"
 
-                data_model = AnalysisDataModel(
-                    analysis_type   =   analysis_result.analysis_type,
-                    results         =   [r.model_dump() for r in analysis_result.results])
+                    data_model = AnalysisDataModel(
+                        analysis_type=analysis_result.analysis_type,
+                        results=[r.model_dump() for r in analysis_result.results],
+                    )
 
-                mac = engine.getMacAddresses()[0].mac_address
-                self.logger.info(f"[analysis] type={atype.name} mac={mac} status={status.name} group={capture_group_id}")
+                    mac = engine.getMacAddresses()[0].mac_address
+                    self.logger.info(f"[analysis] type={atype.name} mac={mac} status={status.name} group={capture_group_id}")
 
-                response_kwargs: dict[str, object] = {}
-                if analysis_result.system_description is not None:
-                    response_kwargs["device"] = {
-                        "mac_address": mac,
-                        "system_description": analysis_result.system_description,
-                    }
+                    response_kwargs: dict[str, object] = {}
+                    if analysis_result.system_description is not None:
+                        response_kwargs["device"] = {
+                            "mac_address": mac,
+                            "system_description": analysis_result.system_description,
+                        }
 
-                response = MultiUsOfdmaPreEqAnalysisResponse(
-                    mac_address =   mac,
-                    status      =   status,
-                    message     =   message,
-                    **response_kwargs,
-                    data        =   data_model)
+                    return MultiUsOfdmaPreEqAnalysisResponse(
+                        mac_address=mac,
+                        status=status,
+                        message=message,
+                        **response_kwargs,
+                        data=data_model,
+                    )
+
+                if output_type == OutputType.ARCHIVE:
+                    try:
+                        rpt = engine.build_report()
+                        self.logger.info(f"[analysis] Built archive report for group {capture_group_id}")
+                        return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
+                    except Exception as e:
+                        msg = f"Archive build failed: {e}"
+                        self.logger.error(msg)
+                        return MultiUsOfdmaPreEqAnalysisResponse(
+                            mac_address=MacAddress.null(),
+                            status=ServiceStatusCode.FAILURE,
+                            message=msg,
+                            data=AnalysisDataModel(analysis_type=atype.name, results=[]),
+                        )
+
+                msg = f"Unsupported output type: {output_type}"
+                self.logger.error(msg)
+                return MultiUsOfdmaPreEqAnalysisResponse(
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    message=msg,
+                    data=AnalysisDataModel(analysis_type=atype.name, results=[]),
+                )
+
+            finally:
                 engine.release_analysis_memory()
                 self._release_operation_memory(request.operation_id)
-                return response
-
-            elif output_type == OutputType.ARCHIVE:
-                try:
-                    rpt = engine.build_report()
-                    self.logger.info(f"[analysis] Built archive report for group {capture_group_id}")
-                    engine.release_analysis_memory()
-                    self._release_operation_memory(request.operation_id)
-                    return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
-
-                except Exception as e:
-                    msg = f"Archive build failed: {e}"
-                    self.logger.error(msg)
-                    return MultiUsOfdmaPreEqAnalysisResponse(
-                        mac_address     =   MacAddress.null(),
-                        status          =   ServiceStatusCode.FAILURE,
-                        message         =   msg,
-                        data            =   AnalysisDataModel(analysis_type=atype.name, results=[]))
-
-            # Unsupported output type
-            msg = f"Unsupported output type: {output_type}"
-            self.logger.error(msg)
-            return MultiUsOfdmaPreEqAnalysisResponse(
-                mac_address     =   MacAddress.null(),
-                status          =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                message         =   msg,
-                data            =   AnalysisDataModel(analysis_type=atype.name, results=[]))
 
     def _resolve_interface_parameters(self, channel_ids: list[ChannelId] | None) -> UpstreamOfdmaParameters | None:
         if channel_ids is None:

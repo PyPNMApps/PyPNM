@@ -62,6 +62,7 @@ run_quality_gates() {
   run_check "secret scan" ./tools/security/scan-secrets.sh
   run_check "encrypted secret scan" python3 ./tools/security/scan-enc-secrets.py
   run_check "MAC scan" ./tools/security/scan-mac-addresses.py --clear-oui --fail-on-found
+  run_check "hardcoded .data path scan" python3 ./tools/security/scan-hardcoded-data-paths.py --fail-on-found
 }
 
 commit_msg="Update"

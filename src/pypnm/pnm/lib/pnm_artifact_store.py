@@ -14,6 +14,7 @@ from pathlib import Path
 from pypnm.api.routes.common.classes.file_capture.types import CompressionMetadataModel
 from pypnm.config.config_manager import ConfigManager
 from pypnm.config.pnm_artifact_storage import PnmArtifactStorageConfig
+from pypnm.config.system_config_settings import SystemConfigSettings
 from pypnm.lib.compression.manager import CompressionManager
 from pypnm.lib.system_call.manager import SystemCall
 from pypnm.lib.types import FileNameStr, PathLike, TransactionId
@@ -426,7 +427,7 @@ class PnmArtifactStore:
         config = ConfigManager().get("PnmFileRetrieval", "pnm_dir")
         if isinstance(config, str) and config.strip():
             return config
-        return ".data/pnm"
+        return SystemConfigSettings.pnm_dir()
 
     def _compression_action(self, pnm_type: str) -> str:
         """

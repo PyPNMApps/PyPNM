@@ -7,6 +7,12 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from pypnm.api.routes.pypnm.system.web_service.schemas import (
+    PyPnmWebServiceRuntimeProfileResponse,
+)
+from pypnm.api.routes.pypnm.system.web_service.service import (
+    PyPnmSystemWebServiceService,
+)
 from pypnm.lib.fastapi_constants import FAST_API_RESPONSE
 
 
@@ -32,6 +38,14 @@ class PyPnmSystemWebServiceAPI:
             response_model=dict[str, str],
             responses=FAST_API_RESPONSE,
         )
+        self.router.add_api_route(
+            path="/runtimeProfile",
+            endpoint=self.get_runtime_profile,
+            methods=["GET"],
+            summary="Get PyPNM Web Service Runtime Profile",
+            response_model=PyPnmWebServiceRuntimeProfileResponse,
+            responses=FAST_API_RESPONSE,
+        )
 
     async def trigger_reload(self) -> dict[str, str]:
         """
@@ -53,6 +67,11 @@ class PyPnmSystemWebServiceAPI:
                 status_code=500,
                 detail=f"Failed to trigger reload: {exc}",
             ) from exc
+
+    async def get_runtime_profile(self) -> PyPnmWebServiceRuntimeProfileResponse:
+        return PyPnmWebServiceRuntimeProfileResponse(
+            profile=PyPnmSystemWebServiceService.get_runtime_profile(),
+        )
 
 
 router = PyPnmSystemWebServiceAPI().router

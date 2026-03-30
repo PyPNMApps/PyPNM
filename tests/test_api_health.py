@@ -50,3 +50,21 @@ def test_health_includes_uptime(monkeypatch) -> None:
             },
         },
     }
+
+
+def test_data_root_path_uses_configured_common_root(monkeypatch) -> None:
+    monkeypatch.setattr(api_main.SystemConfigSettings, "pnm_dir", lambda: ".data/pnm")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "csv_dir", lambda: ".data/csv")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "json_dir", lambda: ".data/json")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "xlsx_dir", lambda: ".data/xlsx")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "png_dir", lambda: ".data/png")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "archive_dir", lambda: ".data/archive")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "message_response_dir", lambda: ".data/msg_rsp")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "runtime_dir", lambda: ".data/runtime")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "transaction_db", lambda: ".data/db/transactions.json")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "capture_group_db", lambda: ".data/db/capture_group.json")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "session_group_db", lambda: ".data/db/session_group.json")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "operation_db", lambda: ".data/db/operation_capture.json")
+    monkeypatch.setattr(api_main.SystemConfigSettings, "json_db", lambda: ".data/db/json_transactions.json")
+
+    assert api_main._data_root_path() == Path(".data")

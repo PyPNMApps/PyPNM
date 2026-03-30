@@ -181,6 +181,7 @@ The practical takeaway is:
 * completed capture services should not remain in memory
 * heavy analysis requests can still cause temporary RSS growth
 * persistent memory creep after terminal service eviction is more likely to come from analysis-path object retention or allocator behavior than from finished capture sessions themselves
+* production FastAPI workers should still use a recycle safety valve such as `pypnm serve --workers 4 --limit-max-requests 2000`
 
 ### sysDescr Collection Behavior
 

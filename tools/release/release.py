@@ -709,6 +709,7 @@ def _run_repo_hygiene_checks() -> None:
         ("Secret scan", ["./tools/security/scan-secrets.sh"]),
         ("Encrypted secret scan", [sys.executable, "./tools/security/scan-enc-secrets.py"]),
         ("MAC scan", ["./tools/security/scan-mac-addresses.py", "--clear-oui", "--fail-on-found"]),
+        ("Hardcoded .data path scan", [sys.executable, "./tools/security/scan-hardcoded-data-paths.py", "--fail-on-found"]),
     ]
     print("Running repository hygiene checks...")
     for label, cmd in checks:

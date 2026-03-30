@@ -36,6 +36,7 @@
         "operation_db": ".data/db/operation_capture.json",
         "png_dir": ".data/png",
         "pnm_dir": ".data/pnm",
+        "runtime_dir": ".data/runtime",
         "retries": 5,
         "retrieval_method": {
             "method": "local",

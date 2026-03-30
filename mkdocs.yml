@@ -56,8 +56,22 @@ nav:
               - Responses: api/fast-api/common/response.md
           - Single Capture: api/fast-api/single/index.md
           - Multi Capture: api/fast-api/multi/index.md
+          - PyPNM:
+              - Overview: api/fast-api/pypnm/index.md
+              - System:
+                  - Overview: api/fast-api/pypnm/system/index.md
+                  - Health: api/fast-api/pypnm/system/health.md
+                  - Log: api/fast-api/pypnm/system/download-log.md
+                  - Web Service Reload: api/fast-api/pypnm/system/reload-web-service.md
+                  - Web Service Runtime Profile: api/fast-api/pypnm/system/web-service-runtime-profile.md
           - Status Codes: api/fast-api/status/fast-api-status-codes.md
       - Python: api/python/index.md
+  - System:
+      - Overview: system/index.md
+      - CLI: system/pypnm-cli.md
+      - Worker Sizing: system/worker-sizing.md
+      - System Config: system/system-config.md
+      - Menu: system/menu.md
   - Examples:
       - Index: examples/index.md
   - Topology:
