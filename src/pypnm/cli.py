@@ -27,6 +27,7 @@ PORT_DEFAULT = 8000
 LOG_LEVEL_DEFAULT = "info"
 DEFAULT_WORKERS = 1
 TIMEOUT_KEEP_ALIVE_SECONDS = 120
+DEFAULT_LIMIT_MAX_REQUESTS = 0
 
 
 def _sanitize_pythonpath_for_serve() -> None:
@@ -100,6 +101,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of worker processes (default: 1).",
     )
     serve_parser.add_argument(
+        "--limit-max-requests",
+        type=int,
+        default=DEFAULT_LIMIT_MAX_REQUESTS,
+        help=(
+            "Restart a worker after serving this many requests (0 disables the limit). "
+            "Useful as a production safety valve for slow memory creep."
+        ),
+    )
+    serve_parser.add_argument(
         "--no-access-log",
         action="store_true",
         help="Disable Uvicorn access log.",
@@ -150,6 +160,10 @@ def _run_serve(args: argparse.Namespace) -> int:
     if bool(args.mute_tags_hard):
         os.environ[ENV_MUTE_TAGS_HARD] = "1"
 
+    if args.limit_max_requests < 0:
+        print("[ERROR] --limit-max-requests must be >= 0")
+        return EXIT_CODE_USAGE
+
     uvicorn_args = {
         "app": "pypnm.api.main:app",
         "host": args.host,
@@ -159,6 +173,8 @@ def _run_serve(args: argparse.Namespace) -> int:
         "workers": args.workers,
         "access_log": not args.no_access_log,
     }
+    if args.limit_max_requests > 0:
+        uvicorn_args["limit_max_requests"] = args.limit_max_requests
 
     if args.reload:
         if args.workers != DEFAULT_WORKERS:

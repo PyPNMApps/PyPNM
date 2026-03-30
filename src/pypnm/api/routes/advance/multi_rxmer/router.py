@@ -410,11 +410,9 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
 
             if atype == MultiRxMerAnalysisType.MIN_AVG_MAX:
                 engine = MultiRxMerSignalAnalysis(cda, atype)
-                multi_analysis:MultiRxMerAnalysisResult = engine.to_model()
 
             elif atype == MultiRxMerAnalysisType.RXMER_HEAT_MAP:
                 engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.RXMER_HEAT_MAP)
-                multi_analysis = engine.to_model()
 
             elif atype == MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1:
                 '''
@@ -435,11 +433,9 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     * Provide total FEC Stats for each profile over the time of the capture.
                 '''
                 engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.OFDM_PROFILE_PERFORMANCE_1)
-                multi_analysis = engine.to_model()
 
             elif atype == MultiRxMerAnalysisType.ECHO_REFLECTION_1:
                 engine = MultiRxMerSignalAnalysis(cda, MultiRxMerAnalysisType.ECHO_REFLECTION_1)
-                multi_analysis = engine.to_model()
 
             else:
                 msg = f'Invalid Analysis Type {atype}'
@@ -448,10 +444,6 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     status      =   ServiceStatusCode.DS_OFDM_MULIT_RXMER_ANALYSIS_TYPE,
                     message     =   msg,
                     data        =   {})
-
-            # 4) Map analysis output to response fields
-            analysis_name = MultiRxMerAnalysisType(atype).name
-            message = f"Analysis {analysis_name} completed for group {capture_group_id}"
 
             try:
                 output_type = request.analysis.output.type
@@ -463,76 +455,77 @@ class MultiRxMerRouter(AbstractMultiCaptureRouter):
                     message     =   msg,
                     data        =   {})
 
-            mac_address = multi_analysis.mac_address
-            fallback_mac = MacAddress.null()
-            fallback_system_description = None
             try:
-                service_for_context = cast(MultiRxMerService, self.getService(request.operation_id))
-                fallback_mac = service_for_context.cm.get_mac_address.mac_address
-                service_sd = service_for_context.get_system_description()
-                if any(str(service_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
-                    fallback_system_description = SystemDescriptor.load_from_dict(service_sd).to_model()
-            except Exception:
-                op_rec = OperationManager.get_operation_record(request.operation_id)
-                if isinstance(op_rec, dict):
-                    metadata = op_rec.get("metadata")
-                    if isinstance(metadata, dict):
-                        md_mac = metadata.get("mac_address")
-                        if isinstance(md_mac, str) and md_mac.strip():
-                            fallback_mac = md_mac
-                        md_sd = metadata.get("system_description")
-                        if isinstance(md_sd, dict) and any(str(md_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
-                            fallback_system_description = SystemDescriptor.load_from_dict(md_sd).to_model()
+                if output_type == OutputType.JSON:
+                    multi_analysis: MultiRxMerAnalysisResult = engine.to_model()
+                    analysis_name = MultiRxMerAnalysisType(atype).name
+                    message = f"Analysis {analysis_name} completed for group {capture_group_id}"
 
-            if mac_address == MacAddress.null():
-                mac_address = fallback_mac
-
-            response_system_description = multi_analysis.system_description or fallback_system_description
-
-            if output_type == OutputType.JSON:
-                err = multi_analysis.error
-                status_code = ServiceStatusCode.SUCCESS if not err else ServiceStatusCode.FAILURE
-                response_message = err or message
-                data = multi_analysis.model_dump().get("data", {})
-                if err:
+                    mac_address = multi_analysis.mac_address
+                    fallback_mac = MacAddress.null()
+                    fallback_system_description = None
                     try:
-                        svc_for_err = cast(MultiRxMerService, self.getService(request.operation_id))
-                        samples_for_err = svc_for_err.results(request.operation_id)
-                        sample_errors = [str(s.error) for s in samples_for_err if getattr(s, "error", None)]
-                        if sample_errors:
-                            response_message = f"{response_message} Last capture error: {sample_errors[-1]}"
+                        service_for_context = cast(MultiRxMerService, self.getService(request.operation_id))
+                        fallback_mac = service_for_context.cm.get_mac_address.mac_address
+                        service_sd = service_for_context.get_system_description()
+                        if any(str(service_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
+                            fallback_system_description = SystemDescriptor.load_from_dict(service_sd).to_model()
                     except Exception:
-                        pass
-                response_kwargs: dict[str, object] = {}
-                if response_system_description is not None:
-                    response_kwargs["device"] = {
-                        "mac_address": mac_address,
-                        "system_description": response_system_description,
-                    }
-                response = MultiRxMerAnalysisResponse(
-                    mac_address =   mac_address,
-                    status      =   status_code,
-                    message     =   response_message,
-                    **response_kwargs,
-                    data        =   data,)
-                engine.release_analysis_memory()
-                self._release_operation_memory(request.operation_id)
-                return response
+                        op_rec = OperationManager.get_operation_record(request.operation_id)
+                        if isinstance(op_rec, dict):
+                            metadata = op_rec.get("metadata")
+                            if isinstance(metadata, dict):
+                                md_mac = metadata.get("mac_address")
+                                if isinstance(md_mac, str) and md_mac.strip():
+                                    fallback_mac = md_mac
+                                md_sd = metadata.get("system_description")
+                                if isinstance(md_sd, dict) and any(str(md_sd.get(k, "")).strip() for k in ("HW_REV", "VENDOR", "BOOTR", "SW_REV", "MODEL")):
+                                    fallback_system_description = SystemDescriptor.load_from_dict(md_sd).to_model()
 
-            elif output_type == OutputType.ARCHIVE:
-                rpt = engine.build_report()
-                engine.release_analysis_memory()
-                self._release_operation_memory(request.operation_id)
-                return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
+                    if mac_address == MacAddress.null():
+                        mac_address = fallback_mac
 
-            else:
+                    response_system_description = multi_analysis.system_description or fallback_system_description
+                    err = multi_analysis.error
+                    status_code = ServiceStatusCode.SUCCESS if not err else ServiceStatusCode.FAILURE
+                    response_message = err or message
+                    data = multi_analysis.model_dump().get("data", {})
+                    if err:
+                        try:
+                            svc_for_err = cast(MultiRxMerService, self.getService(request.operation_id))
+                            samples_for_err = svc_for_err.results(request.operation_id)
+                            sample_errors = [str(s.error) for s in samples_for_err if getattr(s, "error", None)]
+                            if sample_errors:
+                                response_message = f"{response_message} Last capture error: {sample_errors[-1]}"
+                        except Exception:
+                            pass
+                    response_kwargs: dict[str, object] = {}
+                    if response_system_description is not None:
+                        response_kwargs["device"] = {
+                            "mac_address": mac_address,
+                            "system_description": response_system_description,
+                        }
+                    return MultiRxMerAnalysisResponse(
+                        mac_address=mac_address,
+                        status=status_code,
+                        message=response_message,
+                        **response_kwargs,
+                        data=data,
+                    )
 
-                # Fallback for unsupported output types
+                if output_type == OutputType.ARCHIVE:
+                    rpt = engine.build_report()
+                    return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
+
                 return MultiRxMerAnalysisResponse(
-                    mac_address =   mac_address,
-                    status      =   ServiceStatusCode.INVALID_OUTPUT_TYPE,
-                    message     =   f"Unsupported output type: {output_type}",
-                    data        =   {},)
+                    mac_address=MacAddress.null(),
+                    status=ServiceStatusCode.INVALID_OUTPUT_TYPE,
+                    message=f"Unsupported output type: {output_type}",
+                    data={},
+                )
+            finally:
+                engine.release_analysis_memory()
+                self._release_operation_memory(request.operation_id)
 
     @staticmethod
     def _resolve_interface_parameters(
