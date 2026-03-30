@@ -840,6 +840,14 @@ run_tmp_cleanup_cron_installer_if_available() {
   fi
 }
 
+seed_fastapi_worker_profile_if_available() {
+  if [[ -x "${PROJECT_ROOT}/scripts/seed-fastapi-worker-profile.py" ]]; then
+    echo "⚙️  Seeding FastAPI worker profile from host CPU and RAM..."
+    "${PROJECT_ROOT}/scripts/seed-fastapi-worker-profile.py" \
+      --write "${PROJECT_ROOT}/.data/runtime/pypnm-serve.env" || true
+  fi
+}
+
 if [[ "$PNM_FILE_RETRIEVAL_SETUP" == "1" ]]; then
   echo
   echo "PNM File Retrieval Configuration (requested via --pnm-file-retrieval-setup)"
@@ -857,6 +865,7 @@ ensure_pypnm_shared_group
 ensure_tmp_pypnm_permissions
 run_pnm_alias_installer_if_available
 run_tmp_cleanup_cron_installer_if_available
+seed_fastapi_worker_profile_if_available
 
 echo "✅ Bootstrap complete."
 if [[ "$DEMO_MODE" == "1" ]]; then
@@ -871,4 +880,5 @@ fi
 echo "👉 Next steps:"
 echo "   1) source '$VENV_DIR/bin/activate'"
 echo "   2) (optional) ./tools/pnm/pnm_file_retrieval_setup.py"
-echo "   3) mkdocs serve"
+echo "   3) ./scripts/start-fastapi-service.sh"
+echo "   4) mkdocs serve"

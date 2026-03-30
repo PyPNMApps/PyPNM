@@ -164,6 +164,11 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[ERROR] --limit-max-requests must be >= 0")
         return EXIT_CODE_USAGE
 
+    os.environ.setdefault("PYPNM_SERVE_ENV_FILE", ".data/runtime/pypnm-serve.env")
+    os.environ["PYPNM_ACTIVE_RUNTIME_SOURCE"] = os.environ.get("PYPNM_ACTIVE_RUNTIME_SOURCE", "explicit_cli")
+    os.environ["PYPNM_ACTIVE_WORKERS"] = str(args.workers)
+    os.environ["PYPNM_ACTIVE_LIMIT_MAX_REQUESTS"] = str(args.limit_max_requests)
+
     uvicorn_args = {
         "app": "pypnm.api.main:app",
         "host": args.host,

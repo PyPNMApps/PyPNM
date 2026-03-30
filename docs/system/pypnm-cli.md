@@ -58,6 +58,7 @@ Notes:
 - When `--reload` is enabled, `--workers` is forced to `1`.
 - `--limit-max-requests` passes Uvicorn's worker recycle threshold through to the serve runtime.
 - For production memory safety, prefer multiple workers with a non-zero `--limit-max-requests` instead of `--reload`.
+- See [PyPNM Worker Sizing](worker-sizing.md) for CPU and memory-based defaults by hardware profile.
 - `--mute-tags` hides matching-tag routes from OpenAPI/docs.
 - `--mute-tags-hard` additionally enforces `403` for matching routes.
 
