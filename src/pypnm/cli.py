@@ -14,7 +14,11 @@ import uvicorn
 
 from pypnm.config.runtime_flags import ENV_MUTE_TAGS, ENV_MUTE_TAGS_HARD
 from pypnm.config.system_config_settings import SystemConfigSettings
-from pypnm.support.serve_background import launch_background_serve
+from pypnm.support.serve_background import (
+    BACKGROUND_CHILD_ENV,
+    BACKGROUND_PIDFILE_ENV,
+    launch_background_serve,
+)
 from pypnm.support.worker_profile import (
     WorkerProfile,
     default_profile_env_path,
@@ -59,6 +63,15 @@ def _runtime_profile_selection_message(workers: int, limit_max_requests: int) ->
 
 def _log_runtime_profile_selection(workers: int, limit_max_requests: int) -> None:
     print(f"[INFO] {_runtime_profile_selection_message(workers, limit_max_requests)}")
+
+
+def _record_background_parent_pid() -> None:
+    if os.environ.get(BACKGROUND_CHILD_ENV) != "1":
+        return
+    pidfile = os.environ.get(BACKGROUND_PIDFILE_ENV, "").strip()
+    if pidfile == "":
+        return
+    Path(pidfile).write_text(f"{os.getpid()}\n", encoding="utf-8")
 
 
 def _resolve_runtime_worker_profile(args: argparse.Namespace) -> tuple[int, int]:
@@ -299,6 +312,7 @@ def _run_serve(args: argparse.Namespace) -> int:
         workers=effective_workers,
         limit_max_requests=effective_limit_max_requests,
     )
+    _record_background_parent_pid()
 
     try:
         uvicorn.run(**uvicorn_args)

@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 BACKGROUND_CHILD_ENV = "PYPNM_BACKGROUND_CHILD"
+BACKGROUND_PIDFILE_ENV = "PYPNM_BACKGROUND_PIDFILE"
 RUN_BACKGROUND_FLAG = "--run-background"
 BACKGROUND_LOG_FILE_FLAG = "--background-log-file"
 BACKGROUND_PID_FILE_FLAG = "--background-pidfile"
@@ -47,6 +48,7 @@ def launch_background_serve(
     command = [sys.executable, "-m", module_name, *child_argv]
     child_env = os.environ.copy()
     child_env[BACKGROUND_CHILD_ENV] = "1"
+    child_env[BACKGROUND_PIDFILE_ENV] = str(resolved_pidfile)
 
     with resolved_log_file.open("ab") as log_handle:
         process = subprocess.Popen(
@@ -87,6 +89,7 @@ def _strip_background_flags(argv: list[str]) -> list[str]:
 
 __all__ = [
     "BACKGROUND_CHILD_ENV",
+    "BACKGROUND_PIDFILE_ENV",
     "RUN_BACKGROUND_FLAG",
     "BACKGROUND_LOG_FILE_FLAG",
     "BACKGROUND_PID_FILE_FLAG",

@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import os
 from argparse import Namespace
 from pathlib import Path
+
+import pytest
 
 from pypnm import cli
 
@@ -198,3 +201,24 @@ def test_run_serve_background_rejects_reload(monkeypatch) -> None:
 
     assert exit_code == cli.EXIT_CODE_USAGE
     assert uvicorn_called["value"] is False
+
+
+def test_run_serve_background_child_rewrites_pidfile(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pidfile = tmp_path / "pypnm.serve.pid"
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    monkeypatch.setenv(cli.BACKGROUND_CHILD_ENV, "1")
+    monkeypatch.setenv(cli.BACKGROUND_PIDFILE_ENV, str(pidfile))
+    monkeypatch.setattr(
+        cli,
+        "detect_worker_profile",
+        lambda: cli.WorkerProfile(cpu_count=4, total_memory_gib=16.0, workers=2, limit_max_requests=1000),
+    )
+    monkeypatch.setattr(cli.uvicorn, "run", lambda **_kwargs: None)
+
+    exit_code = cli._run_serve(_serve_args())
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert pidfile.read_text(encoding="utf-8").strip() == str(os.getpid())

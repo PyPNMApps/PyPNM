@@ -16,3 +16,32 @@
 ## Tools layout
 
 New tools should live in a category subdirectory under `tools/` (for example, `tools/pnm/`, `tools/snmp/`, `tools/build/`, `tools/local/`, `tools/maintenance/`, `tools/release/`, `tools/security/`). Avoid placing new scripts at the tools root.
+
+## Maintenance
+
+### tools/maintenance/kill-pypnm.py
+
+Lists active `pypnm` processes in a numbered table and supports terminating by table line number.
+This includes detached `pypnm serve --run-background` processes discovered from the runtime pidfile.
+
+```bash
+./tools/maintenance/kill-pypnm.py
+```
+
+```bash
+./tools/maintenance/kill-pypnm.py --line 1 3
+```
+
+```bash
+./tools/maintenance/kill-pypnm.py --all
+```
+
+Key options:
+- `--line <n ...>` kill specific rows from the displayed table
+- `--all` kill all active `pypnm` processes
+- `--signal <TERM|KILL|INT|...>` choose signal (default `TERM`)
+
+Display notes:
+- If `tabulate` is installed, the script uses markdown-style table rendering
+- If `tabulate` is not installed, the script falls back to plain fixed-width formatting
+- The `SOURCE` column shows whether a row came from a live process scan or the detached serve pidfile
