@@ -26,6 +26,9 @@ def _serve_args(**overrides: object) -> Namespace:
         "reload_dirs": [],
         "reload_includes": ["*.py"],
         "reload_excludes": ["*.pyc", "*__pycache__*", "*.tmp", "*.log"],
+        "run_background": False,
+        "background_log_file": "",
+        "background_pidfile": "",
     }
     base.update(overrides)
     return Namespace(**base)
@@ -147,3 +150,51 @@ def test_run_serve_auto_selects_hardware_profile_when_no_seed_exists(monkeypatch
         "[INFO] FastAPI runtime profile: workers=4 limit_max_requests=2000 source=hardware_auto"
         in captured.out
     )
+
+
+def test_run_serve_background_launches_detached_child(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    called: dict[str, object] = {}
+
+    def _fake_launch_background_serve(**kwargs: object) -> int:
+        called.update(kwargs)
+        return cli.SUCCESS_EXIT_CODE
+
+    uvicorn_called = {"value": False}
+
+    def fake_uvicorn_run(**_kwargs: object) -> None:
+        uvicorn_called["value"] = True
+
+    monkeypatch.setattr(cli, "launch_background_serve", _fake_launch_background_serve)
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    monkeypatch.setattr(cli.SystemConfigSettings, "runtime_dir", classmethod(lambda cls: "/tmp/pypnm-runtime"))
+
+    exit_code = cli._run_serve(
+        _serve_args(
+            run_background=True,
+            background_log_file="/tmp/pypnm.log",
+            background_pidfile="/tmp/pypnm.pid",
+        )
+    )
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert uvicorn_called["value"] is False
+    assert called["module_name"] == "pypnm.cli"
+    assert called["app_slug"] == "pypnm"
+    assert called["runtime_dir"] == "/tmp/pypnm-runtime"
+    assert called["log_file"] == "/tmp/pypnm.log"
+    assert called["pidfile"] == "/tmp/pypnm.pid"
+
+
+def test_run_serve_background_rejects_reload(monkeypatch) -> None:
+    uvicorn_called = {"value": False}
+
+    def fake_uvicorn_run(**_kwargs: object) -> None:
+        uvicorn_called["value"] = True
+
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+
+    exit_code = cli._run_serve(_serve_args(run_background=True, reload=True))
+
+    assert exit_code == cli.EXIT_CODE_USAGE
+    assert uvicorn_called["value"] is False

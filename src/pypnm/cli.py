@@ -13,6 +13,8 @@ from time import time
 import uvicorn
 
 from pypnm.config.runtime_flags import ENV_MUTE_TAGS, ENV_MUTE_TAGS_HARD
+from pypnm.config.system_config_settings import SystemConfigSettings
+from pypnm.support.serve_background import launch_background_serve
 from pypnm.support.worker_profile import (
     WorkerProfile,
     default_profile_env_path,
@@ -192,6 +194,21 @@ def _build_parser() -> argparse.ArgumentParser:
         default=["*.pyc", "*__pycache__*", "*.tmp", "*.log"],
         help="Glob pattern(s) to exclude from reload (repeatable).",
     )
+    serve_parser.add_argument(
+        "--run-background",
+        action="store_true",
+        help="Detach the FastAPI service into the background and return the child PID.",
+    )
+    serve_parser.add_argument(
+        "--background-log-file",
+        default="",
+        help="Optional log file path for --run-background.",
+    )
+    serve_parser.add_argument(
+        "--background-pidfile",
+        default="",
+        help="Optional pidfile path for --run-background.",
+    )
 
     subparsers.add_parser("config-menu", help="Launch the interactive system.json configuration menu.")
 
@@ -200,12 +217,30 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _run_serve(args: argparse.Namespace) -> int:
+    run_background = bool(getattr(args, "run_background", False))
+    background_log_file = str(getattr(args, "background_log_file", "")).strip()
+    background_pidfile = str(getattr(args, "background_pidfile", "")).strip()
+
+    if run_background and bool(args.reload):
+        print("[ERROR] --run-background cannot be used with --reload")
+        return EXIT_CODE_USAGE
+
     if args.ssl:
         print(f"🔒 Launching FastAPI with HTTPS on https://{args.host}:{args.port}")
     else:
         print(f"🌐 Launching FastAPI with HTTP on http://{args.host}:{args.port}")
 
     _sanitize_pythonpath_for_serve()
+
+    if run_background:
+        return launch_background_serve(
+            module_name="pypnm.cli",
+            app_slug="pypnm",
+            runtime_dir=SystemConfigSettings.runtime_dir(),
+            argv=sys.argv[1:],
+            log_file=background_log_file,
+            pidfile=background_pidfile,
+        )
 
     if str(args.mute_tags).strip() != "":
         os.environ[ENV_MUTE_TAGS] = str(args.mute_tags).strip()

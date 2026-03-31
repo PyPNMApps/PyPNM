@@ -38,6 +38,9 @@ Common options:
 - `--reload-dir` (repeatable)
 - `--reload-include` (repeatable)
 - `--reload-exclude` (repeatable)
+- `--run-background`
+- `--background-log-file`
+- `--background-pidfile`
 - `--mute-tags`
 - `--mute-tags-hard`
 
@@ -48,6 +51,8 @@ pypnm serve
 pypnm serve --host 0.0.0.0 --port 8080
 pypnm serve --reload
 pypnm serve --workers 4 --limit-max-requests 2000
+pypnm serve --run-background
+pypnm serve --run-background --background-log-file /var/log/pypnm.log --background-pidfile /var/run/pypnm.pid
 pypnm serve --ssl --cert ./certs/cert.pem --key ./certs/key.pem
 pypnm serve --mute-tags "PNM Operations - Multi-Downstream OFDM RxMER"
 pypnm serve --mute-tags "Orchestrator,Operational" --mute-tags-hard
@@ -56,6 +61,8 @@ pypnm serve --mute-tags "Orchestrator,Operational" --mute-tags-hard
 Notes:
 
 - When `--reload` is enabled, `--workers` is forced to `1`.
+- `--run-background` detaches the service, writes a pidfile, and redirects stdout/stderr to a log file.
+- `--run-background` cannot be used with `--reload`.
 - `--limit-max-requests` passes Uvicorn's worker recycle threshold through to the serve runtime.
 - For production memory safety, prefer multiple workers with a non-zero `--limit-max-requests` instead of `--reload`.
 - See [PyPNM Worker Sizing](worker-sizing.md) for CPU and memory-based defaults by hardware profile.
