@@ -14,6 +14,7 @@ from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
 from pypnm.pnm.parser.CmDsOfdmFecSummary import CmDsOfdmFecSummary
 from pypnm.pnm.parser.CmDsOfdmModulationProfile import CmDsOfdmModulationProfile
 from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer
+from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalysis
 from pypnm.pnm.parser.pnm_file_type import PnmFileType
 from pypnm.pnm.parser.pnm_parameter import GetPnmParserAndParameters
 
@@ -27,7 +28,7 @@ CASES = [
     ("modulation_profile.bin", True,  CmDsOfdmModulationProfile),
     ("rxmer.bin",              True,  CmDsOfdmRxMer),
     ("histogram.bin",          True,  CmDsHist),
-    ("spectrum_analyzer.bin",  False, None),
+    ("spectrum_analyzer.bin",  True,  CmSpectrumAnalysis),
 ]
 
 

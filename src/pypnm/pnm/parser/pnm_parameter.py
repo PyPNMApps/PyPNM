@@ -16,11 +16,12 @@ from pypnm.pnm.parser.CmDsOfdmChanEstimateCoef import CmDsOfdmChanEstimateCoef
 from pypnm.pnm.parser.CmDsOfdmFecSummary import CmDsOfdmFecSummary
 from pypnm.pnm.parser.CmDsOfdmModulationProfile import CmDsOfdmModulationProfile
 from pypnm.pnm.parser.CmDsOfdmRxMer import CmDsOfdmRxMer
+from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalysis
 from pypnm.pnm.parser.CmUsOfdmaPreEq import CmUsOfdmaPreEq
 from pypnm.pnm.parser.pnm_file_type import PnmFileType
 from pypnm.pnm.parser.pnm_header import PnmHeader
 
-PnmParsers = CmDsConstDispMeas | CmDsOfdmChanEstimateCoef | CmDsOfdmFecSummary | CmDsOfdmRxMer | CmUsOfdmaPreEq | CmDsHist
+PnmParsers = CmDsConstDispMeas | CmDsOfdmChanEstimateCoef | CmDsOfdmFecSummary | CmDsOfdmRxMer | CmSpectrumAnalysis | CmUsOfdmaPreEq | CmDsHist
 
 class PnmParserParametersModel(BaseModel):
     file_type: PnmFileType     = Field(..., description="PNM file type enum (e.g., PNN2, PNN3, ...).")
@@ -218,9 +219,9 @@ class GetPnmParserAndParameters(PnmHeader):
         """Latency report parser (not implemented)."""
         raise NotImplementedError("Latency report parsing not implemented.")
 
-    def _process_spectrum_analysis(self) -> NoReturn:
-        """Spectrum analysis parser (not implemented)."""
-        raise NotImplementedError("Spectrum analysis parsing not implemented.")
+    def _process_spectrum_analysis(self) -> CmSpectrumAnalysis:
+        """Spectrum analysis parser."""
+        return CmSpectrumAnalysis(self.byte_stream)
 
     """This method may never be implemented by CableLabs, no real intrest from operators"""
     def _process_symbol_capture(self) -> NoReturn:
