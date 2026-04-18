@@ -22,9 +22,13 @@ from pypnm.api.routes.basic.modulation_profile_analysis_rpt import (
     ModulationProfileReport,
 )
 from pypnm.api.routes.basic.rxmer_analysis_rpt import RxMerAnalysisReport
+from pypnm.api.routes.basic.spec_analyzer_analysis_rpt import SpectrumAnalyzerReport
 from pypnm.api.routes.basic.us_ofdma_pre_eq_analysis_rpt import CmUsOfdmaPreEqReport
 from pypnm.api.routes.common.classes.analysis.model.schema import (
     ParserAnalysisModelReturn,
+)
+from pypnm.api.routes.common.classes.analysis.model.spectrum_analyzer_schema import (
+    SpectrumAnalyzerAnalysisModel,
 )
 from pypnm.api.routes.common.classes.file_capture.file_type import FileType
 from pypnm.api.routes.common.classes.file_capture.pnm_file_opearation import (
@@ -58,6 +62,7 @@ from pypnm.lib.types import (
 )
 from pypnm.lib.utils import Generate
 from pypnm.pnm.lib.pnm_artifact_store import PnmArtifactStore
+from pypnm.pnm.parser.CmSpectrumAnalysis import CmSpectrumAnalyzerModel
 from pypnm.pnm.parser.model.parser_rtn_models import (
     CmDsConstDispMeasModel,
     CmDsHistModel,
@@ -398,7 +403,7 @@ class PnmFileService:
             media_type  =   media_type,
         )
 
-    def get_analysis(self, req: FileAnalysisRequest) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
+    def get_analysis(self, req: FileAnalysisRequest) -> tuple[ParserAnalysisModelReturn | SpectrumAnalyzerAnalysisModel, PnmFileType]:
         """
         Returns basic analysis result for a stored PNM file identified by transaction ID.
         The analysis performed depends on the PNM file type.
@@ -530,7 +535,11 @@ class PnmFileService:
             lines          = lines,
         )
 
-    def __get_analysis(self, parser: PnmParsers, model:PnmParserParametersModel) -> tuple[ParserAnalysisModelReturn, PnmFileType]:
+    def __get_analysis(
+        self,
+        parser: PnmParsers,
+        model: PnmParserParametersModel,
+    ) -> tuple[ParserAnalysisModelReturn | SpectrumAnalyzerAnalysisModel, PnmFileType]:
         """
         Internal method to instantiate the Analysis class with the given parser and model.
         """
@@ -552,6 +561,11 @@ class PnmFileService:
 
         elif model.file_type == PnmFileType.OFDM_FEC_SUMMARY:
             return Analysis.basic_analysis_ds_ofdm_fec_summary_from_model(cast(CmDsOfdmFecSummaryModel, parser.to_model())), model.file_type
+
+        elif model.file_type == PnmFileType.SPECTRUM_ANALYSIS:
+            measurement = cast(CmSpectrumAnalyzerModel, parser.to_model()).model_dump()
+            measurement["device_details"] = {}
+            return Analysis.basic_analysis_spectrum_analyzer(measurement, None), model.file_type
 
         elif model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS or model.file_type == PnmFileType.UPSTREAM_PRE_EQUALIZER_COEFFICIENTS_LAST_UPDATE:
             return Analysis.basic_analysis_us_ofdma_pre_equalization_from_model(cast(CmUsOfdmaPreEqModel, parser.to_model())), model.file_type
@@ -598,6 +612,10 @@ class PnmFileService:
             plot_config = ConstDisplayAnalysisRptMatplotConfig(theme = theme)
             analysis_rpt = FecSummaryAnalysisReport(analysis, plot_config)
             rpt: Path = cast(Path, analysis_rpt.build_report())
+
+        elif pnm_ftype == PnmFileType.SPECTRUM_ANALYSIS:
+            analysis_rpt = SpectrumAnalyzerReport(analysis, plot_config)
+            rpt = cast(Path, analysis_rpt.build_report())
 
         return PnmFileService().get_file(FileType.ARCHIVE, rpt.name)
 
