@@ -171,8 +171,6 @@ def _run(
 
 # Simple status printer with color for TTY output
 def _colorize(text: str, color: str) -> str:
-    if not sys.stdout.isatty():
-        return text
     codes = {
         "green": "\033[32m",
         "red": "\033[31m",
