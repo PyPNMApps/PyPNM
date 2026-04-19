@@ -28,6 +28,7 @@ Starts the FastAPI service (`pypnm.api.main:app`) through Uvicorn.
 Common options:
 
 - `--host` (default `127.0.0.1`)
+- `--host-all` (bind to `0.0.0.0`)
 - `--port` (default `8000`)
 - `--ssl`, `--cert`, `--key`
 - `--log-level {critical,error,warning,info,debug,trace}`
@@ -48,7 +49,7 @@ Examples:
 
 ```bash
 pypnm serve
-pypnm serve --host 0.0.0.0 --port 8080
+pypnm serve --host-all --port 8080
 pypnm serve --reload
 pypnm serve --workers 4 --limit-max-requests 2000
 pypnm serve --run-background
@@ -60,6 +61,8 @@ pypnm serve --mute-tags "Orchestrator,Operational" --mute-tags-hard
 
 Notes:
 
+- `--host-all` is a convenience alias for binding on all IPv4 interfaces assigned to the host.
+- Use `--host <ip-or-name>` when you want to bind to one specific interface or address.
 - When `--reload` is enabled, `--workers` is forced to `1`.
 - `--run-background` detaches the service, writes a pidfile, and redirects stdout/stderr to a log file.
 - `--run-background` cannot be used with `--reload`.
@@ -98,5 +101,5 @@ New:
 
 ```bash
 pypnm serve --reload
-pypnm serve --host 0.0.0.0 --port 8000
+pypnm serve --host-all --port 8000
 ```

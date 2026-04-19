@@ -41,6 +41,7 @@ LOG_LEVEL_DEFAULT = "info"
 DEFAULT_WORKERS = 1
 TIMEOUT_KEEP_ALIVE_SECONDS = 120
 DEFAULT_LIMIT_MAX_REQUESTS = 0
+ALL_INTERFACES_HOST = "0.0.0.0"
 
 
 def _runtime_profile_selection_message(workers: int, limit_max_requests: int) -> str:
@@ -115,6 +116,10 @@ def _sanitize_pythonpath_for_serve() -> None:
     os.environ["PYTHONPATH"] = src_path
 
 
+def _resolve_bind_host(args: argparse.Namespace) -> str:
+    return ALL_INTERFACES_HOST if bool(getattr(args, "host_all", False)) else str(args.host)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="PyPNM CLI for service startup and system configuration.",
@@ -140,7 +145,13 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     serve_parser = subparsers.add_parser("serve", help="Start the FastAPI service (Uvicorn).")
-    serve_parser.add_argument("--host", default=HOST_DEFAULT, help=f"Host to bind (default: {HOST_DEFAULT})")
+    host_group = serve_parser.add_mutually_exclusive_group()
+    host_group.add_argument("--host", default=HOST_DEFAULT, help=f"Host to bind (default: {HOST_DEFAULT})")
+    host_group.add_argument(
+        "--host-all",
+        action="store_true",
+        help=f"Bind on all IPv4 interfaces ({ALL_INTERFACES_HOST}).",
+    )
     serve_parser.add_argument("--port", default=PORT_DEFAULT, type=int, help=f"Port to bind (default: {PORT_DEFAULT})")
     serve_parser.add_argument("--ssl", action="store_true", help="Enable HTTPS (requires cert and key).")
     serve_parser.add_argument("--cert", default="./certs/cert.pem", help="Path to SSL certificate (PEM).")
@@ -230,6 +241,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _run_serve(args: argparse.Namespace) -> int:
+    bind_host = _resolve_bind_host(args)
     run_background = bool(getattr(args, "run_background", False))
     background_log_file = str(getattr(args, "background_log_file", "")).strip()
     background_pidfile = str(getattr(args, "background_pidfile", "")).strip()
@@ -239,9 +251,9 @@ def _run_serve(args: argparse.Namespace) -> int:
         return EXIT_CODE_USAGE
 
     if args.ssl:
-        print(f"🔒 Launching FastAPI with HTTPS on https://{args.host}:{args.port}")
+        print(f"🔒 Launching FastAPI with HTTPS on https://{bind_host}:{args.port}")
     else:
-        print(f"🌐 Launching FastAPI with HTTP on http://{args.host}:{args.port}")
+        print(f"🌐 Launching FastAPI with HTTP on http://{bind_host}:{args.port}")
 
     _sanitize_pythonpath_for_serve()
 
@@ -269,7 +281,7 @@ def _run_serve(args: argparse.Namespace) -> int:
 
     uvicorn_args = {
         "app": "pypnm.api.main:app",
-        "host": args.host,
+        "host": bind_host,
         "port": args.port,
         "timeout_keep_alive": TIMEOUT_KEEP_ALIVE_SECONDS,
         "log_level": args.log_level,

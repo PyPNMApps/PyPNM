@@ -15,6 +15,7 @@ from pypnm import cli
 def _serve_args(**overrides: object) -> Namespace:
     base = {
         "host": "127.0.0.1",
+        "host_all": False,
         "port": 8000,
         "ssl": False,
         "cert": "./certs/cert.pem",
@@ -56,6 +57,38 @@ def test_run_serve_passes_limit_max_requests(monkeypatch) -> None:
     assert exit_code == cli.SUCCESS_EXIT_CODE
     assert recorded["limit_max_requests"] == 1000
     assert recorded["workers"] == 2
+
+
+def test_run_serve_host_all_binds_all_ipv4_interfaces(monkeypatch, capsys) -> None:
+    recorded: dict[str, object] = {}
+
+    def fake_uvicorn_run(**kwargs: object) -> None:
+        recorded.update(kwargs)
+
+    monkeypatch.setattr(cli, "_sanitize_pythonpath_for_serve", lambda: None)
+    monkeypatch.setattr(cli.uvicorn, "run", fake_uvicorn_run)
+    monkeypatch.setattr(
+        cli,
+        "detect_worker_profile",
+        lambda: cli.WorkerProfile(cpu_count=4, total_memory_gib=16.0, workers=2, limit_max_requests=1000),
+    )
+
+    exit_code = cli._run_serve(_serve_args(host_all=True))
+    captured = capsys.readouterr()
+
+    assert exit_code == cli.SUCCESS_EXIT_CODE
+    assert recorded["host"] == cli.ALL_INTERFACES_HOST
+    assert f"http://{cli.ALL_INTERFACES_HOST}:8000" in captured.out
+
+
+def test_build_parser_host_all_sets_all_interfaces_host() -> None:
+    parser = cli._build_parser()
+
+    args = parser.parse_args(["serve", "--host-all"])
+
+    assert args.command == "serve"
+    assert args.host_all is True
+    assert cli._resolve_bind_host(args) == cli.ALL_INTERFACES_HOST
 
 
 def test_run_serve_rejects_negative_limit_max_requests(monkeypatch) -> None:

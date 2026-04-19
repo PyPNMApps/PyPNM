@@ -92,13 +92,13 @@ Suggested memory guardrails:
 
 ```bash
 # Small node
-pypnm serve --host 0.0.0.0 --port 8000 --workers 1 --limit-max-requests 1000
+pypnm serve --host-all --port 8000 --workers 1 --limit-max-requests 1000
 
 # Standard production node
-pypnm serve --host 0.0.0.0 --port 8000 --workers 4 --limit-max-requests 2000
+pypnm serve --host-all --port 8000 --workers 4 --limit-max-requests 2000
 
 # Higher-capacity node with proven concurrency need
-pypnm serve --host 0.0.0.0 --port 8000 --workers 6 --limit-max-requests 2000
+pypnm serve --host-all --port 8000 --workers 6 --limit-max-requests 2000
 ```
 
 ## Practical Guidance

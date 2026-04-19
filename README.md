@@ -206,6 +206,18 @@ HTTP (default: `http://127.0.0.1:8000`):
   pypnm serve
   ```
 
+Expose PyPNM on all IPv4 interfaces assigned to the host:
+
+  ```bash
+  pypnm serve --host-all
+  ```
+
+Bind to one specific interface or address:
+
+  ```bash
+  pypnm serve --host 192.168.1.20
+  ```
+
 Development hot-reload:
 
   ```bash
